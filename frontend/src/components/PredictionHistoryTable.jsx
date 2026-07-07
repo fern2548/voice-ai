@@ -67,7 +67,7 @@ export default function PredictionHistoryTable() {
     60000,
     `${page}-${hours}`
   )
-  const rows = data?.rows ?? []
+  const rows = Array.isArray(data?.rows) ? data.rows : []
   const total = data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -97,7 +97,7 @@ export default function PredictionHistoryTable() {
             onClick={() => exportCsv(rows)}
             disabled={rows.length === 0}
           >
-            ⬇ Export CSV (หน้านี้)
+            <i className="ti ti-download" aria-hidden="true" style={{ marginRight: 5 }} />Export CSV (หน้านี้)
           </button>
         </div>
       </div>
@@ -108,11 +108,11 @@ export default function PredictionHistoryTable() {
             <tr>
               <th>เวลาที่ทำนาย</th>
               <th>ทำนายสำหรับ</th>
-              <th>🌡️ อุณหภูมิ<span className="th-unit">ทำนาย / จริง / Δ</span></th>
-              <th>💧 ความชื้น<span className="th-unit">ทำนาย / จริง / Δ</span></th>
-              <th>💨 ลม<span className="th-unit">ทำนาย / จริง / Δ</span></th>
-              <th>🌧️ ฝน<span className="th-unit">ทำนาย / จริง / Δ</span></th>
-              <th>☀️ แสง<span className="th-unit">ทำนาย / จริง / Δ</span></th>
+              <th><i className="ti ti-temperature" aria-hidden="true" /> อุณหภูมิ<span className="th-unit">ทำนาย / จริง / Δ</span></th>
+              <th><i className="ti ti-droplet" aria-hidden="true" /> ความชื้น<span className="th-unit">ทำนาย / จริง / Δ</span></th>
+              <th><i className="ti ti-wind" aria-hidden="true" /> ลม<span className="th-unit">ทำนาย / จริง / Δ</span></th>
+              <th><i className="ti ti-cloud-rain" aria-hidden="true" /> ฝน<span className="th-unit">ทำนาย / จริง / Δ</span></th>
+              <th><i className="ti ti-sun" aria-hidden="true" /> แสง<span className="th-unit">ทำนาย / จริง / Δ</span></th>
             </tr>
           </thead>
           <tbody>

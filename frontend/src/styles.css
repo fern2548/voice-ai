@@ -1,24 +1,25 @@
 /* ============ SCADA Dashboard Theme ============ */
 :root {
-  --radius: 10px;
-  --font: 'Segoe UI', 'Inter', system-ui, sans-serif;
-  --mono: 'Consolas', 'SF Mono', 'Roboto Mono', monospace;
+  --radius: 8px;
+  --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Consolas', 'SF Mono', monospace;
 }
 
-/* ---- Dark (default) ---- */
+/* ---- Dark (default) — GitHub-dark SCADA palette ---- */
 :root, [data-theme='dark'] {
-  --bg: #0a0e14;
-  --bg-grid: rgba(255, 255, 255, 0.02);
-  --panel: #131a24;
-  --panel-2: #1a2430;
-  --border: #263340;
+  --bg: #0d1117;
+  --bg-grid: rgba(255, 255, 255, 0.018);
+  --panel: #161b22;
+  --panel-2: #1c2333;
+  --panel-3: #232b3d;
+  --border: #30363d;
   --border-soft: rgba(255, 255, 255, 0.06);
   --text: #e6edf3;
-  --text-dim: #7d8b99;
-  --accent: #00d9ff;
-  --accent-2: #00ff9c;
-  --warn: #ffb800;
-  --danger: #ff4d5b;
+  --text-dim: #8b949e;
+  --accent: #39c5cf;
+  --accent-2: #3fb950;
+  --warn: #d29922;
+  --danger: #f85149;
   --grid-line: rgba(255, 255, 255, 0.06);
   --gauge-track: rgba(255, 255, 255, 0.08);
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -26,18 +27,19 @@
 
 /* ---- Light ---- */
 [data-theme='light'] {
-  --bg: #e9eef3;
+  --bg: #f4f6f9;
   --bg-grid: rgba(0, 0, 0, 0.015);
   --panel: #ffffff;
-  --panel-2: #f2f6fa;
-  --border: #d3dde5;
+  --panel-2: #f0f2f5;
+  --panel-3: #e6e9ee;
+  --border: #dde1e7;
   --border-soft: rgba(0, 0, 0, 0.06);
-  --text: #16222e;
-  --text-dim: #5f7080;
-  --accent: #0088cc;
-  --accent-2: #00a86b;
-  --warn: #d98c00;
-  --danger: #d83341;
+  --text: #1a1f2e;
+  --text-dim: #5a6272;
+  --accent: #0e7490;
+  --accent-2: #1a7f37;
+  --warn: #9a6700;
+  --danger: #cf222e;
   --grid-line: rgba(0, 0, 0, 0.08);
   --gauge-track: rgba(0, 0, 0, 0.08);
   --shadow: 0 4px 18px rgba(60, 80, 100, 0.12);
@@ -56,6 +58,20 @@ body {
 }
 
 button { font-family: var(--font); cursor: pointer; border: none; }
+
+/* Tabler icon defaults */
+.ti { line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  width: 38px; height: 38px;
+  font-size: 17px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ============ Layout ============ */
 .scada-root {
@@ -160,9 +176,11 @@ button { font-family: var(--font); cursor: pointer; border: none; }
   color: var(--text-dim);
   font-size: 14px;
   text-align: left;
+  text-decoration: none;
   border-left: 3px solid transparent;
   transition: all 0.15s;
   white-space: nowrap;
+  cursor: pointer;
 }
 .nav-item:hover { background: var(--panel-2); color: var(--text); }
 .nav-item.active {
@@ -234,7 +252,11 @@ button { font-family: var(--font); cursor: pointer; border: none; }
   border: 1px solid var(--accent-2);
   border-radius: 4px;
   padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
+.panel-tag.est { color: var(--warn); border-color: var(--warn); }
 .panel-foot {
   padding: 9px 18px;
   font-size: 11px;
@@ -249,6 +271,87 @@ button { font-family: var(--font); cursor: pointer; border: none; }
   margin-left: auto;
   margin-right: 12px;
 }
+.reading-time.stale { color: var(--danger); }
+
+/* ============ Alert stack (ลอยกลางบน ไม่ทับกัน) ============ */
+.alert-stack {
+  position: fixed;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+}
+
+/* ============ Sensor alert (data ขาดหาย) ============ */
+.sensor-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  border-left: 4px solid var(--danger);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+  animation: alert-drop 0.2s ease;
+}
+.sensor-alert > .ti { font-size: 20px; color: var(--danger); flex-shrink: 0; margin-top: 1px; }
+.sensor-alert-text { flex: 1; min-width: 0; }
+.sensor-alert-title { font-size: 13px; font-weight: 700; color: var(--danger); }
+.sensor-alert-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+.sensor-alert-close {
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.sensor-alert-close:hover { color: var(--text); background: var(--panel-2); }
+
+/* variant: ต่อ backend ไม่ได้ (ใช้สีเหลือง แยกจาก sensor stale สีแดง) */
+.sensor-alert.conn {
+  border-color: rgba(210, 153, 34, 0.4);
+  border-left-color: var(--warn);
+}
+.sensor-alert.conn > .ti { color: var(--warn); }
+.sensor-alert.conn .sensor-alert-title { color: var(--warn); }
+
+@keyframes alert-drop {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ Tab bar (สลับโหมดในหน้า) ============ */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  align-self: flex-start;
+}
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  transition: background 0.15s, color 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.on { background: var(--panel-2); color: var(--accent); }
+.tab-btn .ti { font-size: 15px; }
 
 /* range bar + pagination */
 .head-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -304,7 +407,7 @@ button { font-family: var(--font); cursor: pointer; border: none; }
 .led-warn { background: var(--warn); box-shadow: 0 0 7px var(--warn); }
 .led-danger { background: var(--danger); box-shadow: 0 0 7px var(--danger); animation: blink 1s infinite; }
 
-.metric-icon { font-size: 22px; margin-bottom: 6px; }
+.metric-icon { font-size: 22px; margin-bottom: 6px; color: var(--accent); }
 .metric-label { font-size: 12.5px; color: var(--text-dim); margin-bottom: 8px; }
 .metric-value { font-size: 28px; font-weight: 700; font-family: var(--mono); color: var(--text); }
 .metric-unit { font-size: 12px; color: var(--text-dim); font-weight: 400; margin-left: 4px; }
@@ -378,16 +481,38 @@ button { font-family: var(--font); cursor: pointer; border: none; }
 .btn-export:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ============ Chat ============ */
-.chat-answer {
+.chat-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.chat-msg {
+  max-width: 85%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-msg.model {
+  align-self: flex-start;
   background: var(--panel-2);
   border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 16px;
-  min-height: 70px;
-  line-height: 1.6;
   color: var(--text);
-  margin: 16px 18px;
+  border-bottom-left-radius: 4px;
 }
+.chat-msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #04121a;
+  font-weight: 500;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg.dim { opacity: 0.6; font-style: italic; }
 .input-row { display: flex; gap: 10px; padding: 0 18px 18px; }
 .chat-input {
   flex: 1;

@@ -4,8 +4,8 @@ export default function SettingsPanel() {
   const { theme, setTheme } = useTheme()
 
   const options = [
-    { id: 'dark', label: 'Dark Industrial', desc: 'พื้นเข้ม เหมาะห้องควบคุม', swatch: '#0a0e14' },
-    { id: 'light', label: 'Light Control Room', desc: 'พื้นสว่าง เหมาะกลางวัน', swatch: '#eef2f6' },
+    { id: 'dark', label: 'Dark Industrial', desc: 'พื้นเข้ม เหมาะห้องควบคุม', swatch: '#0d1117' },
+    { id: 'light', label: 'Light Control Room', desc: 'พื้นสว่าง เหมาะกลางวัน', swatch: '#f4f6f9' },
   ]
 
   return (
@@ -28,7 +28,7 @@ export default function SettingsPanel() {
                 <span className="theme-opt-name">{o.label}</span>
                 <span className="theme-opt-desc">{o.desc}</span>
               </span>
-              {theme === o.id && <span className="theme-check">✓</span>}
+              {theme === o.id && <span className="theme-check"><i className="ti ti-check" aria-hidden="true" /></span>}
             </button>
           ))}
         </div>

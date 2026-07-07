@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTheme } from '../../theme.jsx'
-import usePolling from '../../hooks/usePolling.js'
-import { getWeather } from '../../api.js'
+import { useLiveData } from '../../context/LiveData.jsx'
 
 function useClock() {
   const [now, setNow] = useState(new Date())
@@ -15,14 +14,14 @@ function useClock() {
 export default function StatusBar() {
   const { theme, toggle } = useTheme()
   const now = useClock()
-  // ใช้ผลการดึง /weather เป็นตัวชี้สถานะการเชื่อมต่อ
-  const { updatedAt } = usePolling(getWeather, 30000)
-  const online = updatedAt && Date.now() - updatedAt.getTime() < 90000
+  // ใช้ /health เป็นตัวชี้สถานะการเชื่อมต่อ backend + DB
+  const { health, healthError } = useLiveData()
+  const online = !healthError && health?.db === true
 
   return (
     <header className="statusbar">
       <div className="sb-left">
-        <div className="sb-logo">◈</div>
+        <div className="sb-logo"><i className="ti ti-cloud-bolt" aria-hidden="true" /></div>
         <div>
           <div className="sb-title">WEATHER STATION AI</div>
           <div className="sb-sub">SCADA MONITORING · SARABURI FARM</div>
@@ -45,7 +44,7 @@ export default function StatusBar() {
           </div>
         </div>
         <button className="theme-btn" onClick={toggle} title="สลับธีม">
-          {theme === 'dark' ? '☀️' : '🌙'}
+          <i className={`ti ${theme === 'dark' ? 'ti-sun' : 'ti-moon'}`} aria-hidden="true" />
         </button>
       </div>
     </header>

@@ -1,21 +1,25 @@
 import { useState } from 'react'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import StatusBar from './components/scada/StatusBar.jsx'
-import MetricGauges from './components/scada/MetricGauges.jsx'
-import TrendChart from './components/scada/TrendChart.jsx'
-import SettingsPanel from './components/scada/SettingsPanel.jsx'
-import PredictTable from './components/PredictTable.jsx'
-import PredictionHistoryTable from './components/PredictionHistoryTable.jsx'
 import ChatWidget from './components/ChatWidget.jsx'
+import SensorAlert from './components/SensorAlert.jsx'
+import ConnectionAlert from './components/ConnectionAlert.jsx'
+import OverviewPage from './pages/OverviewPage.jsx'
+import ForecastPage from './pages/ForecastPage.jsx'
+import TrendComparePage from './pages/TrendComparePage.jsx'
+import HistoryPage from './pages/HistoryPage.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
 
 const NAV = [
-  { id: 'overview', icon: '▣', label: 'Overview' },
-  { id: 'forecast', icon: '◈', label: 'Forecast' },
-  { id: 'accuracy', icon: '▤', label: 'History' },
-  { id: 'settings', icon: '⚙', label: 'Settings' },
+  { to: '/overview', icon: 'ti-layout-dashboard', label: 'Overview' },
+  { to: '/forecast', icon: 'ti-cloud', label: 'Forecast' },
+  { to: '/trend', icon: 'ti-chart-line', label: 'Predictive Insights' },
+  { to: '/history', icon: 'ti-history', label: 'History' },
+  { to: '/settings', icon: 'ti-settings', label: 'Settings' },
 ]
 
 export default function App() {
-  const [page, setPage] = useState('overview')
+  const location = useLocation()
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('nav-collapsed') === '1'
   )
@@ -31,38 +35,42 @@ export default function App() {
   return (
     <div className={`scada-root ${collapsed ? 'nav-collapsed' : ''}`}>
       <StatusBar />
+      <div className="alert-stack">
+        <ConnectionAlert />
+        <SensorAlert />
+      </div>
 
       <nav className="nav-rail">
         {NAV.map((n) => (
-          <button
-            key={n.id}
-            className={`nav-item ${page === n.id ? 'active' : ''}`}
-            onClick={() => setPage(n.id)}
+          <Link
+            key={n.to}
+            to={n.to}
+            className={`nav-item ${location.pathname === n.to ? 'active' : ''}`}
             title={n.label}
           >
-            <span className="nav-icon">{n.icon}</span>
+            <span className="nav-icon"><i className={`ti ${n.icon}`} aria-hidden="true" /></span>
             <span className="nav-label">{n.label}</span>
-          </button>
+          </Link>
         ))}
         <button
           className="nav-toggle"
           onClick={toggleCollapsed}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? '»' : '«'}
+          <i className={`ti ${collapsed ? 'ti-chevrons-right' : 'ti-chevrons-left'}`} aria-hidden="true" />
         </button>
       </nav>
 
       <main className="scada-main">
-        {page === 'overview' && (
-          <>
-            <MetricGauges />
-            <TrendChart />
-          </>
-        )}
-        {page === 'forecast' && <PredictTable />}
-        {page === 'accuracy' && <PredictionHistoryTable />}
-        {page === 'settings' && <SettingsPanel />}
+        <Routes>
+          <Route path="/" element={<Navigate to="/overview" replace />} />
+          <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/forecast" element={<ForecastPage />} />
+          <Route path="/trend" element={<TrendComparePage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/overview" replace />} />
+        </Routes>
       </main>
 
       <ChatWidget />

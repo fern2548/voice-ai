@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { askAI } from '../api.js'
 
 function speak(text) {
@@ -8,19 +8,45 @@ function speak(text) {
   window.speechSynthesis.speak(u)
 }
 
+// ส่งประวัติแค่ไม่กี่เทิร์นล่าสุดให้ backend (backend ก็ตัดซ้ำอีกชั้น) — ประหยัด token/TPM
+const SEND_TURNS = 6 // = 3 คู่ถาม-ตอบล่าสุด
+
+const GREETING = { role: 'model', text: 'สวัสดีครับ! ถามเรื่องสภาพอากาศได้เลยครับ' }
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
   const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('สวัสดีครับ! ถามเรื่องสภาพอากาศได้เลยครับ')
+  const [messages, setMessages] = useState([GREETING])
   const [listening, setListening] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const scrollRef = useRef(null)
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [messages, open])
 
   const ask = async (text) => {
     const q = (text ?? question).trim()
-    if (!q) return
-    setAnswer('กำลังคิด…')
-    const d = await askAI(q)
-    setAnswer(d.answer)
-    speak(d.answer)
+    if (!q || busy) return
+    setQuestion('')
+    setBusy(true)
+
+    // ประวัติที่ส่งไป = บทสนทนาก่อนหน้า (ไม่รวมข้อความทักทายเริ่มต้น) เอาแค่ SEND_TURNS ล่าสุด
+    const history = messages
+      .filter((m) => m !== GREETING)
+      .slice(-SEND_TURNS)
+      .map(({ role, text }) => ({ role, text }))
+
+    setMessages((prev) => [...prev, { role: 'user', text: q }])
+    try {
+      const d = await askAI(q, history)
+      setMessages((prev) => [...prev, { role: 'model', text: d.answer }])
+      speak(d.answer)
+    } catch {
+      setMessages((prev) => [...prev, { role: 'model', text: 'ขออภัยครับ ตอนนี้เชื่อมต่อระบบไม่ได้ ลองใหม่อีกครั้งนะครับ' }])
+    } finally {
+      setBusy(false)
+    }
   }
 
   const startVoice = () => {
@@ -48,10 +74,17 @@ export default function ChatWidget() {
       {open && (
         <div className="chat-pop">
           <div className="chat-pop-head">
-            <span>🤖 ผู้ช่วย AI</span>
-            <button className="chat-pop-close" onClick={() => setOpen(false)}>✕</button>
+            <span><i className="ti ti-robot" aria-hidden="true" style={{ marginRight: 6 }} />ผู้ช่วย AI</span>
+            <button className="chat-pop-close" onClick={() => setOpen(false)} aria-label="ปิด">
+              <i className="ti ti-x" aria-hidden="true" />
+            </button>
           </div>
-          <div className="chat-answer">{answer}</div>
+          <div className="chat-thread" ref={scrollRef}>
+            {messages.map((m, i) => (
+              <div key={i} className={`chat-msg ${m.role}`}>{m.text}</div>
+            ))}
+            {busy && <div className="chat-msg model dim">กำลังคิด…</div>}
+          </div>
           <div className="input-row">
             <input
               className="chat-input"
@@ -64,10 +97,11 @@ export default function ChatWidget() {
             <button
               className={`mic-btn ${listening ? 'listening' : ''}`}
               onClick={startVoice}
+              aria-label="พูด"
             >
-              🎤
+              <i className="ti ti-microphone" aria-hidden="true" />
             </button>
-            <button className="ask-btn" onClick={() => ask()}>ถาม</button>
+            <button className="ask-btn" onClick={() => ask()} disabled={busy}>ถาม</button>
           </div>
         </div>
       )}
@@ -75,8 +109,9 @@ export default function ChatWidget() {
         className={`chat-fab ${open ? 'open' : ''}`}
         onClick={() => setOpen((o) => !o)}
         title="ผู้ช่วย AI"
+        aria-label="ผู้ช่วย AI"
       >
-        {open ? '✕' : '🤖'}
+        <i className={`ti ${open ? 'ti-x' : 'ti-message-chatbot'}`} aria-hidden="true" />
       </button>
     </>
   )

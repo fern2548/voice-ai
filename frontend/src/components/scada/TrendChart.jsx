@@ -22,7 +22,7 @@ const SERIES_COLORS = {
 
 export default function TrendChart() {
   const { data, updatedAt } = usePolling(getHistory, 60000)
-  const rows = data ?? []
+  const rows = Array.isArray(data) ? data : []
   const [active, setActive] = useState('temperature')
 
   const metric = METRICS.find((m) => m.key === active)
@@ -38,7 +38,7 @@ export default function TrendChart() {
               className={`chip ${active === m.key ? 'chip-on' : ''}`}
               onClick={() => setActive(m.key)}
             >
-              {m.icon} {m.label}
+              <i className={`ti ${m.icon}`} aria-hidden="true" style={{ marginRight: 5 }} />{m.label}
             </button>
           ))}
         </div>
@@ -64,7 +64,7 @@ export default function TrendChart() {
               />
               <Tooltip
                 contentStyle={{
-                  background: 'var(--panel-2)',
+                  background: 'var(--panel-3)',
                   border: '1px solid var(--border)',
                   borderRadius: 8,
                   color: 'var(--text)',
