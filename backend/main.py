@@ -317,6 +317,42 @@ def history():
     ]
 
 
+@app.get("/stats")
+def stats(days: int = 7):
+    """สรุปสถิติย้อนหลัง N วัน (เฉลี่ย/ต่ำสุด/สูงสุด) — ใช้โดยหน้าเว็บและ AI ตอบคำถามเชิงประวัติ
+    คำนวณที่ฝั่ง Postgres ผ่าน RPC function `weather_stats` (ดู schema.sql)
+    """
+    days = max(1, min(90, days))
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    res = supabase.rpc("weather_stats", {"since": since}).execute()
+    row = (res.data or [{}])[0]
+    return {
+        "days": days,
+        "reading_count": row.get("reading_count") or 0,
+        "temperature": {
+            "avg": row.get("temperature_avg"),
+            "min": row.get("temperature_min"),
+            "max": row.get("temperature_max"),
+        },
+        "humidity": {
+            "avg": row.get("humidity_avg"),
+            "min": row.get("humidity_min"),
+            "max": row.get("humidity_max"),
+        },
+        "windspeed": {
+            "avg": row.get("windspeed_avg"),
+            "max": row.get("windspeed_max"),
+        },
+        "rainfall": {
+            "sum": row.get("rainfall_sum"),
+            "rainy_readings": row.get("rainy_readings") or 0,
+        },
+        "light": {
+            "avg": row.get("light_avg"),
+        },
+    }
+
+
 @app.get("/predict")
 def predict():
     """
@@ -389,6 +425,7 @@ SYSTEM_PROMPT = (
     "- ตอบเป็นภาษาไทย สุภาพ กระชับ ลงท้ายด้วย 'ครับ'\n"
     "- อ้างอิงตัวเลขจริงพร้อมหน่วยเมื่อเกี่ยวข้อง\n"
     "- ถ้าถามพยากรณ์/แนวโน้ม ให้ดูตารางพยากรณ์และประวัติย้อนหลัง แล้วสรุปทิศทาง (สูงขึ้น/ลดลง/ทรงตัว)\n"
+    "- ถ้าถามเชิงประวัติ/สถิติ (เช่น สัปดาห์นี้ร้อนสุดกี่องศา, เดือนนี้ฝนตกกี่ครั้ง) ให้ดูจากสถิติย้อนหลังใน CONTEXT\n"
     "- ถ้าผู้ใช้ขอคำแนะนำ (เช่น การดูแลพืช ตากผ้า รดน้ำ) ให้แนะนำโดยอิงจากสภาพอากาศปัจจุบัน/พยากรณ์ ตามความรู้ทั่วไปได้\n"
     "- ห้ามแต่งตัวเลขที่ไม่มีใน CONTEXT ถ้าไม่มีข้อมูลค่านั้นให้บอกตรง ๆ ว่ายังไม่มีข้อมูล\n"
     "- ตอบสั้น 1-4 ประโยค เหมาะกับการอ่านออกเสียง (ไม่ใส่ตาราง/markdown)"
@@ -405,15 +442,48 @@ def _fmt_weather(w: Weather) -> str:
 # คำที่บ่งบอกว่าผู้ใช้ถามเรื่องพยากรณ์/แนวโน้ม -> ต้องแนบ history+forecast ให้ LLM
 _FORECAST_KEYWORDS = ("พยากรณ์", "ทำนาย", "อีก", "ต่อไป", "แนวโน้ม", "จะ", "คาด", "เดี๋ยว", "ชั่วโมง", "ช่วง")
 
+# คำที่บ่งบอกว่าผู้ใช้ถามเชิงประวัติ/สถิติ -> ต้องแนบสรุปสถิติย้อนหลังให้ LLM
+# ถ้าระบุช่วงเวลาชัดเจน ใช้จำนวนวันตามนั้น ไม่งั้น default 7 วัน
+_STATS_PERIOD_KEYWORDS = {
+    "เมื่อวาน": 1, "วันนี้": 1,
+    "สัปดาห์": 7, "อาทิตย์": 7,
+    "เดือน": 30,
+}
+_STATS_GENERIC_KEYWORDS = ("ย้อนหลัง", "เฉลี่ย", "สูงสุด", "ต่ำสุด", "สถิติ", "รวม", "กี่วัน", "กี่ครั้ง", "ที่ผ่านมา")
+
 
 def _needs_forecast(text: str) -> bool:
     return any(k in text for k in _FORECAST_KEYWORDS)
 
 
-def _build_context(detailed: bool = False) -> str:
+def _needs_stats(text: str) -> Optional[int]:
+    """คืนจำนวนวันย้อนหลังที่ควรสรุปสถิติ ถ้าคำถามเข้าข่ายเชิงประวัติ ไม่งั้นคืน None"""
+    for k, days in _STATS_PERIOD_KEYWORDS.items():
+        if k in text:
+            return days
+    if any(k in text for k in _STATS_GENERIC_KEYWORDS):
+        return 7
+    return None
+
+
+def _fmt_stats(s: dict) -> str:
+    t, h, w, r, l = s["temperature"], s["humidity"], s["windspeed"], s["rainfall"], s["light"]
+    return (
+        f"สถิติย้อนหลัง {s['days']} วัน ({s['reading_count']} รายการอ่าน):\n"
+        f"  อุณหภูมิ เฉลี่ย {t['avg']:.1f}°C (ต่ำสุด {t['min']:.1f}, สูงสุด {t['max']:.1f})\n"
+        f"  ความชื้น เฉลี่ย {h['avg']:.1f}% (ต่ำสุด {h['min']:.1f}, สูงสุด {h['max']:.1f})\n"
+        f"  ลม เฉลี่ย {w['avg']:.1f} m/s (สูงสุด {w['max']:.1f})\n"
+        f"  ฝนรวม {r['sum']:.1f} mm ({r['rainy_readings']} ครั้งที่มีฝน)\n"
+        f"  แสง เฉลี่ย {l['avg']:.0f} lux"
+        if t["avg"] is not None else f"ยังไม่มีข้อมูลย้อนหลัง {s['days']} วัน"
+    )
+
+
+def _build_context(detailed: bool = False, stats_days: Optional[int] = None) -> str:
     """สร้าง CONTEXT ให้ LLM
     detailed=False -> แนบแค่ค่าปัจจุบัน 1 บรรทัด (ประหยัด token, ใช้กับคำถามทั่วไป)
     detailed=True  -> แนบประวัติย้อนหลัง + ตารางพยากรณ์ (ใช้เฉพาะคำถามพยากรณ์/แนวโน้ม)
+    stats_days     -> ถ้ามีค่า จะแนบสรุปสถิติย้อนหลังกี่วัน (ใช้เฉพาะคำถามเชิงประวัติ/สถิติ)
     """
     parts = []
 
@@ -423,6 +493,12 @@ def _build_context(detailed: bool = False) -> str:
         + f"อุณหภูมิ {cur['temperature']}°C, ความชื้น {cur['humidity']}%, "
         + f"ลม {cur['windspeed']} m/s, ฝน {cur['rainfall']} mm, แสง {cur['light']} lux"
     )
+
+    if stats_days:
+        try:
+            parts.append(_fmt_stats(stats(stats_days)))
+        except Exception:
+            pass
 
     if not detailed:
         return "\n\n".join(parts)
@@ -455,8 +531,22 @@ def _build_context(detailed: bool = False) -> str:
 
 
 def _rule_based_answer(text: str) -> str:
-    """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม"""
+    """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม/สถิติย้อนหลัง"""
     w = read_sensor()
+
+    stats_days = _needs_stats(text)
+    if stats_days:
+        try:
+            s = stats(stats_days)
+            t = s["temperature"]
+            if t["avg"] is not None:
+                return (
+                    f"ย้อนหลัง {stats_days} วัน อุณหภูมิเฉลี่ย {t['avg']:.1f}°C "
+                    f"(ต่ำสุด {t['min']:.1f}, สูงสุด {t['max']:.1f}) "
+                    f"ฝนตกรวม {s['rainfall']['sum']:.1f} mm ครับ"
+                )
+        except Exception:
+            pass
 
     if _needs_forecast(text):
         try:
@@ -507,7 +597,7 @@ def ask(q: Question):
     if _llm is None:
         return Answer(answer=_rule_based_answer(text))
 
-    context = _build_context(detailed=_needs_forecast(text))
+    context = _build_context(detailed=_needs_forecast(text), stats_days=_needs_stats(text))
 
     # ต่อบทสนทนาแบบ multi-turn: เอาประวัติล่าสุดไม่เกิน MAX_HISTORY_TURNS เทิร์น
     contents = []
