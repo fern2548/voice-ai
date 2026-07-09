@@ -4,7 +4,9 @@ import { getPredict } from '../api.js'
 export default function PredictTable() {
   const { data, updatedAt } = usePolling(getPredict, 1800000) // 30 นาที
   const rows = Array.isArray(data) ? data : []
+  const hasForecast = rows.length > 1
   const isEstimate = rows.some((r) => r.is_estimate)
+  const isLive = hasForecast && !isEstimate
 
   return (
     <div className="panel">
@@ -13,6 +15,11 @@ export default function PredictTable() {
         {isEstimate && (
           <span className="panel-tag est" title="ยังไม่ได้เชื่อมต่อโมเดล LSTM จริง (Node-RED/Jetson Nano) แสดงค่าประมาณเชิงเส้นแทน">
             <i className="ti ti-alert-triangle" aria-hidden="true" /> ค่าประมาณ
+          </span>
+        )}
+        {isLive && (
+          <span className="panel-tag live" title="ใช้ผลทำนายจากโมเดล LSTM จริง">
+            <span className="panel-tag-dot" /> LSTM LIVE
           </span>
         )}
       </div>
@@ -49,7 +56,6 @@ export default function PredictTable() {
         </table>
       </div>
       <div className="panel-foot">
-        {isEstimate && 'ยังไม่ได้เชื่อมต่อ LSTM จริง — แสดงค่าประมาณจากค่าปัจจุบัน · '}
         {updatedAt
           ? 'อัปเดตล่าสุด: ' + updatedAt.toLocaleTimeString('th-TH')
           : 'อัปเดตทุก 30 นาที'}
