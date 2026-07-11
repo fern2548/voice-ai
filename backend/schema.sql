@@ -47,11 +47,11 @@ returns table (
 )
 language sql stable as $$
   select
-    count(*),
+    count(1),
     avg(temperature), min(temperature), max(temperature),
     avg(humidity), min(humidity), max(humidity),
     avg(windspeed), max(windspeed),
-    sum(rainfall), count(*) filter (where rainfall > 0),
+    sum(rainfall), count(1) filter (where rainfall > 0),
     avg(light)
   from weather_readings
   where created_at >= since;

@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>คู่มือโปรเจกต์ · Weather Station AI (voice-ai)</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2333; --panel-3: #232b3d;
+    --border: #30363d; --border-soft: rgba(255,255,255,.07);
+    --text: #e6edf3; --dim: #8b949e; --faint: #4d5562;
+    --accent: #39c5cf; --accent-dim: rgba(57,197,207,.12);
+    --green: #3fb950; --green-dim: rgba(63,185,80,.12);
+    --warn: #d29922; --warn-dim: rgba(210,153,34,.12);
+    --danger: #f85149; --danger-dim: rgba(248,81,73,.12);
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, "SF Mono", monospace;
+    --shadow: 0 8px 28px rgba(0,0,0,.4);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f6f9; --panel: #ffffff; --panel-2: #f0f2f5; --panel-3: #e6e9ee;
+      --border: #dde1e7; --border-soft: rgba(0,0,0,.07);
+      --text: #1a1f2e; --dim: #5a6272; --faint: #9aa0ad;
+      --accent: #0e7490; --accent-dim: rgba(14,116,144,.09);
+      --green: #1a7f37; --green-dim: rgba(26,127,55,.08);
+      --warn: #9a6700; --warn-dim: rgba(154,103,0,.08);
+      --danger: #cf222e; --danger-dim: rgba(207,34,46,.08);
+      --shadow: 0 8px 24px rgba(60,80,100,.14);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f9; --panel: #ffffff; --panel-2: #f0f2f5; --panel-3: #e6e9ee;
+    --border: #dde1e7; --border-soft: rgba(0,0,0,.07);
+    --text: #1a1f2e; --dim: #5a6272; --faint: #9aa0ad;
+    --accent: #0e7490; --accent-dim: rgba(14,116,144,.09);
+    --green: #1a7f37; --green-dim: rgba(26,127,55,.08);
+    --warn: #9a6700; --warn-dim: rgba(154,103,0,.08);
+    --danger: #cf222e; --danger-dim: rgba(207,34,46,.08);
+    --shadow: 0 8px 24px rgba(60,80,100,.14);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2333; --panel-3: #232b3d;
+    --border: #30363d; --border-soft: rgba(255,255,255,.07);
+    --text: #e6edf3; --dim: #8b949e; --faint: #4d5562;
+    --accent: #39c5cf; --accent-dim: rgba(57,197,207,.12);
+    --green: #3fb950; --green-dim: rgba(63,185,80,.12);
+    --warn: #d29922; --warn-dim: rgba(210,153,34,.12);
+    --danger: #f85149; --danger-dim: rgba(248,81,73,.12);
+    --shadow: 0 8px 28px rgba(0,0,0,.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans); color: var(--text); background: var(--bg);
+    min-height: 100vh; line-height: 1.65; font-size: 15px;
+  }
+  .doc-shell {
+    max-width: 1180px; margin: 0 auto; padding: 36px 24px 100px;
+    display: grid; grid-template-columns: 220px minmax(0,760px); gap: 48px;
+    justify-content: center;
+  }
+  @media (max-width: 900px) { .doc-shell { grid-template-columns: 1fr; } .toc { display: none; } }
+
+  /* ---- Header ---- */
+  .doc-header { grid-column: 1 / -1; margin-bottom: 8px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 10px;
+  }
+  h1 {
+    font-size: 30px; font-weight: 800; letter-spacing: -0.01em; color: var(--text);
+    text-wrap: balance; margin-bottom: 10px;
+  }
+  .doc-sub { color: var(--dim); font-size: 14.5px; max-width: 620px; }
+
+  /* ---- TOC ---- */
+  .toc { position: sticky; top: 32px; align-self: start; }
+  .toc-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.5px; color: var(--faint); text-transform: uppercase; margin-bottom: 10px; }
+  .toc ol { list-style: none; display: flex; flex-direction: column; gap: 2px; counter-reset: toc; }
+  .toc li { counter-increment: toc; }
+  .toc a {
+    display: flex; gap: 8px; padding: 6px 8px; border-radius: 6px; text-decoration: none;
+    color: var(--dim); font-size: 13px; transition: background .12s, color .12s;
+  }
+  .toc a::before {
+    content: counter(toc, decimal-leading-zero); font-family: var(--mono); font-size: 11px;
+    color: var(--faint); flex-shrink: 0; padding-top: 1px;
+  }
+  .toc a:hover { background: var(--panel-2); color: var(--text); }
+
+  /* ---- Sections ---- */
+  section { padding-top: 52px; scroll-margin-top: 24px; }
+  section:first-of-type { padding-top: 28px; }
+  h2 {
+    font-size: 21px; font-weight: 700; color: var(--text); margin-bottom: 6px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  h2 .num { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 700; }
+  .section-desc { color: var(--dim); font-size: 14px; margin-bottom: 20px; max-width: 62ch; }
+  h3 { font-size: 14.5px; font-weight: 700; color: var(--text); margin: 22px 0 10px; }
+  p { color: var(--text); margin-bottom: 12px; }
+  p.tight { margin-bottom: 6px; }
+  a.inline { color: var(--accent); }
+  code.inline {
+    font-family: var(--mono); font-size: 0.88em; background: var(--panel-2);
+    border: 1px solid var(--border-soft); padding: 1px 6px; border-radius: 5px; color: var(--accent);
+  }
+
+  /* ---- Callouts ---- */
+  .callout {
+    display: flex; gap: 11px; padding: 13px 15px; border-radius: 10px;
+    border: 1px solid var(--border-soft); background: var(--panel); margin: 16px 0;
+    font-size: 13.5px;
+  }
+  .callout svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 1px; }
+  .callout.info { border-left: 3px solid var(--accent); }
+  .callout.info svg { color: var(--accent); }
+  .callout.warn { border-left: 3px solid var(--warn); }
+  .callout.warn svg { color: var(--warn); }
+  .callout.danger { border-left: 3px solid var(--danger); }
+  .callout.danger svg { color: var(--danger); }
+  .callout-body strong { display: block; margin-bottom: 2px; color: var(--text); }
+  .callout-body span { color: var(--dim); }
+
+  /* ---- Flow diagram ---- */
+  .flow {
+    display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 6px 2px 14px;
+    margin: 18px 0 6px;
+  }
+  .flow-step {
+    flex: 0 0 auto; min-width: 128px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 13px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .flow-step .fs-icon { color: var(--accent); }
+  .flow-step .fs-icon svg { width: 18px; height: 18px; }
+  .flow-step .fs-title { font-size: 12.5px; font-weight: 700; color: var(--text); }
+  .flow-step .fs-sub { font-size: 11px; color: var(--dim); line-height: 1.4; }
+  .flow-arrow {
+    flex: 0 0 auto; width: 30px; display: flex; align-items: center; justify-content: center;
+    color: var(--faint);
+  }
+  .flow-arrow svg { width: 18px; height: 18px; }
+
+  /* ---- File tree ---- */
+  .tree {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.85;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; white-space: pre;
+  }
+  .tree .fn { color: var(--accent); }
+  .tree .dir { color: var(--text); font-weight: 600; }
+  .tree .cm { color: var(--faint); font-style: normal; }
+
+  /* ---- Purpose table ---- */
+  .ptable { width: 100%; border-collapse: collapse; font-size: 13px; margin: 14px 0 4px; }
+  .ptable th {
+    text-align: left; font-family: var(--mono); font-size: 10.5px; letter-spacing: .8px;
+    text-transform: uppercase; color: var(--faint); padding: 0 10px 8px; border-bottom: 1px solid var(--border);
+  }
+  .ptable td { padding: 9px 10px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  .ptable tr:last-child td { border-bottom: none; }
+  .ptable td.path { font-family: var(--mono); color: var(--accent); white-space: nowrap; font-size: 12px; }
+  .ptable-wrap { overflow-x: auto; }
+
+  /* ---- Code block ---- */
+  pre.code {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; margin: 12px 0;
+  }
+  pre.code .cm { color: var(--faint); }
+  pre.code .kw { color: var(--accent); }
+
+  /* ---- Definition grid (glossary) ---- */
+  .glossary { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+  .gterm { display: grid; grid-template-columns: 148px 1fr; gap: 14px; align-items: baseline; }
+  @media (max-width: 560px) { .gterm { grid-template-columns: 1fr; gap: 2px; } }
+  .gterm dt { font-family: var(--mono); font-weight: 700; color: var(--accent); font-size: 13px; }
+  .gterm dd { color: var(--dim); font-size: 13.5px; }
+
+  /* ---- Steps list ---- */
+  .steps { display: flex; flex-direction: column; gap: 14px; margin: 14px 0; counter-reset: step; }
+  .step { display: flex; gap: 13px; }
+  .step-num {
+    counter-increment: step; flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--accent);
+    font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-num::before { content: counter(step); }
+  .step-body { padding-top: 2px; font-size: 13.5px; }
+  .step-body strong { color: var(--text); }
+
+  footer { grid-column: 1/-1; margin-top: 32px; color: var(--faint); font-size: 12px; }
+</style>
+</head>
+<body>
+
+  <div class="doc-shell">
+
+    <div class="doc-header">
+      <div class="eyebrow">คู่มืออ่านง่าย · Weather Station AI</div>
+      <h1>โครงสร้างโปรเจกต์ voice-ai</h1>
+      <p class="doc-sub">
+        เอกสารนี้อธิบายว่าไฟล์แต่ละตัวทำหน้าที่อะไร, ที่เก็บรหัสลับ (.env) อยู่ตรงไหน,
+        คำสั่ง Git ที่ใช้บ่อย, และวิธีรันโปรเจกต์ — เขียนสำหรับคนที่ไม่มีพื้นฐานคอมพิวเตอร์มาก่อน
+      </p>
+    </div>
+
+    <nav class="toc">
+      <div class="toc-label">สารบัญ</div>
+      <ol>
+        <li><a href="#overview">ภาพรวมระบบทำงานยังไง</a></li>
+        <li><a href="#structure">โครงสร้างโฟลเดอร์</a></li>
+        <li><a href="#files">แต่ละไฟล์ทำหน้าที่อะไร</a></li>
+        <li><a href="#env">.env คืออะไร อยู่ไหน</a></li>
+        <li><a href="#git">คำสั่ง Git หลักๆ</a></li>
+        <li><a href="#run">วิธีรันโปรเจกต์</a></li>
+        <li><a href="#glossary">ศัพท์ที่ควรรู้</a></li>
+      </ol>
+    </nav>
+
+    <div class="content">
+
+      <!-- 1. OVERVIEW -->
+      <section id="overview">
+        <h2><span class="num">01</span>ภาพรวมระบบทำงานยังไง</h2>
+        <p class="section-desc">ข้อมูลอากาศเดินทางจากเซนเซอร์จริงในฟาร์ม มาจนถึงหน้าจอที่คุณเห็น ผ่าน 5 ขั้นตอนนี้</p>
+
+        <div class="flow">
+          <div class="flow-step">
+            <div class="fs-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18a4.6 4.4 0 0 1 0-9 5 4.5 0 0 1 9.5-1.1A3.5 3.5 0 0 1 18 14.5"/></svg></div>
+            <div class="fs-title">เซนเซอร์ AETHER1</div>
+            <div class="fs-sub">วัดค่าอากาศจริงที่ฟาร์มสระบุรี</div>
+          </div>
+          <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          <div class="flow-step">
+            <div class="fs-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg></div>
+            <div class="fs-title">Node-RED</div>
+            <div class="fs-sub">รันบน Jetson Nano รับค่าแล้วส่งต่อ</div>
+          </div>
+          <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          <div class="flow-step">
+            <div class="fs-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17V7a2 2 0 0 1 2-2h9l5 5v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg></div>
+            <div class="fs-title">backend (FastAPI)</div>
+            <div class="fs-sub">โฟลเดอร์ backend/ — รับ ตรวจสอบ บันทึกข้อมูล</div>
+          </div>
+          <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          <div class="flow-step">
+            <div class="fs-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg></div>
+            <div class="fs-title">Supabase</div>
+            <div class="fs-sub">ฐานข้อมูลเก็บค่าอากาศ + ผลทำนาย</div>
+          </div>
+          <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          <div class="flow-step">
+            <div class="fs-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+            <div class="fs-title">เว็บ (frontend)</div>
+            <div class="fs-sub">โฟลเดอร์ frontend/ — หน้าจอที่คุณเห็น</div>
+          </div>
+        </div>
+
+        <div class="callout info">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <div class="callout-body">
+            <strong>เข้าใจง่ายๆ</strong>
+            <span>โปรเจกต์นี้แบ่งเป็น 2 ฝั่งเสมอ: <code class="inline">backend/</code> คือ "สมอง" ที่รับ-เก็บ-คำนวณข้อมูลอยู่เบื้องหลัง
+            ส่วน <code class="inline">frontend/</code> คือ "หน้าตา" เว็บที่คนเปิดดู ทั้งสองฝั่งคุยกันผ่านอินเทอร์เน็ต ไม่ใช่ไฟล์เดียวกัน</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. STRUCTURE -->
+      <section id="structure">
+        <h2><span class="num">02</span>โครงสร้างโฟลเดอร์</h2>
+        <p class="section-desc">แผนผังไฟล์ทั้งหมดในโปรเจกต์ — ไม่ต้องจำทุกบรรทัด แค่รู้ว่าอะไรอยู่โซนไหน</p>
+
+        <div class="tree">voice-ai/
+├── README.md                <span class="cm">คำแนะนำเริ่มต้น (เปิดอ่านก่อนอันอื่น)</span>
+├── .gitignore                <span class="cm">บอก Git ว่าไฟล์ไหนไม่ต้องอัปโหลด (เช่น .env)</span>
+│
+├── <span class="dir">backend/</span>                  <span class="cm">← "สมอง" ของระบบ (Python)</span>
+│   ├── <span class="fn">main.py</span>              <span class="cm">โค้ดเซิร์ฟเวอร์ทั้งหมดอยู่ที่นี่ไฟล์เดียว</span>
+│   ├── <span class="fn">requirements.txt</span>     <span class="cm">รายชื่อไลบรารีที่ต้องติดตั้ง</span>
+│   ├── <span class="fn">schema.sql</span>           <span class="cm">คำสั่งสร้างตารางฐานข้อมูล (รันครั้งเดียว)</span>
+│   └── <span class="fn">.env</span>                 <span class="cm">รหัสลับทั้งหมด (ไม่อัปโหลดขึ้น Git)</span>
+│
+└── <span class="dir">frontend/</span>                 <span class="cm">← "หน้าตา" เว็บ (React)</span>
+    ├── <span class="fn">index.html</span>
+    ├── <span class="fn">vite.config.js</span>       <span class="cm">ตั้งค่าตัวรันเว็บช่วงพัฒนา</span>
+    ├── <span class="fn">package.json</span>         <span class="cm">รายชื่อไลบรารีของฝั่งเว็บ</span>
+    └── <span class="dir">src/</span>
+        ├── <span class="fn">main.jsx</span>          <span class="cm">จุดเริ่มต้นของเว็บ</span>
+        ├── <span class="fn">App.jsx</span>           <span class="cm">กำหนดเมนู + หน้าเว็บทั้งหมด</span>
+        ├── <span class="fn">api.js</span>            <span class="cm">รวมฟังก์ชันเรียก backend ไว้ที่เดียว</span>
+        ├── <span class="fn">styles.css</span>        <span class="cm">สีและสไตล์ทั้งเว็บ</span>
+        ├── <span class="dir">context/</span>          <span class="cm">ข้อมูลที่ใช้ร่วมกันทั้งเว็บ</span>
+        ├── <span class="dir">hooks/</span>            <span class="cm">ฟังก์ชันช่วยดึงข้อมูลซ้ำเป็นระยะ</span>
+        ├── <span class="dir">utils/</span>            <span class="cm">ฟังก์ชันช่วยเล็กๆน้อยๆ</span>
+        ├── <span class="dir">pages/</span>            <span class="cm">หน้าเว็บหลักแต่ละหน้า</span>
+        └── <span class="dir">components/</span>       <span class="cm">ชิ้นส่วน UI ย่อยที่แต่ละหน้าเอาไปประกอบกัน</span></div>
+      </section>
+
+      <!-- 3. FILE PURPOSES -->
+      <section id="files">
+        <h2><span class="num">03</span>แต่ละไฟล์ทำหน้าที่อะไร</h2>
+        <p class="section-desc">รายละเอียดของไฟล์สำคัญ ๆ ที่ถ้าต้องแก้อะไรในอนาคต จะได้รู้ว่าไปแก้ที่ไหน</p>
+
+        <h3>ฝั่ง backend (สมอง)</h3>
+        <div class="ptable-wrap">
+        <table class="ptable">
+          <tr><th>ไฟล์</th><th>หน้าที่</th></tr>
+          <tr><td class="path">main.py</td><td>ทุก endpoint (ช่องทางรับ-ส่งข้อมูล) ของเซิร์ฟเวอร์ รวมถึงตัวเชื่อม Supabase และ Gemini AI</td></tr>
+          <tr><td class="path">schema.sql</td><td>คำสั่งสร้างตาราง <code class="inline">weather_readings</code> (ค่าเซนเซอร์), <code class="inline">weather_predictions</code> (ค่าทำนาย) และฟังก์ชันสรุปสถิติ — รันใน Supabase ครั้งเดียวตอนตั้งโปรเจกต์ใหม่</td></tr>
+          <tr><td class="path">requirements.txt</td><td>รายชื่อไลบรารี Python เช่น fastapi, supabase, google-genai</td></tr>
+        </table>
+        </div>
+
+        <h3>ช่องทางรับ-ส่งข้อมูล (endpoint) ที่มีอยู่ตอนนี้</h3>
+        <div class="ptable-wrap">
+        <table class="ptable">
+          <tr><th>Endpoint</th><th>ใช้ทำอะไร</th></tr>
+          <tr><td class="path">GET /health</td><td>เช็คว่าเซิร์ฟเวอร์และฐานข้อมูลยังทำงานปกติไหม</td></tr>
+          <tr><td class="path">GET /weather</td><td>ค่าอากาศล่าสุดตอนนี้</td></tr>
+          <tr><td class="path">GET /history</td><td>ค่าอากาศย้อนหลัง 1 ชั่วโมง (ใช้วาดกราฟหน้าแรก)</td></tr>
+          <tr><td class="path">GET /readings-log</td><td>ค่าอากาศดิบทั้งหมด แบ่งหน้า + กรองตามช่วงเวลาได้</td></tr>
+          <tr><td class="path">GET /predict</td><td>ตารางพยากรณ์ล่วงหน้า (ใช้ผลจาก AI จริงถ้ามี ไม่งั้นประมาณเอง)</td></tr>
+          <tr><td class="path">GET /predictions-log</td><td>เทียบค่าที่ทำนายไว้ กับค่าจริงที่เกิดขึ้นภายหลัง</td></tr>
+          <tr><td class="path">GET /stats</td><td>สรุปสถิติย้อนหลัง (เฉลี่ย/ต่ำสุด/สูงสุด) ให้ AI ตอบคำถามเชิงประวัติ</td></tr>
+          <tr><td class="path">POST /ingest</td><td>ช่องทางให้ Node-RED ส่งค่าเซนเซอร์ใหม่เข้ามา (ต้องมีรหัสผ่านแนบมาด้วย)</td></tr>
+          <tr><td class="path">POST /ingest-prediction</td><td>ช่องทางให้โมเดล AI ส่งผลทำนายเข้ามา</td></tr>
+          <tr><td class="path">POST /ask</td><td>ถาม-ตอบกับผู้ช่วย AI ในแชท</td></tr>
+        </table>
+        </div>
+
+        <h3>ฝั่ง frontend (หน้าตา)</h3>
+        <div class="ptable-wrap">
+        <table class="ptable">
+          <tr><th>ไฟล์ / โฟลเดอร์</th><th>หน้าที่</th></tr>
+          <tr><td class="path">App.jsx</td><td>กำหนดเมนูด้านซ้าย และเส้นทาง (URL) ของแต่ละหน้า</td></tr>
+          <tr><td class="path">api.js</td><td>รวมฟังก์ชันเรียก backend ทั้งหมด — ถ้า backend เพิ่ม endpoint ใหม่ ต้องมาเพิ่มที่นี่</td></tr>
+          <tr><td class="path">context/LiveData.jsx</td><td>ดึงข้อมูล /health และ /weather ครั้งเดียว แล้วแจกจ่ายให้ทุกหน้าใช้ร่วมกัน (กันยิงซ้ำ)</td></tr>
+          <tr><td class="path">pages/OverviewPage.jsx</td><td>หน้าแรก — การ์ดตัวเลข + กราฟแนวโน้ม 1 ชม.</td></tr>
+          <tr><td class="path">pages/ForecastPage.jsx</td><td>ตารางพยากรณ์ล่วงหน้า</td></tr>
+          <tr><td class="path">pages/TrendComparePage.jsx</td><td>กราฟเทียบ "ค่าจริง" กับ "ค่าทำนาย" แยกทีละพารามิเตอร์</td></tr>
+          <tr><td class="path">pages/HistoryPage.jsx</td><td>ประวัติข้อมูล มี 2 แท็บ: ข้อมูลดิบ / ข้อมูลเทียบ</td></tr>
+          <tr><td class="path">pages/SettingsPage.jsx</td><td>ตั้งค่าธีมเว็บ (dark/light)</td></tr>
+          <tr><td class="path">components/ChatWidget.jsx</td><td>ปุ่มแชท AI มุมล่างขวา รวมปุ่มเลือกเสียง/ปิดเสียง</td></tr>
+          <tr><td class="path">components/SensorAlert.jsx</td><td>แจ้งเตือนเมื่อไม่มีข้อมูลเซนเซอร์ใหม่เกิน 10 นาที</td></tr>
+          <tr><td class="path">components/ConnectionAlert.jsx</td><td>แจ้งเตือนเมื่อเว็บต่อเซิร์ฟเวอร์ไม่ได้เลย</td></tr>
+        </table>
+        </div>
+
+        <div class="callout warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+          <div class="callout-body">
+            <strong>มีไฟล์เก่าเหลืออยู่ 3 ไฟล์</strong>
+            <span><code class="inline">ChatBox.jsx</code>, <code class="inline">HistoryTable.jsx</code>, <code class="inline">WeatherCards.jsx</code> ใน <code class="inline">components/</code>
+            เป็นไฟล์จากเวอร์ชันก่อนปรับปรุง ไม่ได้ถูกใช้งานจริงแล้ว — เห็นในโฟลเดอร์แต่ไม่ต้องสนใจ</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. ENV -->
+      <section id="env">
+        <h2><span class="num">04</span>.env คืออะไร อยู่ไหน</h2>
+        <p class="section-desc">ไฟล์เก็บ "รหัสลับ" ที่ห้ามให้ใครเห็น เช่น รหัสผ่านฐานข้อมูล และคีย์ AI</p>
+
+        <p>ไฟล์นี้อยู่ที่ <code class="inline">backend/.env</code> เพียงจุดเดียวในโปรเจกต์ (ฝั่งเว็บไม่มีไฟล์ .env ของตัวเอง)</p>
+
+        <div class="callout danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <div class="callout-body">
+            <strong>ห้ามอัปโหลดไฟล์นี้ขึ้น GitHub เด็ดขาด</strong>
+            <span>ไฟล์ <code class="inline">.gitignore</code> ถูกตั้งไว้ให้ข้ามไฟล์ .env โดยอัตโนมัติอยู่แล้ว — แค่อย่าไปแก้ .gitignore ทิ้งบรรทัดนั้น และอย่า copy ค่าในไฟล์นี้ไปวางในแชทหรือที่สาธารณะ</span>
+          </div>
+        </div>
+
+        <h3>ข้างในมีอะไรบ้าง</h3>
+        <dl class="glossary">
+          <div class="gterm">
+            <dt>SUPABASE_URL</dt>
+            <dd>ที่อยู่ของฐานข้อมูล — หาได้จากเว็บ Supabase → โปรเจกต์ → Settings → API</dd>
+          </div>
+          <div class="gterm">
+            <dt>SUPABASE_SERVICE_KEY</dt>
+            <dd>รหัสผ่านเข้าฐานข้อมูลแบบเต็มสิทธิ์ — อยู่หน้าเดียวกับ SUPABASE_URL</dd>
+          </div>
+          <div class="gterm">
+            <dt>INGEST_TOKEN</dt>
+            <dd>รหัสผ่านที่ Node-RED ต้องแนบมาด้วยเวลาส่งค่าเซนเซอร์เข้า — ตั้งเองเป็นข้อความสุ่มอะไรก็ได้ แต่ต้องตรงกับที่ตั้งไว้ใน Node-RED</dd>
+          </div>
+          <div class="gterm">
+            <dt>GEMINI_API_KEY</dt>
+            <dd>คีย์เข้าใช้ AI (Gemini) — ขอได้ฟรีที่ Google AI Studio</dd>
+          </div>
+          <div class="gterm">
+            <dt>GEMINI_MODEL</dt>
+            <dd>ชื่อรุ่นของ AI ที่ใช้ (ตอนนี้ตั้งเป็น gemini-3.1-flash-lite)</dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- 5. GIT -->
+      <section id="git">
+        <h2><span class="num">05</span>คำสั่ง Git หลักๆ</h2>
+        <p class="section-desc">Git คือระบบเก็บประวัติการแก้โค้ด ส่วน GitHub คือที่เก็บออนไลน์ — repo นี้อยู่ที่ <code class="inline">github.com/fern2548/voice-ai</code> สาขาหลักชื่อ <code class="inline">main</code></p>
+
+        <dl class="glossary">
+          <div class="gterm">
+            <dt>git status</dt>
+            <dd>ดูว่าไฟล์ไหนถูกแก้ไปบ้าง ยังไม่ได้บันทึก — ใช้เช็คก่อนทำอะไรทุกครั้ง</dd>
+          </div>
+          <div class="gterm">
+            <dt>git add .</dt>
+            <dd>เลือกไฟล์ที่แก้ทั้งหมด เตรียมจะบันทึก</dd>
+          </div>
+          <div class="gterm">
+            <dt>git commit -m "..."</dt>
+            <dd>บันทึกการแก้ไข พร้อมข้อความอธิบายสั้นๆ ว่าแก้อะไร</dd>
+          </div>
+          <div class="gterm">
+            <dt>git push</dt>
+            <dd>ส่งสิ่งที่บันทึกไว้ขึ้น GitHub ให้คนอื่นในทีมเห็นด้วย</dd>
+          </div>
+          <div class="gterm">
+            <dt>git pull</dt>
+            <dd>ดึงงานล่าสุดที่คนอื่นเพิ่มเข้ามาใน GitHub มาไว้ในเครื่องตัวเอง</dd>
+          </div>
+          <div class="gterm">
+            <dt>git log --oneline</dt>
+            <dd>ดูประวัติการบันทึกทั้งหมดแบบย่อ</dd>
+          </div>
+        </dl>
+
+        <h3>ลำดับที่ใช้บ่อยที่สุด (บันทึกงานแล้วส่งขึ้น GitHub)</h3>
+        <pre class="code"><span class="cm"># 1. ดูว่าแก้อะไรไปบ้าง</span>
+git status
+
+<span class="cm"># 2. เลือกทุกไฟล์ที่แก้ไว้</span>
+git add .
+
+<span class="cm"># 3. บันทึกพร้อมข้อความอธิบาย</span>
+git commit -m "แก้หน้า Settings"
+
+<span class="cm"># 4. ส่งขึ้น GitHub</span>
+git push</pre>
+
+        <div class="callout info">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <div class="callout-body">
+            <strong>ก่อนเริ่มทำงานทุกครั้ง</strong>
+            <span>รัน <code class="inline">git pull</code> ก่อนเสมอ กันพลาดไปแก้ทับงานคนอื่นในทีมที่เพิ่ง push เข้ามา</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. HOW TO RUN -->
+      <section id="run">
+        <h2><span class="num">06</span>วิธีรันโปรเจกต์</h2>
+        <p class="section-desc">ต้องรัน 2 โปรแกรมแยกกัน (คนละหน้าต่าง terminal) เพราะ backend กับ frontend เป็นคนละโปรแกรม</p>
+
+        <h3>ฝั่ง backend (สมอง)</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num"></div><div class="step-body">เปิด terminal แล้วเข้าโฟลเดอร์ <code class="inline">backend</code></div></div>
+          <div class="step"><div class="step-num"></div><div class="step-body">ติดตั้งไลบรารีครั้งแรก (ครั้งเดียวพอ): <code class="inline">pip install -r requirements.txt</code></div></div>
+          <div class="step"><div class="step-num"></div><div class="step-body">รันเซิร์ฟเวอร์: <code class="inline">python main.py</code> — ระบบจะลองพอร์ต 8000, 8001, 8002 ให้อัตโนมัติ แล้วบอกในหน้าจอว่าใช้พอร์ตไหน</div></div>
+        </div>
+
+        <h3>ฝั่ง frontend (หน้าตา)</h3>
+        <div class="steps">
+          <div class="step"><div class="step-num"></div><div class="step-body">เปิด terminal อีกหน้าต่าง แล้วเข้าโฟลเดอร์ <code class="inline">frontend</code></div></div>
+          <div class="step"><div class="step-num"></div><div class="step-body">ติดตั้งไลบรารีครั้งแรก: <code class="inline">npm install</code></div></div>
+          <div class="step"><div class="step-num"></div><div class="step-body">รันเว็บ: <code class="inline">npm run dev</code> แล้วเปิดเบราว์เซอร์ไปที่ <code class="inline">http://localhost:5173</code></div></div>
+        </div>
+
+        <div class="callout warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+          <div class="callout-body">
+            <strong>ถ้า backend ไม่ได้อยู่พอร์ต 8000</strong>
+            <span>ให้รัน frontend ด้วยคำสั่ง <code class="inline">VITE_BACKEND_PORT=8001 npm run dev</code> แทน (เปลี่ยน 8001 เป็นพอร์ตจริงที่ backend บอกไว้)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. GLOSSARY -->
+      <section id="glossary">
+        <h2><span class="num">07</span>ศัพท์ที่ควรรู้</h2>
+        <p class="section-desc">คำศัพท์เทคนิคที่เจอบ่อยในเอกสารนี้ อธิบายแบบไม่ต้องมีพื้นฐาน</p>
+
+        <dl class="glossary">
+          <div class="gterm"><dt>Backend</dt><dd>โปรแกรมที่ทำงานเบื้องหลัง ไม่มีหน้าตาให้เห็น รับ-ประมวลผล-เก็บข้อมูล</dd></div>
+          <div class="gterm"><dt>Frontend</dt><dd>ส่วนที่คนเห็นและกดใช้งานได้ผ่านเบราว์เซอร์</dd></div>
+          <div class="gterm"><dt>Endpoint</dt><dd>ช่องทาง/ที่อยู่หนึ่งจุดที่ frontend ยิงคำขอไปหา backend เช่น <code class="inline">/weather</code></dd></div>
+          <div class="gterm"><dt>Database (Supabase)</dt><dd>ที่เก็บข้อมูลถาวร เหมือนตู้เก็บเอกสารดิจิทัลที่ค้นหาได้เร็ว</dd></div>
+          <div class="gterm"><dt>API key</dt><dd>รหัสผ่านสำหรับให้โปรแกรมของเราคุยกับบริการภายนอกได้ (เช่น Google Gemini AI)</dd></div>
+          <div class="gterm"><dt>Repository (repo)</dt><dd>โฟลเดอร์โปรเจกต์ทั้งหมดที่ถูกเก็บประวัติไว้ด้วย Git</dd></div>
+          <div class="gterm"><dt>Deploy</dt><dd>การเอาโปรแกรมขึ้นไปรันบนเซิร์ฟเวอร์จริง ให้คนอื่นเข้าใช้งานได้ตลอดเวลา (ไม่ใช่แค่รันในเครื่องตัวเอง)</dd></div>
+        </dl>
+      </section>
+
+    </div>
+
+    <footer>
+      อัปเดตล่าสุดตามโครงสร้างโปรเจกต์ ณ วันที่ทำเอกสารนี้ · Weather Station AI (voice-ai)
+    </footer>
+
+  </div>
+
+</body>
+</html>
