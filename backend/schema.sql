@@ -57,3 +57,17 @@ language sql stable as $$
   where created_at >= since;
 $$;
 
+-- บันทึกจำนวนหมูป่วยรายวัน (กรอกมือ ไม่ได้มาจากเซนเซอร์) — ใช้หน้า "บันทึกหมูป่วย"
+-- และให้ AI อ้างอิงตอบคำถามเรื่องสุขภาพหมูได้
+create table if not exists pig_health_log (
+  id bigint generated always as identity primary key,
+  log_date date not null,
+  sick_count integer not null,
+  total_count integer,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists pig_health_log_date_idx
+  on pig_health_log (log_date desc);
+

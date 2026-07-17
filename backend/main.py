@@ -12,7 +12,7 @@ Endpoints (แปลงมาจาก weather_predict.py เดิม):
   -> ใช้พอร์ต 8000 เสมอ ให้ตรงกับ Vite proxy ฝั่ง frontend
 """
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -75,6 +75,13 @@ class Prediction(BaseModel):
     windspeed_pred: Optional[float] = None
     rainfall_pred: Optional[float] = None
     light_pred: Optional[float] = None
+
+
+class PigHealth(BaseModel):
+    log_date: date
+    sick_count: int
+    total_count: Optional[int] = None
+    note: Optional[str] = None
 
 
 class ChatTurn(BaseModel):
@@ -353,6 +360,37 @@ def stats(days: int = 7):
     }
 
 
+@app.post("/pig-health", response_model=PigHealth)
+def save_pig_health(p: PigHealth):
+    """บันทึกจำนวนหมูป่วยรายวัน (กรอกมือจากหน้าเว็บ ไม่ใช่จากเซนเซอร์)"""
+    data = p.model_dump(mode="json")
+    supabase.table("pig_health_log").insert(data).execute()
+    return p
+
+
+@app.get("/pig-health-log")
+def pig_health_log(page: int = 0, page_size: int = 100):
+    """ประวัติจำนวนหมูป่วยรายวันทั้งหมด แบ่งหน้าฝั่ง server"""
+    page = max(0, page)
+    page_size = max(1, min(100, page_size))
+    start = page * page_size
+    end = start + page_size - 1
+
+    result = (
+        supabase.table("pig_health_log")
+        .select("*", count="exact")
+        .order("log_date", desc=True)
+        .range(start, end)
+        .execute()
+    )
+    return {
+        "rows": result.data or [],
+        "total": result.count or 0,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
 @app.get("/predict")
 def predict():
     """
@@ -418,15 +456,16 @@ def predict():
 
 
 SYSTEM_PROMPT = (
-    "คุณคือผู้ช่วย AI ของสถานีตรวจอากาศอัจฉริยะ (Weather Station AI) ที่ฟาร์มสระบุรี "
-    "ช่วยเกษตรกร/ผู้ดูแลฟาร์มเข้าใจสภาพอากาศและให้คำแนะนำเชิงปฏิบัติ\n"
+    "คุณคือผู้ช่วย AI ของฟาร์มสระบุรี ดูแลทั้งสถานีตรวจอากาศอัจฉริยะ (Weather Station AI) "
+    "และข้อมูลสุขภาพหมูในฟาร์ม ช่วยเกษตรกร/ผู้ดูแลฟาร์มเข้าใจสภาพอากาศ สุขภาพหมู และให้คำแนะนำเชิงปฏิบัติ\n"
     "แนวทางการตอบ:\n"
-    "- ใช้ตัวเลขสภาพอากาศจาก CONTEXT เป็นข้อมูลอ้างอิงหลัก และตอบคำถามให้ครบถ้วนเสมอ\n"
+    "- ใช้ตัวเลขจาก CONTEXT เป็นข้อมูลอ้างอิงหลัก และตอบคำถามให้ครบถ้วนเสมอ\n"
     "- ตอบเป็นภาษาไทย สุภาพ กระชับ ลงท้ายด้วย 'ครับ'\n"
     "- อ้างอิงตัวเลขจริงพร้อมหน่วยเมื่อเกี่ยวข้อง\n"
-    "- ถ้าถามพยากรณ์/แนวโน้ม ให้ดูตารางพยากรณ์และประวัติย้อนหลัง แล้วสรุปทิศทาง (สูงขึ้น/ลดลง/ทรงตัว)\n"
-    "- ถ้าถามเชิงประวัติ/สถิติ (เช่น สัปดาห์นี้ร้อนสุดกี่องศา, เดือนนี้ฝนตกกี่ครั้ง) ให้ดูจากสถิติย้อนหลังใน CONTEXT\n"
-    "- ถ้าผู้ใช้ขอคำแนะนำ (เช่น การดูแลพืช ตากผ้า รดน้ำ) ให้แนะนำโดยอิงจากสภาพอากาศปัจจุบัน/พยากรณ์ ตามความรู้ทั่วไปได้\n"
+    "- ถ้าถามพยากรณ์/แนวโน้มอากาศ ให้ดูตารางพยากรณ์และประวัติย้อนหลัง แล้วสรุปทิศทาง (สูงขึ้น/ลดลง/ทรงตัว)\n"
+    "- ถ้าถามเชิงประวัติ/สถิติอากาศ (เช่น สัปดาห์นี้ร้อนสุดกี่องศา, เดือนนี้ฝนตกกี่ครั้ง) ให้ดูจากสถิติย้อนหลังใน CONTEXT\n"
+    "- ถ้าถามเรื่องหมูป่วย/สุขภาพหมู ให้ดูจากบันทึกหมูป่วยรายวันใน CONTEXT สรุปจำนวน แนวโน้ม (เพิ่มขึ้น/ลดลง) และเตือนถ้าตัวเลขสูงผิดปกติ\n"
+    "- ถ้าผู้ใช้ขอคำแนะนำ (เช่น การดูแลพืช/หมู ตากผ้า รดน้ำ) ให้แนะนำโดยอิงจากข้อมูลปัจจุบัน/พยากรณ์ ตามความรู้ทั่วไปได้\n"
     "- ห้ามแต่งตัวเลขที่ไม่มีใน CONTEXT ถ้าไม่มีข้อมูลค่านั้นให้บอกตรง ๆ ว่ายังไม่มีข้อมูล\n"
     "- ตอบสั้น 1-4 ประโยค เหมาะกับการอ่านออกเสียง (ไม่ใส่ตาราง/markdown)"
 )
@@ -466,6 +505,37 @@ def _needs_stats(text: str) -> Optional[int]:
     return None
 
 
+# คำที่บ่งบอกว่าผู้ใช้ถามเรื่องหมู/สุขภาพหมู -> ต้องแนบบันทึกหมูป่วยให้ LLM
+_PIG_KEYWORDS = ("หมู", "สุกร", "ป่วย", "คอก", "ปศุสัตว์")
+
+
+def _needs_pig(text: str) -> bool:
+    return any(k in text for k in _PIG_KEYWORDS)
+
+
+def _recent_pig_health(limit: int = 14) -> list[dict]:
+    res = (
+        supabase.table("pig_health_log")
+        .select("*")
+        .order("log_date", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return res.data or []
+
+
+def _fmt_pig_health(rows: list[dict]) -> str:
+    if not rows:
+        return "บันทึกสุขภาพหมู: ยังไม่มีข้อมูล"
+    lines = [
+        f"  {r['log_date']}: ป่วย {r['sick_count']} ตัว"
+        + (f" จากทั้งหมด {r['total_count']} ตัว" if r.get("total_count") is not None else "")
+        + (f" ({r['note']})" if r.get("note") else "")
+        for r in rows
+    ]
+    return f"บันทึกจำนวนหมูป่วยรายวัน (ล่าสุดก่อน):\n" + "\n".join(lines)
+
+
 def _fmt_stats(s: dict) -> str:
     t, h, w, r, l = s["temperature"], s["humidity"], s["windspeed"], s["rainfall"], s["light"]
     return (
@@ -479,11 +549,12 @@ def _fmt_stats(s: dict) -> str:
     )
 
 
-def _build_context(detailed: bool = False, stats_days: Optional[int] = None) -> str:
+def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig: bool = False) -> str:
     """สร้าง CONTEXT ให้ LLM
     detailed=False -> แนบแค่ค่าปัจจุบัน 1 บรรทัด (ประหยัด token, ใช้กับคำถามทั่วไป)
     detailed=True  -> แนบประวัติย้อนหลัง + ตารางพยากรณ์ (ใช้เฉพาะคำถามพยากรณ์/แนวโน้ม)
     stats_days     -> ถ้ามีค่า จะแนบสรุปสถิติย้อนหลังกี่วัน (ใช้เฉพาะคำถามเชิงประวัติ/สถิติ)
+    pig            -> ถ้า True จะแนบบันทึกสุขภาพหมูย้อนหลัง (ใช้เฉพาะคำถามเกี่ยวกับหมู)
     """
     parts = []
 
@@ -497,6 +568,12 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None) -> 
     if stats_days:
         try:
             parts.append(_fmt_stats(stats(stats_days)))
+        except Exception:
+            pass
+
+    if pig:
+        try:
+            parts.append(_fmt_pig_health(_recent_pig_health()))
         except Exception:
             pass
 
@@ -531,8 +608,26 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None) -> 
 
 
 def _rule_based_answer(text: str) -> str:
-    """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม/สถิติย้อนหลัง"""
+    """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม/สถิติย้อนหลัง/หมู"""
     w = read_sensor()
+
+    if _needs_pig(text):
+        try:
+            rows = _recent_pig_health(limit=2)
+            if rows:
+                latest = rows[0]
+                msg = f"บันทึกล่าสุด ({latest['log_date']}) หมูป่วย {latest['sick_count']} ตัว"
+                if latest.get("total_count") is not None:
+                    msg += f" จากทั้งหมด {latest['total_count']} ตัว"
+                if len(rows) > 1:
+                    diff = latest["sick_count"] - rows[1]["sick_count"]
+                    if diff > 0:
+                        msg += f" (เพิ่มขึ้น {diff} ตัวจากวันก่อนหน้า)"
+                    elif diff < 0:
+                        msg += f" (ลดลง {-diff} ตัวจากวันก่อนหน้า)"
+                return msg + " ครับ"
+        except Exception:
+            pass
 
     stats_days = _needs_stats(text)
     if stats_days:
@@ -597,7 +692,11 @@ def ask(q: Question):
     if _llm is None:
         return Answer(answer=_rule_based_answer(text))
 
-    context = _build_context(detailed=_needs_forecast(text), stats_days=_needs_stats(text))
+    context = _build_context(
+        detailed=_needs_forecast(text),
+        stats_days=_needs_stats(text),
+        pig=_needs_pig(text),
+    )
 
     # ต่อบทสนทนาแบบ multi-turn: เอาประวัติล่าสุดไม่เกิน MAX_HISTORY_TURNS เทิร์น
     contents = []
