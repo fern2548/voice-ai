@@ -22,7 +22,7 @@ export default function MetricGauges() {
           const v = stale ? null : (data?.[m.key] ?? null)
           const level = levelOf(m, v)
           return (
-            <div className={`metric-cell lv-${level}`} key={m.key}>
+            <div className={`metric-cell lv-${level}`} key={m.key} style={{ '--metric-color': m.color }}>
               <div className={`status-led led-${level}`} />
               <div className="metric-icon"><i className={`ti ${m.icon}`} aria-hidden="true" /></div>
               <div className="metric-label">{m.label}</div>

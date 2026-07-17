@@ -23,7 +23,7 @@ export default function StatusBar() {
       <div className="sb-left">
         <div className="sb-logo"><i className="ti ti-cloud-bolt" aria-hidden="true" /></div>
         <div>
-          <div className="sb-title">WEATHER STATION AI</div>
+          <div className="sb-title">ฟาร์มมี่ (FARMY)</div>
           <div className="sb-sub">SCADA MONITORING · SARABURI FARM</div>
         </div>
       </div>

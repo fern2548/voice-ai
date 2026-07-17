@@ -14,6 +14,8 @@ export default defineConfig({
       '/predict': target,
       '/readings-log': target,
       '/predictions-log': target,
+      '/pig-health': target,
+      '/pig-health-log': target,
       '/ask': target,
     },
   },

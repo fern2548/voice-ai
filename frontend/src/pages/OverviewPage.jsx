@@ -1,11 +1,13 @@
 import MetricGauges from '../components/scada/MetricGauges.jsx'
-import TrendChart from '../components/scada/TrendChart.jsx'
+import VoiceAIPanel from '../components/VoiceAIPanel.jsx'
 
 export default function OverviewPage() {
   return (
     <>
+      <div className="hero-voice-wrap">
+        <VoiceAIPanel />
+      </div>
       <MetricGauges />
-      <TrendChart />
     </>
   )
 }

@@ -53,7 +53,6 @@ export default function ChatWidget() {
     setQuestion('')
     setBusy(true)
 
-    // ประวัติที่ส่งไป = บทสนทนาก่อนหน้า (ไม่รวมข้อความทักทายเริ่มต้น) เอาแค่ SEND_TURNS ล่าสุด
     const history = messages
       .filter((m) => m !== GREETING)
       .slice(-SEND_TURNS)
@@ -89,6 +88,7 @@ export default function ChatWidget() {
       ask(t)
     }
     r.onerror = () => setListening(false)
+    r.onend = () => setListening(false)
   }
 
   return (

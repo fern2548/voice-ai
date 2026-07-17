@@ -30,5 +30,8 @@ export const getPredict = () => get('/predict')
 export const getReadingsLog = (opts) => logQuery('/readings-log', opts)
 export const getPredictionsLog = (opts) => logQuery('/predictions-log', opts)
 
+export const getPigHealthLog = (opts) => logQuery('/pig-health-log', opts)
+export const savePigHealth = (entry) => post('/pig-health', entry)
+
 // history: อาร์เรย์ของ { role: 'user'|'model', text } ไม่กี่เทิร์นล่าสุด (ประหยัด token)
 export const askAI = (text, history = []) => post('/ask', { text, history })

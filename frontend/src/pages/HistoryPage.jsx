@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import RawReadingsTable from '../components/RawReadingsTable.jsx'
 import PredictionHistoryTable from '../components/PredictionHistoryTable.jsx'
+import TrendChart from '../components/scada/TrendChart.jsx'
 
 const TABS = [
   { id: 'raw', label: 'ข้อมูลดิบ', icon: 'ti-database' },
@@ -24,6 +25,8 @@ export default function HistoryPage() {
           </button>
         ))}
       </div>
+
+      <TrendChart />
 
       {tab === 'raw' ? <RawReadingsTable /> : <PredictionHistoryTable />}
     </>

@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import StatusBar from './components/scada/StatusBar.jsx'
-import ChatWidget from './components/ChatWidget.jsx'
 import SensorAlert from './components/SensorAlert.jsx'
 import ConnectionAlert from './components/ConnectionAlert.jsx'
+import ChatWidget from './components/ChatWidget.jsx'
 import OverviewPage from './pages/OverviewPage.jsx'
 import ForecastPage from './pages/ForecastPage.jsx'
 import TrendComparePage from './pages/TrendComparePage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
+import PigHealthPage from './pages/PigHealthPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 
 const NAV = [
@@ -15,6 +16,7 @@ const NAV = [
   { to: '/forecast', icon: 'ti-cloud', label: 'Forecast' },
   { to: '/trend', icon: 'ti-chart-line', label: 'Predictive Insights' },
   { to: '/history', icon: 'ti-history', label: 'History' },
+  { to: '/pig-log', icon: 'ti-paw', label: 'หมูป่วยรายวัน' },
   { to: '/settings', icon: 'ti-settings', label: 'Settings' },
 ]
 
@@ -68,12 +70,13 @@ export default function App() {
           <Route path="/forecast" element={<ForecastPage />} />
           <Route path="/trend" element={<TrendComparePage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/pig-log" element={<PigHealthPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Routes>
       </main>
 
-      <ChatWidget />
+      {location.pathname !== '/overview' && <ChatWidget />}
     </div>
   )
 }

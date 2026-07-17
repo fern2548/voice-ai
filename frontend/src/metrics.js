@@ -5,6 +5,7 @@ export const METRICS = [
     label: 'อุณหภูมิ',
     unit: '°C',
     icon: 'ti-temperature',
+    color: '#ff7a45',
     min: 0,
     max: 50,
     // ช่วงเตือน: ปกติ / เฝ้าระวัง / อันตราย
@@ -19,6 +20,7 @@ export const METRICS = [
     label: 'ความชื้น',
     unit: '%',
     icon: 'ti-droplet',
+    color: '#3fa9f5',
     min: 0,
     max: 100,
     zones: [
@@ -32,6 +34,7 @@ export const METRICS = [
     label: 'ความเร็วลม',
     unit: 'm/s',
     icon: 'ti-wind',
+    color: '#39c5cf',
     min: 0,
     max: 20,
     zones: [
@@ -45,6 +48,7 @@ export const METRICS = [
     label: 'ปริมาณฝน',
     unit: 'mm',
     icon: 'ti-cloud-rain',
+    color: '#9b7bff',
     min: 0,
     max: 50,
     zones: [
@@ -58,6 +62,7 @@ export const METRICS = [
     label: 'ความเข้มแสง',
     unit: 'lux',
     icon: 'ti-sun',
+    color: '#ffcc33',
     min: 0,
     max: 2000,
     zones: [
