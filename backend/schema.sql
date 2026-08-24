@@ -71,3 +71,51 @@ create table if not exists pig_health_log (
 create index if not exists pig_health_log_date_idx
   on pig_health_log (log_date desc);
 
+-- บันทึกการฉีดวัคซีน/ยาให้หมู (กรอกมือหรือสั่งด้วยเสียงผ่าน Voice AI)
+create table if not exists vaccine_log (
+  id bigint generated always as identity primary key,
+  log_date date not null,
+  vaccine_name text,
+  barn_no text,       -- เลขโรงเรือน
+  pen_no text,        -- เลขคอก
+  pig_count integer,  -- จำนวนหมูที่ฉีด
+  injector text,      -- ผู้ฉีด
+  lot_no text,        -- Lot/Batch วัคซีน
+  dose text,          -- ปริมาณ/ขนาดยา (เช่น "2ml")
+  log_time text,      -- เวลาที่ฉีด (เช่น "09:30")
+  next_due_date date, -- นัดฉีดครั้งถัดไป
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists vaccine_log_date_idx
+  on vaccine_log (log_date desc);
+
+-- รันก้อนนี้แยกถ้าตาราง vaccine_log มีอยู่แล้วก่อนหน้า (เพิ่มคอลัมน์ใหม่โดยไม่ลบข้อมูลเดิม)
+alter table vaccine_log add column if not exists barn_no text;
+alter table vaccine_log add column if not exists pen_no text;
+alter table vaccine_log add column if not exists pig_count integer;
+alter table vaccine_log add column if not exists injector text;
+alter table vaccine_log add column if not exists lot_no text;
+alter table vaccine_log add column if not exists dose text;
+alter table vaccine_log add column if not exists log_time text;
+alter table vaccine_log add column if not exists next_due_date date;
+
+-- กำหนดรอบฉีดซ้ำต่อวัคซีน 1 ชื่อ = 1 กำหนด (ผู้ใช้/สัตวแพทย์เป็นคนตั้งเอง ระบบไม่เดาเอง)
+-- เมื่อบันทึกฉีดวัคซีนที่มีชื่อตรงกับตารางนี้ ระบบจะคำนวณ next_due_date ให้อัตโนมัติ
+create table if not exists vaccine_schedule (
+  vaccine_name text primary key,
+  interval_days integer not null,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+-- ผู้ใช้ admin หลายคน (แทนที่รหัสผ่านเดียวแบบเดิม) — เก็บ password แบบ hash+salt เสมอ ไม่เก็บ plain text
+create table if not exists admin_users (
+  id bigint generated always as identity primary key,
+  username text not null unique,
+  password_hash text not null,
+  password_salt text not null,
+  created_at timestamptz not null default now()
+);
+

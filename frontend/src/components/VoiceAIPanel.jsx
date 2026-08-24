@@ -1,117 +1,130 @@
 import { useEffect, useRef, useState } from 'react'
-import { askAI } from '../api.js'
-import { speak, isMuted, setMuted, listVoices, getSavedVoiceURI, setSavedVoiceURI } from '../utils/voice.js'
+import { useNavigate } from 'react-router-dom'
+import { useVoiceAI } from '../context/VoiceAI.jsx'
+import { HeroWave, HeroRibbons } from './FarmDecor.jsx'
 
-// ส่งประวัติแค่ไม่กี่เทิร์นล่าสุดให้ backend (backend ก็ตัดซ้ำอีกชั้น) — ประหยัด token/TPM
-const SEND_TURNS = 6 // = 3 คู่ถาม-ตอบล่าสุด
-
-const GREETING = { role: 'model', text: 'สวัสดีครับ! แตะช่องด้านล่างแล้วพูดถามเรื่องสภาพอากาศได้เลยครับ' }
-
-function useVoiceList() {
-  const [voices, setVoices] = useState(() => listVoices())
-  useEffect(() => {
-    const synth = window.speechSynthesis
-    if (!synth) return
-    const update = () => setVoices(listVoices())
-    synth.addEventListener('voiceschanged', update)
-    update()
-    return () => synth.removeEventListener('voiceschanged', update)
-  }, [])
-  return voices
-}
+// ปุ่มลัด — บางอันพาไปหน้าอื่น บางอันถาม AI ให้เลย
+const QUICK_ACTIONS = [
+  { icon: 'ti-home', tone: 'blue', text: 'เปิดโรงเรือน', to: '/pig-log' },
+  { icon: 'ti-heartbeat', tone: 'pink', text: 'เช็กหมูป่วย', ask: 'วันนี้หมูป่วยกี่ตัว' },
+  { icon: 'ti-vaccine', tone: 'cyan', text: 'บันทึกวัคซีน', to: '/vaccine' },
+  { icon: 'ti-file-analytics', tone: 'purple', text: 'ดูรายงาน', to: '/history' },
+]
 
 export default function VoiceAIPanel() {
-  const [question, setQuestion] = useState('')
-  const [messages, setMessages] = useState([GREETING])
-  const [listening, setListening] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [muted, setMutedState] = useState(() => isMuted())
   const [showVoiceMenu, setShowVoiceMenu] = useState(false)
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState(() => getSavedVoiceURI())
+  const {
+    question, setQuestion, messages, listening, busy,
+    muted, toggleMute, selectedVoiceURI, changeVoice, voices,
+    ask, startVoice, voiceError,
+  } = useVoiceAI()
   const scrollRef = useRef(null)
-  const voices = useVoiceList()
+  const inputRef = useRef(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
-  const toggleMute = () => {
-    const next = !muted
-    setMuted(next)
-    setMutedState(next)
-  }
-
-  const changeVoice = (uri) => {
-    setSavedVoiceURI(uri)
-    setSelectedVoiceURI(uri)
-  }
-
-  const ask = async (text) => {
-    const q = (text ?? question).trim()
-    if (!q || busy) return
-    setQuestion('')
-    setBusy(true)
-
-    const history = messages
-      .filter((m) => m !== GREETING)
-      .slice(-SEND_TURNS)
-      .map(({ role, text }) => ({ role, text }))
-
-    setMessages((prev) => [...prev, { role: 'user', text: q }])
-    try {
-      const d = await askAI(q, history)
-      setMessages((prev) => [...prev, { role: 'model', text: d.answer }])
-      speak(d.answer)
-    } catch {
-      setMessages((prev) => [...prev, { role: 'model', text: 'ขออภัยครับ ตอนนี้เชื่อมต่อระบบไม่ได้ ลองใหม่อีกครั้งนะครับ' }])
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const startVoice = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) {
-      alert('Browser ไม่รองรับ กรุณาใช้ Chrome')
-      return
-    }
-    const r = new SR()
-    r.lang = 'th-TH'
-    r.interimResults = false
-    setListening(true)
-    r.start()
-    r.onresult = (e) => {
-      const t = e.results[0][0].transcript
-      setQuestion(t)
-      setListening(false)
-      ask(t)
-    }
-    r.onerror = () => setListening(false)
-    r.onend = () => setListening(false)
-  }
-
   return (
-    <div className="voice-panel">
-      <div className="voice-panel-head">
-        <span><i className="ti ti-microphone-2" aria-hidden="true" style={{ marginRight: 8 }} />Voice AI ผู้ช่วยสภาพอากาศ</span>
-        <div className="chat-pop-actions">
-          <button
-            className="chat-pop-icon-btn"
-            onClick={() => setShowVoiceMenu((v) => !v)}
-            aria-label="ตั้งค่าเสียง"
-            title="ตั้งค่าเสียง"
-          >
-            <i className="ti ti-settings" aria-hidden="true" />
-          </button>
-          <button
-            className="chat-pop-icon-btn"
-            onClick={toggleMute}
-            aria-label={muted ? 'เปิดเสียง' : 'ปิดเสียง'}
-            title={muted ? 'เปิดเสียง' : 'ปิดเสียง'}
-          >
-            <i className={`ti ${muted ? 'ti-volume-off' : 'ti-volume'}`} aria-hidden="true" />
-          </button>
+    <div className="voice-hero">
+      <HeroRibbons />
+      <h1 className="hero-title">Farmy Voice</h1>
+      <div className="hero-tagline">Voice AI สำหรับฟาร์มหมูอัจฉริยะ</div>
+      <div className="hero-sub">ถามข้อมูลภายในฟาร์ม หรือให้พาไปยังหน้าต่างๆ ได้ด้วยเสียง</div>
+
+      <div className="voice-ptt-stage">
+        <HeroWave side="left" active={listening} />
+
+        <button
+          className={`voice-ptt ${listening ? 'listening' : ''} ${busy ? 'busy' : ''}`}
+          onClick={startVoice}
+          disabled={busy}
+          aria-label="เริ่มสนทนา"
+        >
+          <span className="voice-ptt-mic" aria-hidden="true">
+            <span className="mic-dot-ring" />
+            <i className="ti ti-microphone" />
+          </span>
+          <span className="voice-ptt-text">
+            {busy ? 'กำลังคิด…' : listening ? 'กำลังฟัง…' : 'คุยกับ Farmy Voice'}
+          </span>
+          <i className="ti ti-chevron-right voice-ptt-arrow" aria-hidden="true" />
+        </button>
+
+        <HeroWave side="right" active={listening} />
+      </div>
+      <span className="ptt-reflection" aria-hidden="true" />
+
+      {listening && (
+        <div className="voice-ptt-hint">
+          <span className="voice-ptt-dot" />
+          กำลังฟังอยู่… แตะอีกครั้งเพื่อหยุด
         </div>
+      )}
+
+      <div className="voice-quick-row">
+        {QUICK_ACTIONS.map((a) => (
+          <button
+            key={a.text}
+            className={`voice-quick-chip tone-${a.tone}`}
+            disabled={busy}
+            onClick={() => (a.to ? navigate(a.to) : ask(a.ask))}
+          >
+            <span className="quick-chip-icon"><i className={`ti ${a.icon}`} aria-hidden="true" /></span>
+            <span className="quick-chip-label">{a.text}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="voice-inputbar">
+        <i className="ti ti-wave-sine voice-inputbar-icon" aria-hidden="true" />
+        <input
+          ref={inputRef}
+          className="voice-inputbar-input"
+          type="text"
+          placeholder="พูดหรือพิมพ์คำสั่งได้เลยครับ"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && ask()}
+        />
+        {/* ปุ่มไมค์อยู่ตลอด (กดซ้ำเพื่อหยุดฟังได้) ส่วนปุ่มส่งจะโผล่เพิ่มเมื่อมีข้อความแล้ว */}
+        <button
+          className={`voice-inputbar-mic ${listening ? 'listening' : ''}`}
+          onClick={startVoice}
+          disabled={busy}
+          aria-label={listening ? 'หยุดฟัง' : 'พูด'}
+        >
+          <i className={`ti ${listening ? 'ti-player-stop-filled' : 'ti-microphone'}`} aria-hidden="true" />
+        </button>
+        {question.trim() && (
+          <button
+            className="voice-inputbar-send"
+            onClick={() => ask()}
+            disabled={busy}
+            aria-label="ส่งคำถาม"
+          >
+            <i className="ti ti-send" aria-hidden="true" />
+            <span>ส่ง</span>
+          </button>
+        )}
+      </div>
+
+      {voiceError && (
+        <div className="voice-error">
+          <i className="ti ti-alert-triangle" aria-hidden="true" />
+          {voiceError}
+        </div>
+      )}
+
+      <div className="voice-hero-tools">
+        <button className="voice-mute-toggle" onClick={() => setShowVoiceMenu((v) => !v)}>
+          <i className="ti ti-settings" aria-hidden="true" /> ตั้งค่าเสียง
+        </button>
+        <button className="voice-mute-toggle" onClick={toggleMute}>
+          <i className={`ti ${muted ? 'ti-volume-off' : 'ti-volume'}`} aria-hidden="true" />
+          {muted ? 'เปิดเสียงตอบ' : 'ปิดเสียงตอบ'}
+        </button>
       </div>
 
       {showVoiceMenu && (
@@ -136,35 +149,14 @@ export default function VoiceAIPanel() {
         </div>
       )}
 
-      <button
-        className={`voice-box ${listening ? 'listening' : ''} ${busy ? 'busy' : ''}`}
-        onClick={startVoice}
-        disabled={busy}
-      >
-        <i className="ti ti-microphone" aria-hidden="true" />
-        <span className="voice-box-text">
-          {busy ? 'กำลังคิด…' : listening ? 'กำลังฟัง… พูดได้เลยครับ' : 'แตะที่นี่แล้วพูดถามเรื่องสภาพอากาศ'}
-        </span>
-      </button>
-
-      <div className="input-row voice-panel-typerow">
-        <input
-          className="chat-input"
-          type="text"
-          placeholder="หรือพิมพ์คำถามที่นี่…"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && ask()}
-        />
-        <button className="ask-btn" onClick={() => ask()} disabled={busy}>ถาม</button>
-      </div>
-
-      <div className="chat-thread voice-panel-thread" ref={scrollRef}>
-        {messages.map((m, i) => (
-          <div key={i} className={`chat-msg ${m.role}`}>{m.text}</div>
-        ))}
-        {busy && <div className="chat-msg model dim">กำลังคิด…</div>}
-      </div>
+      {messages.length > 1 && (
+        <div className="chat-thread voice-hero-thread" ref={scrollRef}>
+          {messages.map((m, i) => (
+            <div key={i} className={`chat-msg ${m.role}`}>{m.text}</div>
+          ))}
+          {busy && <div className="chat-msg model dim">กำลังคิด…</div>}
+        </div>
+      )}
     </div>
   )
 }

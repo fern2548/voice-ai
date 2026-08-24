@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Design tokens
+   สองโหมดใช้โครงสีเดียวกัน ต่างกันแค่ค่า ทำให้รู้สึกเป็นผลิตภัณฑ์เดียวกัน
+   ============================================================ */
+:root {
+  /* Light — warm white / pearl / soft gray + icy blue, lavender, muted cyan */
+  --c-base: 250 249 247;
+  --c-raised: 255 255 255;
+  --c-fg: 22 24 31;
+  --c-muted: 104 108 122;
+  --c-faint: 152 156 168;
+  --c-line: 226 224 220;
+  --c-accent: 22 148 92;
+  --c-iris: 132 116 226;
+  --c-aqua: 64 168 140;
+  --c-warm: 226 148 116;
+}
+
+.dark {
+  /* Dark — near black / midnight navy / deep graphite + cool blue, soft violet, subtle cyan */
+  --c-base: 8 9 14;
+  --c-raised: 18 20 30;
+  --c-fg: 237 239 245;
+  --c-muted: 148 154 172;
+  --c-faint: 104 110 130;
+  --c-line: 42 46 62;
+  --c-accent: 74 202 137;
+  --c-iris: 158 142 246;
+  --c-aqua: 94 208 176;
+  --c-warm: 240 168 134;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-base font-sans text-fg antialiased;
+    overflow-x: hidden;
+    /* เปลี่ยนธีมแบบช้า ๆ ให้รู้สึกพรีเมียม */
+    transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1), color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ผิวเนื้อฟิล์มบาง ๆ ทั่วหน้า ลดความ "แบน" ของสีพื้น */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0.022;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  ::selection {
+    background: rgb(var(--c-accent) / 0.22);
+  }
+}
+
+@layer components {
+  /* ตัวอักษรไล่สี ใช้เฉพาะหัวข้อใหญ่ที่ต้องการให้เป็นจุดสนใจ */
+  .text-display-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      104deg,
+      rgb(var(--c-fg)) 0%,
+      rgb(var(--c-fg)) 30%,
+      rgb(var(--c-accent)) 58%,
+      rgb(var(--c-iris)) 82%,
+      rgb(var(--c-aqua)) 100%
+    );
+  }
+
+  /* พื้นผิวกระจก — ใช้เท่าที่จำเป็น ไม่ใส่กรอบทุกชิ้น */
+  .glass {
+    @apply rounded-[28px] backdrop-blur-2xl;
+    background: rgb(var(--c-raised) / 0.55);
+    border: 1px solid rgb(var(--c-line) / 0.7);
+  }
+
+  .dark .glass {
+    background: rgb(var(--c-raised) / 0.45);
+    border-color: rgb(255 255 255 / 0.06);
+  }
+
+  /* ป้ายกำกับหมวด ตัวเล็ก ระยะห่างตัวอักษรกว้าง */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.34em] text-faint;
+  }
+
+  .stage {
+    @apply mx-auto w-full max-w-stage px-6 sm:px-10 lg:px-14;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

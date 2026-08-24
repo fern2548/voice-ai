@@ -1,82 +1,69 @@
-import { useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import StatusBar from './components/scada/StatusBar.jsx'
 import SensorAlert from './components/SensorAlert.jsx'
 import ConnectionAlert from './components/ConnectionAlert.jsx'
+import VaccineDueAlert from './components/VaccineDueAlert.jsx'
 import ChatWidget from './components/ChatWidget.jsx'
+import { VoiceAIProvider } from './context/VoiceAI.jsx'
+import { AdminAuthProvider } from './context/AdminAuth.jsx'
+import AdminLoginGate from './components/AdminLoginGate.jsx'
 import OverviewPage from './pages/OverviewPage.jsx'
 import ForecastPage from './pages/ForecastPage.jsx'
 import TrendComparePage from './pages/TrendComparePage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
 import PigHealthPage from './pages/PigHealthPage.jsx'
+import VaccinePage from './pages/VaccinePage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 
 const NAV = [
-  { to: '/overview', icon: 'ti-layout-dashboard', label: 'Overview' },
-  { to: '/forecast', icon: 'ti-cloud', label: 'Forecast' },
-  { to: '/trend', icon: 'ti-chart-line', label: 'Predictive Insights' },
-  { to: '/history', icon: 'ti-history', label: 'History' },
-  { to: '/pig-log', icon: 'ti-paw', label: 'หมูป่วยรายวัน' },
-  { to: '/settings', icon: 'ti-settings', label: 'Settings' },
+  { to: '/overview', label: 'หน้าแรก' },
+  { to: '/pig-log', label: 'โรงเรือน' },
+  { to: '/vaccine', label: 'วัคซีน' },
+  { to: '/history', label: 'รายงาน' },
+  { to: '/forecast', label: 'พยากรณ์อากาศ' },
+  { to: '/settings', label: 'ตั้งค่า' },
 ]
 
-export default function App() {
+function AppShell() {
   const location = useLocation()
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem('nav-collapsed') === '1'
-  )
-
-  const toggleCollapsed = () => {
-    setCollapsed((c) => {
-      const next = !c
-      localStorage.setItem('nav-collapsed', next ? '1' : '0')
-      return next
-    })
-  }
 
   return (
-    <div className={`scada-root ${collapsed ? 'nav-collapsed' : ''}`}>
-      <StatusBar />
-      <div className="alert-stack">
-        <ConnectionAlert />
-        <SensorAlert />
+    <VoiceAIProvider>
+      <div className="app-root">
+        <StatusBar navItems={NAV} currentPath={location.pathname} />
+
+        <div className="alert-stack">
+          <ConnectionAlert />
+          <SensorAlert />
+          <VaccineDueAlert />
+        </div>
+
+        <main className="app-main">
+          <Routes>
+            <Route path="/" element={<Navigate to="/overview" replace />} />
+            <Route path="/overview" element={<OverviewPage />} />
+            <Route path="/forecast" element={<ForecastPage />} />
+            <Route path="/trend" element={<TrendComparePage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/pig-log" element={<PigHealthPage />} />
+            <Route path="/vaccine" element={<VaccinePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/overview" replace />} />
+          </Routes>
+        </main>
+
+        {location.pathname !== '/overview' && <ChatWidget />}
       </div>
+    </VoiceAIProvider>
+  )
+}
 
-      <nav className="nav-rail">
-        {NAV.map((n) => (
-          <Link
-            key={n.to}
-            to={n.to}
-            className={`nav-item ${location.pathname === n.to ? 'active' : ''}`}
-            title={n.label}
-          >
-            <span className="nav-icon"><i className={`ti ${n.icon}`} aria-hidden="true" /></span>
-            <span className="nav-label">{n.label}</span>
-          </Link>
-        ))}
-        <button
-          className="nav-toggle"
-          onClick={toggleCollapsed}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <i className={`ti ${collapsed ? 'ti-chevrons-right' : 'ti-chevrons-left'}`} aria-hidden="true" />
-        </button>
-      </nav>
-
-      <main className="scada-main">
-        <Routes>
-          <Route path="/" element={<Navigate to="/overview" replace />} />
-          <Route path="/overview" element={<OverviewPage />} />
-          <Route path="/forecast" element={<ForecastPage />} />
-          <Route path="/trend" element={<TrendComparePage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/pig-log" element={<PigHealthPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/overview" replace />} />
-        </Routes>
-      </main>
-
-      {location.pathname !== '/overview' && <ChatWidget />}
-    </div>
+export default function App() {
+  return (
+    <AdminAuthProvider>
+      <AdminLoginGate>
+        <AppShell />
+      </AdminLoginGate>
+    </AdminAuthProvider>
   )
 }

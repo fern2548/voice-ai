@@ -2,7 +2,18 @@ backend/venv/
 backend/__pycache__/
 **/__pycache__/
 *.pyc
+
+# ความลับ — ห้ามขึ้น git เด็ดขาด
 .env
 backend/.env
+*.env.local
+
+# ของที่ build/ติดตั้งเอง
 frontend/node_modules/
 frontend/dist/
+farmy-voice/node_modules/
+farmy-voice/dist/
+
+# ไฟล์ log และไฟล์ทดสอบที่เกิดระหว่างพัฒนา
+*.log
+report-test.png

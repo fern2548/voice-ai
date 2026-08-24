@@ -1,95 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { askAI } from '../api.js'
-import { speak, isMuted, setMuted, listVoices, getSavedVoiceURI, setSavedVoiceURI } from '../utils/voice.js'
-
-// ส่งประวัติแค่ไม่กี่เทิร์นล่าสุดให้ backend (backend ก็ตัดซ้ำอีกชั้น) — ประหยัด token/TPM
-const SEND_TURNS = 6 // = 3 คู่ถาม-ตอบล่าสุด
-
-const GREETING = { role: 'model', text: 'สวัสดีครับ! ถามเรื่องสภาพอากาศได้เลยครับ' }
-
-function useVoiceList() {
-  const [voices, setVoices] = useState(() => listVoices())
-  useEffect(() => {
-    const synth = window.speechSynthesis
-    if (!synth) return
-    const update = () => setVoices(listVoices())
-    synth.addEventListener('voiceschanged', update)
-    update()
-    return () => synth.removeEventListener('voiceschanged', update)
-  }, [])
-  return voices
-}
+import { useVoiceAI } from '../context/VoiceAI.jsx'
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
-  const [question, setQuestion] = useState('')
-  const [messages, setMessages] = useState([GREETING])
-  const [listening, setListening] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [muted, setMutedState] = useState(() => isMuted())
   const [showVoiceMenu, setShowVoiceMenu] = useState(false)
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState(() => getSavedVoiceURI())
+  const {
+    question, setQuestion, messages, listening, busy,
+    muted, toggleMute, selectedVoiceURI, changeVoice, voices,
+    ask, startVoice,
+  } = useVoiceAI()
   const scrollRef = useRef(null)
-  const voices = useVoiceList()
+  const inputRef = useRef(null)
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, open])
-
-  const toggleMute = () => {
-    const next = !muted
-    setMuted(next)
-    setMutedState(next)
-  }
-
-  const changeVoice = (uri) => {
-    setSavedVoiceURI(uri)
-    setSelectedVoiceURI(uri)
-  }
-
-  const ask = async (text) => {
-    const q = (text ?? question).trim()
-    if (!q || busy) return
-    setQuestion('')
-    setBusy(true)
-
-    const history = messages
-      .filter((m) => m !== GREETING)
-      .slice(-SEND_TURNS)
-      .map(({ role, text }) => ({ role, text }))
-
-    setMessages((prev) => [...prev, { role: 'user', text: q }])
-    try {
-      const d = await askAI(q, history)
-      setMessages((prev) => [...prev, { role: 'model', text: d.answer }])
-      speak(d.answer)
-    } catch {
-      setMessages((prev) => [...prev, { role: 'model', text: 'ขออภัยครับ ตอนนี้เชื่อมต่อระบบไม่ได้ ลองใหม่อีกครั้งนะครับ' }])
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const startVoice = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) {
-      alert('Browser ไม่รองรับ กรุณาใช้ Chrome')
-      return
-    }
-    const r = new SR()
-    r.lang = 'th-TH'
-    r.interimResults = false
-    setListening(true)
-    r.start()
-    r.onresult = (e) => {
-      const t = e.results[0][0].transcript
-      setQuestion(t)
-      setListening(false)
-      ask(t)
-    }
-    r.onerror = () => setListening(false)
-    r.onend = () => setListening(false)
-  }
 
   return (
     <>
@@ -150,6 +75,7 @@ export default function ChatWidget() {
           </div>
           <div className="input-row">
             <input
+              ref={inputRef}
               className="chat-input"
               type="text"
               placeholder="พิมพ์ หรือกดไมค์…"

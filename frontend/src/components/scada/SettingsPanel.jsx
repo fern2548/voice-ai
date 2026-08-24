@@ -1,4 +1,5 @@
 import { useTheme } from '../../theme.jsx'
+import AdminUsersPanel from '../AdminUsersPanel.jsx'
 
 export default function SettingsPanel() {
   const { theme, setTheme } = useTheme()
@@ -55,6 +56,8 @@ export default function SettingsPanel() {
           </div>
         </div>
       </div>
+
+      <AdminUsersPanel />
     </div>
   )
 }

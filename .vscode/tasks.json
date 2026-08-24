@@ -1,0 +1,102 @@
+{
+  // งานสำหรับรันเซิร์ฟเวอร์ทั้งหมดจาก VS Code
+  //
+  // วิธีใช้: เปิดโฟลเดอร์นี้ใน VS Code แล้วมันรันให้เองทันที (runOn: folderOpen)
+  //          หรือกด Ctrl+Shift+B เพื่อสั่งรันเอง
+  //
+  // ทุกงานเรียกสคริปต์ .vscode/start-dev.ps1 ซึ่งจะเคลียร์พอร์ตที่ค้างให้ก่อนสตาร์ทเสมอ
+  // (อย่าย้ายคำสั่งกลับมาเขียนยาว ๆ ใน command ตรงนี้ — VS Code จะใส่ quote ครอบ
+  //  แล้ว PowerShell ตีความเป็นข้อความ ทำให้เซิร์ฟเวอร์ไม่สตาร์ทโดยไม่มี error ที่อ่านรู้เรื่อง)
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "เว็บใหม่ Farmy Voice (5174)",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/.vscode/start-dev.ps1",
+        "-Port",
+        "5174",
+        "-Dir",
+        "${workspaceFolder}/farmy-voice",
+        "-Exe",
+        "npm.cmd",
+        "-ExeArgs",
+        "run,dev",
+        "-OpenBrowser"
+      ],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "farmy", "panel": "dedicated", "reveal": "always" }
+    },
+    {
+      "label": "เว็บเดิม dashboard (5173)",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/.vscode/start-dev.ps1",
+        "-Port",
+        "5173",
+        "-Dir",
+        "${workspaceFolder}/frontend",
+        "-Exe",
+        "npm.cmd",
+        "-ExeArgs",
+        "run,dev"
+      ],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "farmy", "panel": "dedicated", "reveal": "always" }
+    },
+    {
+      "label": "backend API (8000)",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/.vscode/start-dev.ps1",
+        "-Port",
+        "8000",
+        "-Dir",
+        "${workspaceFolder}/backend",
+        "-Exe",
+        "python",
+        "-ExeArgs",
+        "-m,uvicorn,main:app,--reload,--port,8000"
+      ],
+      "options": {
+        // จำเป็น: backend พิมพ์ข้อความภาษาไทยตอนเริ่มทำงาน
+        // ถ้าคอนโซล Windows ใช้ cp1252 จะ crash ด้วย UnicodeEncodeError ตั้งแต่ยังไม่ทันเปิด
+        "env": { "PYTHONIOENCODING": "utf-8" }
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "farmy", "panel": "dedicated", "reveal": "always" }
+    },
+    {
+      "label": "เปิดทุกอย่าง",
+      "dependsOn": [
+        "backend API (8000)",
+        "เว็บเดิม dashboard (5173)",
+        "เว็บใหม่ Farmy Voice (5174)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      // เป็นงานหลัก กด Ctrl+Shift+B ได้เลย
+      "group": { "kind": "build", "isDefault": true },
+      // เปิดโฟลเดอร์นี้ใน VS Code เมื่อไหร่ ทั้งสามตัวจะรันให้เองทันที
+      "runOptions": { "runOn": "folderOpen" }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import usePolling from '../hooks/usePolling.js'
 import { getPigHealthLog, savePigHealth } from '../api.js'
+import AdminGate from './AdminGate.jsx'
 
 const PAGE_SIZE = 100
 
@@ -56,6 +57,7 @@ export default function PigHealthLog() {
         <div className="panel-head">
           <span className="panel-title">บันทึกจำนวนหมูป่วยรายวัน · MANUAL ENTRY</span>
         </div>
+        <AdminGate>
         <form className="pig-form" onSubmit={submit}>
           <div className="pig-form-row">
             <label className="pig-form-field">
@@ -110,6 +112,7 @@ export default function PigHealthLog() {
             {saveMsg && <span className="pig-form-msg">{saveMsg}</span>}
           </div>
         </form>
+        </AdminGate>
       </div>
 
       <div className="panel">
