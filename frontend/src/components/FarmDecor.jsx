@@ -1,22 +1,26 @@
 // ภาพตกแต่งทั้งหมดวาดเป็น inline SVG — ไม่ต้องพึ่งไฟล์ภาพภายนอก และเปลี่ยนสีตามธีมได้
 
 // โลโก้: หมูในวงกลม + คลื่นเสียง (แบบเดียวกับหัวมุมซ้ายบนของดีไซน์)
+// โลโก้ = ไอคอนคลื่นเสียง ชุดเส้นเดียวกับที่เว็บ Farmy Voice (5174) ใช้
 export function FarmyLogo() {
   return (
-    <svg className="farmy-logo-svg" viewBox="0 0 64 64" role="img" aria-label="Farmy Voice">
-      <circle cx="30" cy="32" r="21" fill="none" stroke="currentColor" strokeWidth="2.4" />
-      {/* หน้าหมู */}
-      <ellipse cx="27" cy="34" rx="12" ry="10" fill="none" stroke="currentColor" strokeWidth="2.2" />
-      <path d="M18 26 L16 19 L23 22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-      <path d="M36 26 L38 19 L31 22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-      <ellipse cx="27" cy="37" rx="5" ry="4" fill="none" stroke="currentColor" strokeWidth="2" />
-      <circle cx="25.4" cy="37" r="1.1" fill="currentColor" />
-      <circle cx="28.6" cy="37" r="1.1" fill="currentColor" />
-      <circle cx="22" cy="30" r="1.4" fill="currentColor" />
-      <circle cx="32" cy="30" r="1.4" fill="currentColor" />
-      {/* คลื่นเสียงด้านขวา */}
-      <path d="M46 24 a12 12 0 0 1 0 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-      <path d="M51 19 a19 19 0 0 1 0 26" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    <svg
+      className="farmy-logo-svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      role="img"
+      aria-label="Farmy Voice"
+    >
+      <path d="M2 10v3" />
+      <path d="M6 6v11" />
+      <path d="M10 3v18" />
+      <path d="M14 8v7" />
+      <path d="M18 5v13" />
+      <path d="M22 10v3" />
     </svg>
   )
 }

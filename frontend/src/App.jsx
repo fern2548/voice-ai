@@ -8,6 +8,7 @@ import { VoiceAIProvider } from './context/VoiceAI.jsx'
 import { AdminAuthProvider } from './context/AdminAuth.jsx'
 import AdminLoginGate from './components/AdminLoginGate.jsx'
 import OverviewPage from './pages/OverviewPage.jsx'
+import FeaturesPage from './pages/FeaturesPage.jsx'
 import ForecastPage from './pages/ForecastPage.jsx'
 import TrendComparePage from './pages/TrendComparePage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
@@ -17,6 +18,7 @@ import SettingsPage from './pages/SettingsPage.jsx'
 
 const NAV = [
   { to: '/overview', label: 'หน้าแรก' },
+  { to: '/features', label: 'ทำอะไรได้บ้าง' },
   { to: '/pig-log', label: 'โรงเรือน' },
   { to: '/vaccine', label: 'วัคซีน' },
   { to: '/history', label: 'รายงาน' },
@@ -42,6 +44,7 @@ function AppShell() {
           <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<OverviewPage />} />
+            <Route path="/features" element={<FeaturesPage />} />
             <Route path="/forecast" element={<ForecastPage />} />
             <Route path="/trend" element={<TrendComparePage />} />
             <Route path="/history" element={<HistoryPage />} />
