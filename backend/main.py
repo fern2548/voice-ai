@@ -19,6 +19,7 @@ import json
 import os
 import re
 import secrets
+import threading
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -202,7 +203,11 @@ def verify_admin_token(x_admin_token: str = Header(...)) -> None:
 
 
 app = FastAPI(title="Weather Station AI")
-_bootstrap_admin_user()
+
+# ทำเบื้องหลัง ห้ามเรียกตรง ๆ ตรงนี้
+# เพราะถ้าต่อฐานข้อมูลไม่ได้ ไลบรารีจะ retry อยู่นาน แอปจะค้างไม่ยอมเปิดพอร์ต
+# แล้ว health check ของผู้ให้บริการจะไม่ผ่าน -> deploy ล้มด้วย Timed Out (เจอมาแล้วตอนขึ้น Render)
+threading.Thread(target=_bootstrap_admin_user, daemon=True).start()
 
 # ---------- PDF export (ภาษาไทย) ----------
 # fpdf2 ไม่มีฟอนต์ไทยติดมาให้ ต้องฝังฟอนต์เอง ไม่งั้นตัวอักษรไทยจะไม่ขึ้น
