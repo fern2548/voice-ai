@@ -17,9 +17,14 @@ load_dotenv(override=True)
 
 TOKEN = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+PUBLIC_REPORT_KEY = os.environ.get("PUBLIC_REPORT_KEY", "")
+# URL ของ "เว็บ" (คนละตัวกับ backend) ใช้กับปุ่มเปิดเว็บ
+# ถ้ายังไม่ได้ deploy เว็บ ให้ปุ่มไปที่หน้าสรุปฟาร์มแทน จะได้ไม่เจอ 401
+# (ห้ามชี้ไปที่ PUBLIC_BASE_URL เฉย ๆ เพราะ backend ล็อกทุก endpoint)
+PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL", "").rstrip("/")
 FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
-F_BOLD = os.path.join(FONT_DIR, "tahomabd.ttf")
-F_REG = os.path.join(FONT_DIR, "tahoma.ttf")
+F_BOLD = os.path.join(FONT_DIR, "Sarabun-Bold.ttf")
+F_REG = os.path.join(FONT_DIR, "Sarabun-Regular.ttf")
 
 W, H = 2500, 843  # ขนาดริชเมนูแบบครึ่งจอ (compact) ที่ LINE รองรับ
 CELL_W = W // 4
@@ -30,6 +35,15 @@ BUTTONS = [
     ("หมูป่วยวันนี้", "จำนวนล่าสุด", "#db2777", "pig_sick"),
     ("เปิดเว็บฟาร์มมี่", "จัดการข้อมูล", "#0891b2", None),
 ]
+
+
+def _site_link() -> str:
+    """ลิงก์ของปุ่ม 'เปิดเว็บ' — เว็บจริงถ้ามี ไม่งั้นใช้หน้าสรุปฟาร์มแทน"""
+    if PUBLIC_SITE_URL:
+        return PUBLIC_SITE_URL
+    if PUBLIC_BASE_URL and PUBLIC_REPORT_KEY:
+        return f"{PUBLIC_BASE_URL}/r/{PUBLIC_REPORT_KEY}/summary"
+    return "https://line.me"
 
 
 def build_image() -> bytes:
@@ -59,7 +73,7 @@ def main() -> None:
         action = (
             {"type": "postback", "data": data, "displayText": title}
             if data
-            else {"type": "uri", "uri": PUBLIC_BASE_URL or "https://line.me"}
+            else {"type": "uri", "uri": _site_link()}
         )
         areas.append({
             "bounds": {"x": i * CELL_W, "y": 0, "width": CELL_W, "height": H},
