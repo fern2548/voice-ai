@@ -1,0 +1,24 @@
+# ไฟล์ตั้งค่าสำหรับ Render (Blueprint)
+# ใช้สร้าง "เว็บ" (static site) โดยไม่ต้องกรอกฟอร์มเอง
+#
+# วิธีใช้: ที่ Render กด New + -> Blueprint -> เลือก repo นี้ -> Apply
+#
+# หมายเหตุ: ไฟล์นี้กำหนดเฉพาะตัวเว็บ ส่วน backend (service ชื่อ voice-ai)
+# สร้างด้วยมือไว้แล้ว จึงไม่ใส่ไว้ที่นี่ กันไม่ให้ไปทับของเดิม
+services:
+  - type: web
+    name: farmy-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      # ที่อยู่ของ backend ที่เว็บจะเรียกข้อมูล
+      - key: VITE_API_BASE
+        value: https://voice-ai-q94g.onrender.com
+    routes:
+      # จำเป็น: เว็บใช้ React Router ทุก path ต้องส่งกลับไปที่ index.html
+      # ถ้าไม่มีบรรทัดนี้ กด F5 หรือเปิด /vaccine ตรง ๆ จะขึ้น 404
+      - type: rewrite
+        source: /*
+        destination: /index.html
