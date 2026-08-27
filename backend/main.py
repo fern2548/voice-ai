@@ -1107,16 +1107,30 @@ def _vaccine_due_rows(days: int = 7) -> list[dict]:
 
 
 def _build_vaccine_report_messages() -> list[dict]:
-    """ชุดข้อความรายงานวัคซีน (รูป + ลิงก์ PDF) ใช้ร่วมกันทั้งตอน broadcast และตอบ webhook"""
-    img_url = f"{PUBLIC_BASE_URL}/export/vaccine-log.png?t={_issue_download_token()}"
-    pdf_url = f"{PUBLIC_BASE_URL}/export/vaccine-log.pdf?t={_issue_download_token()}"
+    """ชุดข้อความรายงานวัคซีน (รูป + ลิงก์ PDF) ใช้ร่วมกันทั้งตอน broadcast และตอบ webhook
+
+    ใช้ลิงก์ถาวร /r/{คีย์}/... ไม่ใช่ token ที่หมดอายุ เพราะ:
+      - token เก็บในหน่วยความจำ พอเซิร์ฟเวอร์รีสตาร์ท/หลับแล้วตื่น (free tier หลับเองเมื่อไม่มีคนใช้)
+        ลิงก์ที่ส่งไปแล้วจะใช้ไม่ได้ทันที ขึ้น 401 และรูปกลายเป็นกรอบว่าง
+      - LINE โหลดรูปจากฝั่งเซิร์ฟเวอร์ตัวเอง ถ้าตอนนั้น token หมดอายุพอดี รูปจะไม่ขึ้นเลย
+    ลิงก์แบบคีย์ใช้ได้ตลอด และดึงข้อมูลสดทุกครั้งที่เปิดอยู่แล้ว
+    """
+    if not PUBLIC_REPORT_KEY:
+        return [{
+            "type": "text",
+            "text": "ยังตั้งค่า PUBLIC_REPORT_KEY ไม่ครบ จึงยังสร้างลิงก์รายงานไม่ได้ครับ",
+        }]
+
+    base = f"{PUBLIC_BASE_URL}/r/{PUBLIC_REPORT_KEY}"
+    img_url = f"{base}/vaccine.png"
+    pdf_url = f"{base}/vaccine.pdf"
     return [
         {"type": "image", "originalContentUrl": img_url, "previewImageUrl": img_url},
         {
             "type": "text",
             "text": (
                 "รายงานประวัติการฉีดวัคซีน · ฟาร์มมี่\n"
-                f"ไฟล์ PDF ฉบับเต็ม (ลิงก์หมดอายุใน {DOWNLOAD_TOKEN_TTL_MIN} นาที):\n{pdf_url}"
+                f"ไฟล์ PDF ฉบับเต็ม (ข้อมูลอัปเดตทุกครั้งที่เปิด):\n{pdf_url}"
             ),
         },
     ]
@@ -1544,20 +1558,9 @@ def _send_line_vaccine_report() -> str:
     if not PUBLIC_BASE_URL:
         return "ยังส่งรายงานไม่ได้ครับ เพราะระบบยังรันอยู่แค่ในเครื่อง (localhost) ต้องมี URL สาธารณะก่อน"
 
-    # token ชั่วคราว ให้เปิดจาก LINE ได้โดยไม่ต้องล็อกอิน (และ LINE เองก็ต้องโหลดรูปผ่าน URL นี้)
-    img_url = f"{PUBLIC_BASE_URL}/export/vaccine-log.png?t={_issue_download_token()}"
-    pdf_url = f"{PUBLIC_BASE_URL}/export/vaccine-log.pdf?t={_issue_download_token()}"
-
-    ok = _send_line_messages([
-        {"type": "image", "originalContentUrl": img_url, "previewImageUrl": img_url},
-        {
-            "type": "text",
-            "text": (
-                "รายงานประวัติการฉีดวัคซีน · ฟาร์มมี่\n"
-                f"ไฟล์ PDF ฉบับเต็ม (ลิงก์หมดอายุใน {DOWNLOAD_TOKEN_TTL_MIN} นาที):\n{pdf_url}"
-            ),
-        },
-    ])
+    # ใช้ตัวสร้างข้อความตัวเดียวกับที่ตอบริชเมนู จะได้ไม่ต้องดูแลโค้ดสองที่
+    # (และได้ลิงก์ถาวรเหมือนกัน ไม่ใช่ token ที่หมดอายุแล้วรูปไม่ขึ้น)
+    ok = _send_line_messages(_build_vaccine_report_messages())
     return "ส่งรายงานวัคซีนเข้า LINE แล้วครับ (ทั้งรูปและไฟล์ PDF)" if ok else "ส่ง LINE ไม่สำเร็จครับ ลองใหม่อีกครั้ง"
 
 
