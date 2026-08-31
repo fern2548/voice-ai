@@ -26,10 +26,17 @@ export default function VoiceHero() {
   // สถานะที่แสดงใต้แคปซูล ใช้ถ้อยคำชุดเดียวกับ 5174
   const statusText = listening ? 'กำลังฟัง...' : busy ? 'กำลังคิด...' : ''
 
-  // คำถามล่าสุดของผู้ใช้ และคำตอบล่าสุดของ AI
-  const lastUser = [...messages].reverse().find((m) => m.role === 'user')
-  const lastBot = [...messages].reverse().find((m) => m.role !== 'user')
-  const showThread = messages.length > 1
+  // จับคู่คำถาม-คำตอบจากท้ายรายการ ต้องเป็นคู่กันจริง
+  // ห้ามหา "คำถามล่าสุด" กับ "คำตอบล่าสุด" แยกกัน เพราะระหว่างรอคำตอบใหม่
+  // จะได้คำถามใหม่มาคู่กับคำตอบเก่าที่ยังค้างอยู่ (เคยทำให้แสดงผลผิดคู่มาแล้ว)
+  const lastUserIdx = messages.map((m) => m.role).lastIndexOf('user')
+  const lastUser = lastUserIdx >= 0 ? messages[lastUserIdx] : null
+  // คำตอบต้องอยู่ "หลัง" คำถามนั้นเท่านั้น ถ้ายังไม่มีก็ไม่ต้องแสดงอะไร
+  const lastBot =
+    lastUserIdx >= 0
+      ? messages.slice(lastUserIdx + 1).find((m) => m.role !== 'user') || null
+      : null
+  const showThread = lastUser != null
 
   return (
     <section className="vh-hero">

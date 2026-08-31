@@ -1437,33 +1437,167 @@ button { font-family: var(--font); cursor: pointer; border: none; }
 .admin-gate-locked .ti { font-size: 20px; color: var(--warn); flex-shrink: 0; }
 
 /* ============ Full-page login gate ============ */
-.login-gate {
-  min-height: 100vh;
+/* ============ หน้าเข้าสู่ระบบ ============ */
+.lg-page {
+  position: relative;
+  min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    linear-gradient(var(--bg-grid) 1px, transparent 1px) 0 0 / 44px 44px,
-    linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px) 0 0 / 44px 44px,
-    var(--bg);
-  padding: 20px;
+  padding: 24px;
+  overflow: hidden;
 }
-.login-gate-card {
-  width: 100%;
-  max-width: 340px;
-  background: var(--panel);
+/* แสงเขียวนุ่ม ๆ ชุดเดียวกับหน้าแรก ให้รู้สึกต่อเนื่องกัน */
+.lg-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 58% 48% at 50% 44%,
+    color-mix(in srgb, var(--accent) 15%, transparent),
+    transparent 70%
+  );
+}
+
+.lg-theme {
+  position: absolute;
+  top: 22px; right: 22px;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 32px 28px;
-  text-align: center;
-  box-shadow: var(--shadow);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 17px;
+  cursor: pointer;
+  transition: color 0.4s, border-color 0.4s;
 }
-.login-gate-icon { font-size: 44px; margin-bottom: 8px; }
-.login-gate-title { font-size: 20px; font-weight: 800; color: var(--text); }
-.login-gate-sub { font-size: 13px; color: var(--text-dim); margin-top: 4px; margin-bottom: 20px; }
-.login-gate-input { width: 100%; text-align: center; margin-bottom: 14px; }
-.login-gate-submit { width: 100%; justify-content: center; }
-.login-gate-error { font-size: 12.5px; color: var(--danger); margin-top: 12px; }
+.lg-theme:hover { color: var(--accent); border-color: var(--accent); }
+
+.lg-card {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 36px 32px;
+  border-radius: 26px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(22px);
+}
+
+.lg-brand { display: flex; align-items: center; gap: 10px; }
+.lg-logo { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; }
+.lg-name { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; }
+.lg-name span { color: var(--accent); }
+
+.lg-title {
+  margin-top: 26px;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  color: var(--text);
+}
+.lg-sub {
+  margin-top: 6px;
+  margin-bottom: 30px;
+  font-size: 15px;
+  font-weight: 300;
+  color: var(--text-dim);
+}
+
+.lg-field { display: block; margin-bottom: 18px; }
+.lg-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.lg-input-wrap { position: relative; display: block; }
+.lg-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;   /* ต่ำกว่า 16px แล้ว iOS จะซูมหน้าจอเองตอนกดช่อง */
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.lg-input::placeholder { color: var(--text-faint); }
+.lg-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.lg-input:disabled { opacity: 0.6; }
+.lg-input-wrap .lg-input { padding-right: 46px; }
+
+.lg-eye {
+  position: absolute;
+  right: 6px; top: 50%;
+  transform: translateY(-50%);
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 17px;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+.lg-eye:hover { color: var(--text); }
+
+/* จองพื้นที่ไว้ตลอด ปุ่มจะได้ไม่ขยับตอน error โผล่ */
+.lg-error-slot { min-height: 26px; margin-bottom: 6px; }
+.lg-error {
+  display: flex; align-items: flex-start; gap: 7px;
+  font-size: 13.5px; line-height: 1.5;
+  color: var(--danger);
+}
+.lg-error .ti { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+.lg-submit {
+  height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  border: none; border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 16px; font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.3s, transform 0.2s;
+}
+.lg-submit:hover:not(:disabled) { opacity: 0.92; }
+.lg-submit:active:not(:disabled) { transform: translateY(1px); }
+.lg-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.lg-spinner {
+  width: 15px; height: 15px;
+  border: 2px solid color-mix(in srgb, #fff 35%, transparent);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: lg-spin 0.7s linear infinite;
+}
+@keyframes lg-spin { to { transform: rotate(360deg); } }
+
+.lg-hint {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 300;
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-spinner { animation-duration: 2s; }
+}
 
 /* ============ Side card shared bits ============ */
 .side-card-head-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
