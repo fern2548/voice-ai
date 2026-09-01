@@ -1915,16 +1915,27 @@ def ask(q: Question):
             "parts": [{"text": f"CONTEXT (ข้อมูลจริงจากสถานี):\n{context}\n\nคำถาม: {text}"}],
         })
 
+        base_config = {
+            "system_instruction": SYSTEM_PROMPT,
+            "max_output_tokens": 300,
+        }
+        # ปิด thinking ถ้าโมเดลรองรับ: ประหยัด token และกันคำตอบถูกตัดจนเพี้ยน
+        # แต่รุ่นใหม่ (เช่น gemini-3.x) ไม่รับค่านี้ จะตอบ 400 INVALID_ARGUMENT
+        # จึงลองแบบมีก่อน ถ้าไม่ผ่านค่อยลองใหม่แบบไม่ใส่ ให้ใช้ได้ทั้งรุ่นเก่าและใหม่
         try:
             resp = _llm.models.generate_content(
                 model=GEMINI_MODEL,
-                config={
-                    "system_instruction": SYSTEM_PROMPT,
-                    "max_output_tokens": 300,
-                    # ปิด thinking: ประหยัด token/TPM และกันคำตอบถูกตัดจนเพี้ยน
-                    "thinking_config": {"thinking_budget": 0},
-                },
+                config={**base_config, "thinking_config": {"thinking_budget": 0}},
                 contents=contents,
+            )
+            answer = (resp.text or "").strip()
+            if answer:
+                return Answer(answer=answer)
+        except Exception as e:
+            if "INVALID_ARGUMENT" not in str(e):
+                raise
+            resp = _llm.models.generate_content(
+                model=GEMINI_MODEL, config=base_config, contents=contents
             )
             answer = (resp.text or "").strip()
             if answer:
