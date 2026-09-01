@@ -1963,17 +1963,22 @@ def ask(q: Question):
             "parts": [{"text": f"CONTEXT (ข้อมูลจริงจากสถานี):\n{context}\n\nคำถาม: {text}"}],
         })
 
-        base_config = {
-            "system_instruction": SYSTEM_PROMPT,
-            "max_output_tokens": 300,
-        }
-        # ปิด thinking ถ้าโมเดลรองรับ: ประหยัด token และกันคำตอบถูกตัดจนเพี้ยน
-        # แต่รุ่นใหม่ (เช่น gemini-3.x) ไม่รับค่านี้ จะตอบ 400 INVALID_ARGUMENT
-        # จึงลองแบบมีก่อน ถ้าไม่ผ่านค่อยลองใหม่แบบไม่ใส่ ให้ใช้ได้ทั้งรุ่นเก่าและใหม่
+        # ปิด thinking ถ้าโมเดลรองรับ: ประหยัด token และคำตอบสั้นกระชับพอดี
+        # รุ่นใหม่ (เช่น gemini-3.x) ไม่รับค่านี้ จะตอบ 400 INVALID_ARGUMENT
+        # จึงลองแบบปิดก่อน ถ้าไม่ผ่านค่อยลองใหม่แบบเปิด
+        #
+        # สำคัญ: ตอนปิดไม่ได้ ต้องเพิ่มเพดาน token ให้เยอะขึ้นมาก
+        # เพราะ token ที่ใช้ "คิด" นับรวมในเพดานเดียวกัน
+        # ถ้าตั้งไว้ 300 โมเดลจะใช้คิดไปเกือบหมด เหลือเขียนคำตอบไม่กี่ token
+        # แล้วคำตอบจะขาดกลางประโยค (เคยเจอมาแล้ว)
         try:
             resp = _llm.models.generate_content(
                 model=GEMINI_MODEL,
-                config={**base_config, "thinking_config": {"thinking_budget": 0}},
+                config={
+                    "system_instruction": SYSTEM_PROMPT,
+                    "max_output_tokens": 300,
+                    "thinking_config": {"thinking_budget": 0},
+                },
                 contents=contents,
             )
             answer = (resp.text or "").strip()
@@ -1983,7 +1988,9 @@ def ask(q: Question):
             if "INVALID_ARGUMENT" not in str(e):
                 raise
             resp = _llm.models.generate_content(
-                model=GEMINI_MODEL, config=base_config, contents=contents
+                model=GEMINI_MODEL,
+                config={"system_instruction": SYSTEM_PROMPT, "max_output_tokens": 2000},
+                contents=contents,
             )
             answer = (resp.text or "").strip()
             if answer:
