@@ -2,15 +2,23 @@
 import { adminHeaders, notifySessionExpired } from './context/AdminAuth.jsx'
 import { apiUrl } from './config.js'
 
-// 401 = token หมดอายุ (backend restart) -> แจ้งให้เด้งกลับหน้า login แทนที่จะพังเงียบ ๆ
+// 401 = ยังไม่ได้ล็อกอิน/เซสชันหมดอายุ -> เด้งกลับหน้า login แทนที่จะพังเงียบ ๆ
 function checkAuth(res) {
   if (res.status === 401) notifySessionExpired()
+}
+
+// แนบสถานะ HTTP ไปกับ error ด้วย ฝั่งที่เรียกจะได้แยกได้ว่า
+// "เซสชันหมดอายุ" (401) กับ "ต่อเซิร์ฟเวอร์ไม่ได้" ซึ่งต้องบอกผู้ใช้คนละแบบ
+function httpError(url, res) {
+  const err = new Error(`${url} -> ${res.status}`)
+  err.status = res.status
+  return err
 }
 
 async function get(url) {
   const res = await fetch(apiUrl(url), { headers: adminHeaders() })
   checkAuth(res)
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`)
+  if (!res.ok) throw httpError(url, res)
   return res.json()
 }
 
@@ -22,14 +30,14 @@ async function post(url, body) {
     body: JSON.stringify(body),
   })
   checkAuth(res)
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`)
+  if (!res.ok) throw httpError(url, res)
   return res.json()
 }
 
 async function del(url) {
   const res = await fetch(apiUrl(url), { method: 'DELETE', headers: adminHeaders() })
   checkAuth(res)
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`)
+  if (!res.ok) throw httpError(url, res)
   return res.json()
 }
 

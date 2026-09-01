@@ -152,9 +152,60 @@ def verify_ingest_token(x_ingest_token: str = Header(...)) -> None:
 
 # ---------- Admin auth (หลายผู้ใช้ เก็บใน DB) ----------
 # เก็บ password เป็น hash+salt เสมอ (PBKDF2) ไม่เก็บ plain text ไว้ในตาราง admin_users
-# ล็อกอินสำเร็จ -> ได้ token แบบสุ่ม เก็บไว้ใน memory (หาย/ต้อง login ใหม่ทุกครั้งที่ restart backend)
 _BOOTSTRAP_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")  # ใช้แค่ตอนสร้างผู้ใช้ admin คนแรกครั้งเดียว
-_ADMIN_TOKENS: dict[str, str] = {}  # token -> username
+
+# ---------- token ล็อกอิน ----------
+# เดิมสุ่ม token แล้วเก็บไว้ใน memory ทำให้ทุกคนหลุดจากระบบทุกครั้งที่เซิร์ฟเวอร์รีสตาร์ท
+# ซึ่งบนโฮสต์แพ็กเกจฟรีเกิดบ่อยมาก (หลับเองเมื่อไม่มีคนใช้ + รีสตาร์ททุกครั้งที่ deploy)
+#
+# เปลี่ยนมาใช้ token ที่ "เซ็นลายเซ็น" ไว้ในตัวเอง เซิร์ฟเวอร์ไม่ต้องจำอะไร
+# รูปแบบ: <payload ที่เข้ารหัส base64>.<ลายเซ็น>   payload = {"u": ชื่อผู้ใช้, "exp": หมดอายุ}
+SESSION_TTL_DAYS = 7
+
+# ถ้าไม่ได้ตั้ง SESSION_SECRET ไว้ ให้สร้างจาก service key ซึ่งเป็นค่าคงที่และเป็นความลับอยู่แล้ว
+# (ห้ามสุ่มใหม่ทุกครั้งที่เริ่มทำงาน ไม่งั้นจะกลับไปเป็นปัญหาเดิม)
+_SESSION_SECRET = os.environ.get("SESSION_SECRET") or hashlib.sha256(
+    ("farmy-session:" + SUPABASE_SERVICE_KEY).encode()
+).hexdigest()
+
+# รายการ token ที่กดออกจากระบบไปแล้ว เก็บใน memory เท่านั้น
+# หลังรีสตาร์ทรายการนี้จะว่าง แต่ token ก็ยังมีวันหมดอายุกำกับอยู่
+_REVOKED_TOKENS: set[str] = set()
+
+# ชื่อผู้ใช้ที่ถูกลบบัญชีไปแล้ว — session เดิมของคนเหล่านี้ใช้ต่อไม่ได้
+_REVOKED_USERS: set[str] = set()
+
+
+def _sign(data: bytes) -> str:
+    return base64.urlsafe_b64encode(
+        hmac.new(_SESSION_SECRET.encode(), data, hashlib.sha256).digest()
+    ).decode().rstrip("=")
+
+
+def _issue_session_token(username: str) -> str:
+    exp = int((datetime.now(timezone.utc) + timedelta(days=SESSION_TTL_DAYS)).timestamp())
+    payload = base64.urlsafe_b64encode(
+        json.dumps({"u": username, "exp": exp}, separators=(",", ":")).encode()
+    ).decode().rstrip("=")
+    return f"{payload}.{_sign(payload.encode())}"
+
+
+def _session_username(token: str) -> Optional[str]:
+    """คืนชื่อผู้ใช้ถ้า token ถูกต้องและยังไม่หมดอายุ ไม่งั้นคืน None"""
+    if not token or token in _REVOKED_TOKENS:
+        return None
+    try:
+        payload, sig = token.split(".", 1)
+        # compare_digest กันการเดาลายเซ็นด้วยการจับเวลา
+        if not hmac.compare_digest(sig, _sign(payload.encode())):
+            return None
+        data = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+        if int(data.get("exp", 0)) < int(datetime.now(timezone.utc).timestamp()):
+            return None
+        username = data.get("u") or None
+        return None if username in _REVOKED_USERS else username
+    except Exception:
+        return None
 
 
 def _hash_password(password: str, salt: str) -> str:
@@ -162,6 +213,7 @@ def _hash_password(password: str, salt: str) -> str:
 
 
 def _create_admin_user(username: str, password: str) -> None:
+    _REVOKED_USERS.discard(username)  # เผื่อเคยลบชื่อนี้ไปแล้วสร้างใหม่
     salt = secrets.token_hex(16)
     supabase.table("admin_users").insert({
         "username": username,
@@ -198,7 +250,7 @@ def _bootstrap_admin_user() -> None:
 
 
 def verify_admin_token(x_admin_token: str = Header(...)) -> None:
-    if x_admin_token not in _ADMIN_TOKENS:
+    if _session_username(x_admin_token) is None:
         raise HTTPException(status_code=401, detail="กรุณาเข้าสู่ระบบ admin ก่อน")
 
 
@@ -322,7 +374,7 @@ async def _require_admin_login(request, call_next):
         return await call_next(request)
 
     token = request.headers.get("x-admin-token")
-    if token not in _ADMIN_TOKENS:
+    if _session_username(token) is None:
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=401, content={"detail": "กรุณาเข้าสู่ระบบ admin ก่อน"})
 
@@ -468,26 +520,24 @@ def health():
 def admin_login(body: AdminLogin):
     if not _verify_admin_password(body.username, body.password):
         raise HTTPException(status_code=401, detail="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
-    token = secrets.token_urlsafe(32)
-    _ADMIN_TOKENS[token] = body.username
-    return AdminLoginResponse(token=token, username=body.username)
+    return AdminLoginResponse(token=_issue_session_token(body.username), username=body.username)
 
 
 @app.post("/admin/logout")
 def admin_logout(x_admin_token: str = Header(...)):
-    _ADMIN_TOKENS.pop(x_admin_token, None)
+    _REVOKED_TOKENS.add(x_admin_token)
     return {"ok": True}
 
 
 @app.get("/admin/whoami")
 def admin_whoami(x_admin_token: str = Header(...)):
-    username = _ADMIN_TOKENS.get(x_admin_token)
+    username = _session_username(x_admin_token)
     return {"logged_in": username is not None, "username": username}
 
 
 @app.post("/admin/change-password")
 def admin_change_password(body: ChangePassword, x_admin_token: str = Header(...)):
-    username = _ADMIN_TOKENS.get(x_admin_token)
+    username = _session_username(x_admin_token)
     if not username:
         raise HTTPException(status_code=401, detail="กรุณาเข้าสู่ระบบก่อน")
     if not _verify_admin_password(username, body.current_password):
@@ -521,17 +571,16 @@ def create_admin_user(body: NewAdminUser):
 
 @app.delete("/admin/users/{username}")
 def delete_admin_user(username: str, x_admin_token: str = Header(...)):
-    me = _ADMIN_TOKENS.get(x_admin_token)
+    me = _session_username(x_admin_token)
     if username == me:
         raise HTTPException(status_code=400, detail="ลบบัญชีตัวเองไม่ได้ ให้ผู้ใช้อื่นลบแทน")
     total = supabase.table("admin_users").select("id", count="exact").execute().count or 0
     if total <= 1:
         raise HTTPException(status_code=400, detail="ต้องมีผู้ใช้ admin อย่างน้อย 1 คนเสมอ")
     supabase.table("admin_users").delete().eq("username", username).execute()
-    # เพิกถอน token ของผู้ใช้ที่ถูกลบทั้งหมด กันใช้ session เดิมต่อได้
-    for tok, uname in list(_ADMIN_TOKENS.items()):
-        if uname == username:
-            _ADMIN_TOKENS.pop(tok, None)
+    # กันไม่ให้ใช้ session เดิมต่อได้ — token แบบเซ็นลายเซ็นไล่ดูทีละใบไม่ได้
+    # เพราะเซิร์ฟเวอร์ไม่ได้เก็บไว้ จึงบล็อกที่ชื่อผู้ใช้แทน
+    _REVOKED_USERS.add(username)
     return {"ok": True}
 
 

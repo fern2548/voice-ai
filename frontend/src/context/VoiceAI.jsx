@@ -57,8 +57,13 @@ export function VoiceAIProvider({ children }) {
       const d = await askAI(q, history)
       setMessages((prev) => [...prev, { role: 'model', text: d.answer }])
       speak(d.answer)
-    } catch {
-      setMessages((prev) => [...prev, { role: 'model', text: 'ขออภัยครับ ตอนนี้เชื่อมต่อระบบไม่ได้ ลองใหม่อีกครั้งนะครับ' }])
+    } catch (err) {
+      // แยกให้ตรงสาเหตุ ไม่งั้นผู้ใช้จะนึกว่าเซิร์ฟเวอร์ล่ม ทั้งที่แค่ต้องล็อกอินใหม่
+      const text =
+        err?.status === 401
+          ? 'เซสชันหมดอายุแล้วครับ กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
+          : 'ขออภัยครับ ตอนนี้เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้งนะครับ'
+      setMessages((prev) => [...prev, { role: 'model', text }])
     } finally {
       setBusy(false)
     }
