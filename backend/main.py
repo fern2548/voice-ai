@@ -175,6 +175,11 @@ _REVOKED_TOKENS: set[str] = set()
 # ชื่อผู้ใช้ที่ถูกลบบัญชีไปแล้ว — session เดิมของคนเหล่านี้ใช้ต่อไม่ได้
 _REVOKED_USERS: set[str] = set()
 
+# เก็บสาเหตุที่เรียก LLM ไม่สำเร็จครั้งล่าสุด เอาไว้ดูผ่าน /health
+# จำเป็นเพราะ llm_configured บอกแค่ว่า "ตั้งคีย์ไว้แล้ว" ไม่ได้แปลว่าเรียกได้จริง
+# เคยทำให้เข้าใจผิดว่า Gemini ทำงานอยู่ ทั้งที่ตกไปใช้คำตอบสำรองมาตลอด
+_LAST_LLM_ERROR: Optional[str] = None
+
 
 def _sign(data: bytes) -> str:
     return base64.urlsafe_b64encode(
@@ -513,6 +518,9 @@ def health():
         "status": "ok" if db_ok else "degraded",
         "db": db_ok,
         "llm_configured": _llm is not None,
+        "llm_model": GEMINI_MODEL,
+        # None = ยังไม่เคยพัง (หรือยังไม่มีใครถาม) / มีข้อความ = ครั้งล่าสุดพังเพราะอะไร
+        "llm_last_error": _LAST_LLM_ERROR,
     }
 
 
@@ -1922,6 +1930,10 @@ def ask(q: Question):
             if answer:
                 return Answer(answer=answer)
         except Exception as e:
+            global _LAST_LLM_ERROR
+            # ตัดของยาวและกันคีย์หลุดออกมาในข้อความ
+            msg = f"{type(e).__name__}: {e}"
+            _LAST_LLM_ERROR = re.sub(r"(key=|AIza)[A-Za-z0-9_\-.]{6,}", r"***", msg)[:300]
             print(f"[warn] Gemini ตอบไม่สำเร็จ ลอง Ollama ต่อ: {e}")
 
     # 2) Ollama local (ถ้ารันอยู่ในเครื่อง) — ไม่มีค่าใช้จ่าย/ไม่จำกัดโควตา
