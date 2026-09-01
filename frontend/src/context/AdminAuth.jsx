@@ -19,7 +19,15 @@ async function loginRequest(username, password) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   })
-  if (!res.ok) throw new Error('invalid credentials')
+  if (!res.ok) {
+    // ส่งข้อความจากเซิร์ฟเวอร์ต่อไปด้วย เช่น "เหลืออีก 2 ครั้งก่อนถูกล็อก"
+    // หรือ "ลองผิดหลายครั้งเกินไป กรุณารออีก 15 นาที" ถ้าทิ้งไปผู้ใช้จะไม่รู้ว่าเกิดอะไรขึ้น
+    const detail = await res.json().then((d) => d?.detail).catch(() => null)
+    const err = new Error(detail || 'invalid credentials')
+    err.status = res.status
+    err.detail = detail
+    throw err
+  }
   return res.json()
 }
 

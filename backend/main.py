@@ -180,6 +180,38 @@ _REVOKED_USERS: set[str] = set()
 # เคยทำให้เข้าใจผิดว่า Gemini ทำงานอยู่ ทั้งที่ตกไปใช้คำตอบสำรองมาตลอด
 _LAST_LLM_ERROR: Optional[str] = None
 
+# ---------- จำกัดจำนวนครั้งการล็อกอินผิด ----------
+# กันโปรแกรมเดารหัสผ่านอัตโนมัติ (เดิมลองผิดได้ไม่จำกัดครั้ง)
+# นับแยกตามคู่ (ไอพี, ชื่อผู้ใช้) เก็บใน memory พอสำหรับเซิร์ฟเวอร์ตัวเดียว
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCK_MINUTES = 15
+_LOGIN_FAILS: dict[str, list] = {}   # key -> [จำนวนครั้ง, เวลาที่ล้มเหลวล่าสุด]
+
+
+def _login_key(request: Request, username: str) -> str:
+    ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+          or (request.client.host if request.client else "?"))
+    return f"{ip}|{username}"
+
+
+def _login_locked_for(key: str) -> int:
+    """คืนจำนวนวินาทีที่ยังต้องรอ ถ้าไม่ได้ถูกล็อกคืน 0"""
+    rec = _LOGIN_FAILS.get(key)
+    if not rec or rec[0] < LOGIN_MAX_ATTEMPTS:
+        return 0
+    passed = (datetime.now(timezone.utc) - rec[1]).total_seconds()
+    remain = LOGIN_LOCK_MINUTES * 60 - passed
+    if remain <= 0:
+        _LOGIN_FAILS.pop(key, None)   # ครบเวลาแล้ว เริ่มนับใหม่
+        return 0
+    return int(remain)
+
+
+def _login_failed(key: str) -> None:
+    rec = _LOGIN_FAILS.get(key)
+    now = datetime.now(timezone.utc)
+    _LOGIN_FAILS[key] = [rec[0] + 1, now] if rec else [1, now]
+
 
 def _sign(data: bytes) -> str:
     return base64.urlsafe_b64encode(
@@ -525,9 +557,25 @@ def health():
 
 
 @app.post("/admin/login", response_model=AdminLoginResponse)
-def admin_login(body: AdminLogin):
+def admin_login(body: AdminLogin, request: Request):
+    key = _login_key(request, body.username)
+
+    wait = _login_locked_for(key)
+    if wait:
+        raise HTTPException(
+            status_code=429,
+            detail=f"ลองผิดหลายครั้งเกินไป กรุณารออีก {wait // 60 + 1} นาทีแล้วลองใหม่",
+        )
+
     if not _verify_admin_password(body.username, body.password):
-        raise HTTPException(status_code=401, detail="ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+        _login_failed(key)
+        left = LOGIN_MAX_ATTEMPTS - _LOGIN_FAILS[key][0]
+        detail = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+        if 0 < left <= 2:   # เตือนก่อนโดนล็อก จะได้ไม่งงว่าทำไมอยู่ ๆ เข้าไม่ได้
+            detail += f" (เหลืออีก {left} ครั้งก่อนถูกล็อกชั่วคราว)"
+        raise HTTPException(status_code=401, detail=detail)
+
+    _LOGIN_FAILS.pop(key, None)   # เข้าสำเร็จแล้วล้างตัวนับ
     return AdminLoginResponse(token=_issue_session_token(body.username), username=body.username)
 
 
