@@ -48,6 +48,10 @@ function logQuery(path, { page = 0, pageSize = 100, hours } = {}) {
   return get(`${path}?${params.toString()}`)
 }
 
+// หน้าล็อกอินถามว่าเปิดให้สมัครเองไหม — เรียกได้โดยไม่ต้องล็อกอิน
+export const getSignupEnabled = () =>
+  fetch(apiUrl('/admin/signup-enabled')).then((r) => (r.ok ? r.json() : { enabled: false }))
+
 export const getHealth = () => get('/health')
 export const getWeather = () => get('/weather')
 export const getHistory = () => get('/history')
@@ -67,7 +71,19 @@ export const getVaccineSchedule = () => get('/vaccine-schedule')
 export const getVaccineDue = (days = 7) => get(`/vaccine-due?days=${days}`)
 
 // history: อาร์เรย์ของ { role: 'user'|'model', text } ไม่กี่เทิร์นล่าสุด (ประหยัด token)
-export const askAI = (text, history = []) => post('/ask', { text, history })
+export const askAI = async (text, history = []) => {
+  try {
+    return await post('/ask', { text, history })
+  } catch (err) {
+    // เซิร์ฟเวอร์ฟรีที่เพิ่งตื่น มักตอบ 502/503 หรือหลุดการเชื่อมต่อในคำขอแรก
+    // ลองซ้ำอีกครั้งเงียบ ๆ ดีกว่าให้ผู้ใช้เจอ "เชื่อมต่อไม่ได้" แล้วต้องพูดใหม่ทั้งประโยค
+    // (401 คือยังไม่ล็อกอิน ลองซ้ำไปก็ได้ผลเดิม ต้องปล่อยผ่านไปให้แสดงข้อความถูกต้อง)
+    const retryable = !err?.status || err.status >= 500
+    if (!retryable) throw err
+    await new Promise((r) => setTimeout(r, 3000))
+    return post('/ask', { text, history })
+  }
+}
 
 export const changeAdminPassword = (current_password, new_password) =>
   post('/admin/change-password', { current_password, new_password })

@@ -31,6 +31,22 @@ async function loginRequest(username, password) {
   return res.json()
 }
 
+async function signupRequest(username, password, code) {
+  const res = await fetch(apiUrl('/admin/signup'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password, code }),
+  })
+  if (!res.ok) {
+    const detail = await res.json().then((d) => d?.detail).catch(() => null)
+    const err = new Error(detail || 'signup failed')
+    err.status = res.status
+    err.detail = detail
+    throw err
+  }
+  return res.json()
+}
+
 export function AdminAuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || '')
   const [username, setUsername] = useState(() => localStorage.getItem(USERNAME_KEY) || '')
@@ -67,14 +83,19 @@ export function AdminAuthProvider({ children }) {
     return () => window.removeEventListener('admin-session-expired', onExpired)
   }, [])
 
-  const login = async (user, password) => {
-    const d = await loginRequest(user, password)
+  const acceptSession = (d) => {
     localStorage.setItem(TOKEN_KEY, d.token)
     localStorage.setItem(USERNAME_KEY, d.username)
     setToken(d.token)
     setUsername(d.username)
     setChecking(false)
   }
+
+  const login = async (user, password) => acceptSession(await loginRequest(user, password))
+
+  // สมัครสำเร็จแล้วเข้าระบบให้เลย ผู้ใช้จะได้ไม่ต้องกรอกชื่อกับรหัสซ้ำอีกรอบ
+  const signup = async (user, password, code) =>
+    acceptSession(await signupRequest(user, password, code))
 
   const logout = () => {
     if (token) {
@@ -88,7 +109,7 @@ export function AdminAuthProvider({ children }) {
     setUsername('')
   }
 
-  const value = { isAdmin: !!token, token, username, login, logout, checking }
+  const value = { isAdmin: !!token, token, username, login, signup, logout, checking }
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>
 }
 

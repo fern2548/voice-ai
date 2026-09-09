@@ -59,6 +59,13 @@ if GEMINI_API_KEY:
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:3b")
 
+# AI ตัวที่สองของ CPF — ใช้ตอบก่อน Gemini ถ้าตั้งค่าไว้
+# ห้ามใส่คีย์ตรงนี้เด็ดขาด repo เป็นสาธารณะ ให้ตั้งเป็นค่าลับบน Render เท่านั้น
+# ถ้าไม่ได้ตั้ง CPF_API_BASE ระบบจะข้ามตัวนี้ไปใช้ Gemini เหมือนเดิม (ไม่พัง)
+CPF_API_KEY = os.environ.get("CPF_API_KEY", "")
+CPF_API_BASE = os.environ.get("CPF_API_BASE", "").rstrip("/")
+CPF_MODEL = os.environ.get("CPF_MODEL", "")
+
 # ---------- LINE Messaging API ----------
 # ใช้ broadcast (ส่งหาทุกคนที่แอด bot เป็นเพื่อน) เพราะฟาร์มนี้มีผู้ใช้คนเดียว/ทีมเล็ก
 # ไม่ต้องรู้ userId ล่วงหน้า แค่มี Channel Access Token ก็พอ
@@ -68,6 +75,8 @@ LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "")
 # LINE Bot แนบไฟล์ตรง ๆ ไม่ได้ ต้องส่งเป็นลิงก์ให้กดดาวน์โหลดแทน — ตอนนี้ยังว่างเพราะรันแค่ localhost
 # (localhost เข้าจากมือถือ/อุปกรณ์อื่นไม่ได้) พอ deploy ขึ้นเซิร์ฟเวอร์จริงแล้วค่อยใส่ URL จริงตรงนี้ใน .env
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+# ที่อยู่หน้าเว็บ (คนละตัวกับ PUBLIC_BASE_URL ซึ่งเป็นที่อยู่ของเซิร์ฟเวอร์)
+PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL", "").rstrip("/")
 
 
 def _send_line_broadcast(text: str) -> bool:
@@ -358,10 +367,10 @@ app.add_middleware(
 # ---------- ล็อกทั้งเว็บด้วยรหัสผ่าน admin ----------
 # ไม่ใช่แค่ปุ่มแก้ไขข้อมูล — ทุก endpoint ต้องมี X-Admin-Token ที่ถูกต้องก่อน ยกเว้นที่อยู่ใน allowlist
 # (เผื่อ deploy ขึ้นเซิร์ฟเวอร์จริงแล้วมี URL สาธารณะ กันคนนอกเข้ามาดูข้อมูลฟาร์มได้เลยโดยไม่ต้องรู้รหัส)
-_PUBLIC_PATHS = {"/admin/login", "/health", "/line/webhook"}  # webhook: LINE เรียกเข้ามาเอง ตรวจด้วยลายเซ็นแทน
+_PUBLIC_PATHS = {"/admin/login", "/admin/signup", "/admin/signup-enabled", "/health", "/line/webhook"}  # webhook: LINE เรียกเข้ามาเอง ตรวจด้วยลายเซ็นแทน
 # /ingest = อุปกรณ์เซนเซอร์/Node-RED ใช้ INGEST_TOKEN ของตัวเองแยกต่างหากอยู่แล้ว
 # /r      = ลิงก์รายงานสำหรับปุ่มริชเมนู LINE (ดูหมายเหตุที่ PUBLIC_REPORT_KEY ด้านล่าง)
-_PUBLIC_PREFIXES = ("/ingest", "/r/")
+_PUBLIC_PREFIXES = ("/ingest", "/r/", "/cron/")  # /cron/: ตัวตั้งเวลาภายนอกเรียก ตรวจด้วย CRON_KEY แทน
 
 # ---------- ลิงก์รายงานถาวรสำหรับปุ่มริชเมนู LINE ----------
 # ปุ่มริชเมนูที่สร้างจากหน้า LINE OA Manager ใส่ได้แค่ "ลิงก์" ธรรมดา
@@ -371,6 +380,23 @@ _PUBLIC_PREFIXES = ("/ingest", "/r/")
 # จึงใส่คีย์สุ่มยาวไว้ใน path (เดาไม่ได้) แทนการเปิดโล่ง
 # ถ้าลิงก์หลุด ให้เปลี่ยนค่า PUBLIC_REPORT_KEY ใน .env แล้วรีสตาร์ท ลิงก์เก่าจะใช้ไม่ได้ทันที
 PUBLIC_REPORT_KEY = os.environ.get("PUBLIC_REPORT_KEY", "")
+
+# คีย์ให้ตัวตั้งเวลาภายนอก (GitHub Actions) เรียกงานประจำวันได้ โดยไม่ต้องล็อกอิน
+# แยกจาก PUBLIC_REPORT_KEY เพราะคีย์นั้นถูกแนบไปกับลิงก์ที่ส่งเข้ากลุ่ม LINE แล้ว
+# ใครเห็นลิงก์ก็จะสั่งให้ระบบยิงข้อความเข้ากลุ่มรัว ๆ ได้ ถ้าใช้คีย์เดียวกัน
+CRON_KEY = os.environ.get("CRON_KEY", "")
+
+# รหัสเชิญสำหรับให้ผู้ใช้สมัครบัญชีเอง
+# ไม่ตั้งค่า = ปิดการสมัครเอง (ค่าเริ่มต้น) ผู้ดูแลต้องเป็นคนสร้างบัญชีให้เท่านั้น
+#
+# ทำไมต้องมีรหัสเชิญ ไม่เปิดให้ใครสมัครก็ได้:
+# เว็บนี้เปิดข้อมูลฟาร์มทั้งหมดให้คนที่ล็อกอินสำเร็จ ถ้าใครสมัครเองได้อิสระ
+# คนนอกที่เจอ URL ก็เข้ามาดูข้อมูลได้ทันที รหัสเชิญทำให้ยังสมัครเองได้
+# แต่ต้องเป็นคนที่ได้รับรหัสจากในทีมเท่านั้น
+SIGNUP_CODE = os.environ.get("SIGNUP_CODE", "")
+
+# ความยาวรหัสผ่านขั้นต่ำตอนสมัครเอง (ตอนผู้ดูแลสร้างให้ไม่บังคับ)
+SIGNUP_MIN_PASSWORD = 8
 
 # ---------- ลิงก์ดาวน์โหลดชั่วคราว (สำหรับส่งเข้า LINE) ----------
 # LINE แนบไฟล์ตรง ๆ ไม่ได้ ต้องส่งเป็นลิงก์ให้กด แต่ลิงก์ที่กดจากมือถือจะไม่มี X-Admin-Token
@@ -483,6 +509,12 @@ class NewAdminUser(BaseModel):
     password: str
 
 
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+    code: str = ""
+
+
 class ChatTurn(BaseModel):
     role: str  # "user" | "model"
     text: str
@@ -551,6 +583,8 @@ def health():
         "db": db_ok,
         "llm_configured": _llm is not None,
         "llm_model": GEMINI_MODEL,
+        # บอกว่า AI ของ CPF ต่อไว้หรือยัง จะได้ไล่ปัญหาได้โดยไม่ต้องเปิด log
+        "cpf_configured": bool(CPF_API_BASE and CPF_API_KEY),
         # None = ยังไม่เคยพัง (หรือยังไม่มีใครถาม) / มีข้อความ = ครั้งล่าสุดพังเพราะอะไร
         "llm_last_error": _LAST_LLM_ERROR,
     }
@@ -604,6 +638,64 @@ def admin_change_password(body: ChangePassword, x_admin_token: str = Header(...)
         "password_salt": salt,
     }).eq("username", username).execute()
     return {"ok": True}
+
+
+@app.get("/admin/signup-enabled")
+def signup_enabled():
+    """หน้าล็อกอินเรียกดูว่าควรโชว์ลิงก์ "สมัครสมาชิก" ไหม
+    ไม่บอกรหัสเชิญออกไป บอกแค่ว่าเปิดให้สมัครหรือเปล่า
+    """
+    return {"enabled": bool(SIGNUP_CODE)}
+
+
+@app.post("/admin/signup", response_model=AdminLoginResponse)
+def signup(body: SignupRequest, request: Request):
+    """สมัครบัญชีเอง — ต้องกรอกรหัสเชิญที่ได้รับจากผู้ดูแลให้ถูก
+
+    สมัครสำเร็จแล้วล็อกอินให้เลย ผู้ใช้จะได้ไม่ต้องกรอกซ้ำอีกรอบ
+    """
+    if not SIGNUP_CODE:
+        raise HTTPException(status_code=403, detail="ระบบปิดการสมัครด้วยตนเอง กรุณาติดต่อผู้ดูแลระบบ")
+
+    # ใช้ตัวนับเดียวกับการล็อกอินผิด กันคนไล่เดารหัสเชิญทีละตัว
+    key = _login_key(request, "signup")
+    wait = _login_locked_for(key)
+    if wait:
+        raise HTTPException(
+            status_code=429,
+            detail=f"ลองผิดหลายครั้งเกินไป กรุณารออีก {wait // 60 + 1} นาที",
+        )
+
+    if not secrets.compare_digest(body.code.strip(), SIGNUP_CODE):
+        _login_failed(key)
+        raise HTTPException(status_code=400, detail="รหัสเชิญไม่ถูกต้อง")
+
+    username = body.username.strip()
+    if len(username) < 3:
+        raise HTTPException(status_code=400, detail="ชื่อผู้ใช้ต้องยาวอย่างน้อย 3 ตัวอักษร")
+    # จำกัดอักขระ กันชื่อที่มีช่องว่าง/อักขระพิเศษ ซึ่งทำให้สับสนตอนดูรายชื่อผู้ใช้
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", username):
+        raise HTTPException(
+            status_code=400,
+            detail="ชื่อผู้ใช้ใช้ได้เฉพาะตัวอักษรอังกฤษ ตัวเลข และ _ . - เท่านั้น",
+        )
+    if len(body.password) < SIGNUP_MIN_PASSWORD:
+        raise HTTPException(
+            status_code=400,
+            detail=f"รหัสผ่านต้องยาวอย่างน้อย {SIGNUP_MIN_PASSWORD} ตัวอักษร",
+        )
+
+    try:
+        existing = supabase.table("admin_users").select("id").eq("username", username).execute().data
+    except Exception as e:
+        print(f"[warn] อ่านตาราง admin_users ไม่ได้ตอนสมัคร: {e}")
+        raise HTTPException(status_code=503, detail="ระบบยังไม่พร้อมรับสมัคร กรุณาติดต่อผู้ดูแลระบบ")
+    if existing:
+        raise HTTPException(status_code=400, detail="มีชื่อผู้ใช้นี้อยู่แล้ว กรุณาใช้ชื่ออื่น")
+
+    _create_admin_user(username, body.password)
+    print(f"[info] สมัครบัญชีใหม่: {username}")
+    return AdminLoginResponse(token=_issue_session_token(username), username=username)
 
 
 @app.get("/admin/users")
@@ -1301,6 +1393,46 @@ def line_send_vaccine_report():
     return {"ok": ok, "message": msg}
 
 
+@app.post("/cron/vaccine-due-notify")
+def cron_vaccine_due_notify(days: int = 3, x_cron_key: str = Header(default="")):
+    """แจ้งเตือนวัคซีนใกล้ครบกำหนดเข้ากลุ่ม LINE — ให้ตัวตั้งเวลาภายนอกเรียกวันละครั้ง
+
+    ทำไมต้องให้ข้างนอกเรียก: เซิร์ฟเวอร์แพ็กเกจฟรีหลับเองเมื่อไม่มีคนใช้
+    ตัวตั้งเวลาที่รันอยู่ในโปรเซสเดียวกันจึงไม่ทำงานตอนหลับ ต้องมีคนมาเคาะจากข้างนอก
+    (ผลพลอยได้: การเคาะนี้ปลุกเซิร์ฟเวอร์ให้ตื่นด้วย)
+
+    ไม่มีรายการครบกำหนด = ไม่ส่งอะไรเลย กันข้อความรบกวนกลุ่มทุกวันโดยไม่มีสาระ
+    """
+    if not CRON_KEY or not secrets.compare_digest(x_cron_key, CRON_KEY):
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    days = max(0, min(30, days))
+    rows = _vaccine_due_rows(days)
+    if not rows:
+        return {"sent": False, "due_count": 0, "reason": "ยังไม่มีวัคซีนครบกำหนด"}
+
+    today = datetime.now(BANGKOK).date()
+    lines = []
+    for r in rows[:10]:
+        where = " ".join(x for x in (r.get("barn_no"), r.get("pen_no")) if x)
+        due = r.get("next_due_date") or ""
+        try:
+            left = (date.fromisoformat(due) - today).days
+            when = "ถึงกำหนดวันนี้" if left == 0 else (f"เลยกำหนด {-left} วัน" if left < 0 else f"อีก {left} วัน")
+        except ValueError:
+            when = due
+        lines.append(f"• {r.get('vaccine_name') or 'วัคซีน'}{' · ' + where if where else ''} — {when}")
+    if len(rows) > 10:
+        lines.append(f"• และอีก {len(rows) - 10} รายการ")
+
+    text = "แจ้งเตือนวัคซีนใกล้ครบกำหนด · ฟาร์มมี่\n" + "\n".join(lines)
+    if PUBLIC_SITE_URL:
+        text += f"\n\nดูรายละเอียดทั้งหมด:\n{PUBLIC_SITE_URL}"
+
+    ok = _send_line_broadcast(text)
+    return {"sent": ok, "due_count": len(rows)}
+
+
 @app.get("/vaccine-due")
 def vaccine_due(days: int = 7):
     """รายการวัคซีนที่ใกล้ครบกำหนดฉีดซ้ำ (next_due_date อยู่ในอีก N วันข้างหน้า หรือเลยกำหนดไปแล้ว)
@@ -1866,6 +1998,57 @@ def _rule_based_answer(text: str) -> str:
 MAX_HISTORY_TURNS = 3  # เก็บแชทย้อนหลังกี่เทิร์นล่าสุด (ประหยัด token/TPM)
 
 
+def _redact_secrets(msg: str) -> str:
+    """ตัดคีย์ที่อาจติดมากับข้อความ error ก่อนเก็บ/แสดงผล
+    /health เปิดให้เรียกได้โดยไม่ต้องล็อกอิน ถ้าคีย์หลุดออกไปตรงนั้นคือรั่วทันที
+    """
+    msg = re.sub(r"(key=|AIza)[A-Za-z0-9_\-.]{6,}", "***", msg)
+    msg = re.sub(r"cpfai_[A-Za-z0-9_\-]{6,}", "cpfai_***", msg)
+    msg = re.sub(r"(Bearer\s+)\S+", r"\1***", msg)
+    return msg[:300]
+
+
+def _cpf_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -> Optional[str]:
+    """ลองตอบด้วย AI ของ CPF — คืน None ถ้ายังไม่ได้ตั้งค่า หรือเรียกไม่สำเร็จ
+    ให้ caller ไปใช้ Gemini ต่อ เว็บจะได้ไม่พังเพราะ AI ตัวเดียวล่ม
+
+    เขียนตามมาตรฐาน OpenAI-compatible (/chat/completions) ซึ่ง AI gateway
+    ส่วนใหญ่ใช้กัน ถ้า CPF ใช้รูปแบบอื่นแก้แค่ฟังก์ชันนี้ที่เดียว
+    """
+    if not (CPF_API_BASE and CPF_API_KEY):
+        return None
+
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for turn in (history or [])[-MAX_HISTORY_TURNS * 2:]:
+        role = "assistant" if turn.role == "model" else "user"
+        messages.append({"role": role, "content": turn.text})
+    messages.append({
+        "role": "user",
+        "content": f"CONTEXT (ข้อมูลจริงจากสถานี):\n{context}\n\nคำถาม: {text}",
+    })
+
+    body = {"messages": messages, "max_tokens": 500, "stream": False}
+    if CPF_MODEL:
+        body["model"] = CPF_MODEL
+
+    try:
+        resp = httpx.post(
+            f"{CPF_API_BASE}/chat/completions",
+            headers={"Authorization": f"Bearer {CPF_API_KEY}"},
+            json=body,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        answer = (data["choices"][0]["message"]["content"] or "").strip()
+        return answer or None
+    except Exception as e:
+        global _LAST_LLM_ERROR
+        _LAST_LLM_ERROR = _redact_secrets(f"CPF {type(e).__name__}: {e}")
+        print(f"[warn] CPF ตอบไม่สำเร็จ ลอง Gemini ต่อ: {e}")
+        return None
+
+
 def _ollama_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -> Optional[str]:
     """ลองตอบด้วยโมเดล local ผ่าน Ollama (http://localhost:11434 โดย default)
     คืน None ถ้าต่อ Ollama ไม่ได้ (ยังไม่ได้ติดตั้ง/ปิดอยู่/โมเดลไม่มี) ให้ caller ไป fallback rule-based ต่อ
@@ -1951,7 +2134,13 @@ def ask(q: Question):
         pig=_needs_pig(text),
     )
 
-    # 1) Gemini ก่อน (ถ้าตั้งค่าคีย์ไว้) — ยิงครั้งเดียวต่อคำถาม ไม่ retry เพื่อไม่ให้เปลืองโควตา
+    # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)
+    #    ถ้ายังไม่ได้ตั้ง หรือเรียกไม่สำเร็จ จะคืน None แล้วไหลไป Gemini ต่อเอง
+    cpf_answer = _cpf_answer(text, context, q.history)
+    if cpf_answer:
+        return Answer(answer=cpf_answer)
+
+    # 2) Gemini (ถ้าตั้งค่าคีย์ไว้) — ยิงครั้งเดียวต่อคำถาม ไม่ retry เพื่อไม่ให้เปลืองโควตา
     if _llm is not None:
         # ต่อบทสนทนาแบบ multi-turn: เอาประวัติล่าสุดไม่เกิน MAX_HISTORY_TURNS เทิร์น
         contents = []
@@ -1985,29 +2174,32 @@ def ask(q: Question):
             if answer:
                 return Answer(answer=answer)
         except Exception as e:
-            if "INVALID_ARGUMENT" not in str(e):
-                raise
-            resp = _llm.models.generate_content(
-                model=GEMINI_MODEL,
-                config={"system_instruction": SYSTEM_PROMPT, "max_output_tokens": 2000},
-                contents=contents,
-            )
-            answer = (resp.text or "").strip()
-            if answer:
-                return Answer(answer=answer)
-        except Exception as e:
             global _LAST_LLM_ERROR
             # ตัดของยาวและกันคีย์หลุดออกมาในข้อความ
-            msg = f"{type(e).__name__}: {e}"
-            _LAST_LLM_ERROR = re.sub(r"(key=|AIza)[A-Za-z0-9_\-.]{6,}", r"***", msg)[:300]
+            _LAST_LLM_ERROR = _redact_secrets(f"Gemini {type(e).__name__}: {e}")
+            # 400 INVALID_ARGUMENT = โมเดลรุ่นใหม่ไม่รับ thinking_budget -> ลองใหม่แบบเปิด thinking
+            # ห้าม raise ออกไป เพราะจะทำให้ Gemini ล่มทีไร เว็บตอบ 500 ทันที
+            # ทั้งที่ยังมี Ollama กับ rule-based รอตอบอยู่ข้างล่าง (เคยทำให้เว็บพังมาแล้ว)
+            if "INVALID_ARGUMENT" in str(e):
+                try:
+                    resp = _llm.models.generate_content(
+                        model=GEMINI_MODEL,
+                        config={"system_instruction": SYSTEM_PROMPT, "max_output_tokens": 2000},
+                        contents=contents,
+                    )
+                    answer = (resp.text or "").strip()
+                    if answer:
+                        return Answer(answer=answer)
+                except Exception as e2:
+                    _LAST_LLM_ERROR = _redact_secrets(f"Gemini retry {type(e2).__name__}: {e2}")
             print(f"[warn] Gemini ตอบไม่สำเร็จ ลอง Ollama ต่อ: {e}")
 
-    # 2) Ollama local (ถ้ารันอยู่ในเครื่อง) — ไม่มีค่าใช้จ่าย/ไม่จำกัดโควตา
+    # 3) Ollama local (ถ้ารันอยู่ในเครื่อง) — ไม่มีค่าใช้จ่าย/ไม่จำกัดโควตา
     ollama_answer = _ollama_answer(text, context, q.history)
     if ollama_answer:
         return Answer(answer=ollama_answer)
 
-    # 3) rule-based — ด่านสุดท้าย ตอบได้เสมอ ไม่มีทางพัง
+    # 4) rule-based — ด่านสุดท้าย ตอบได้เสมอ ไม่มีทางพัง
     return Answer(answer=_rule_based_answer(text))
 
 

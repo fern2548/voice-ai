@@ -1,0 +1,121 @@
+-- รันใน Supabase SQL Editor ครั้งเดียวตอนตั้งโปรเจกต์
+create table if not exists weather_readings (
+  id bigint generated always as identity primary key,
+  temperature double precision,
+  humidity double precision,
+  windspeed double precision,
+  rainfall double precision,
+  light double precision,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists weather_readings_created_at_idx
+  on weather_readings (created_at desc);
+
+-- เก็บผลทำนายจากโมเดล LSTM (predicted_for = เวลาที่ทำนายว่าจะเป็นตอนนั้น)
+-- ไว้เทียบกับ weather_readings จริงตาม target time ในภายหลัง
+create table if not exists weather_predictions (
+  id bigint generated always as identity primary key,
+  predicted_for timestamptz,
+  temperature_pred double precision,
+  humidity_pred double precision,
+  windspeed_pred double precision,
+  rainfall_pred double precision,
+  light_pred double precision,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists weather_predictions_predicted_for_idx
+  on weather_predictions (predicted_for desc);
+
+-- สรุปสถิติย้อนหลัง (เฉลี่ย/ต่ำสุด/สูงสุด) ให้ AI ใช้ตอบคำถามเชิงประวัติ เช่น
+-- "สัปดาห์นี้ร้อนสุดกี่องศา" โดยคำนวณที่ฝั่ง Postgres (เร็วกว่าดึง raw rows มาคำนวณเอง)
+create or replace function weather_stats(since timestamptz)
+returns table (
+  reading_count bigint,
+  temperature_avg double precision,
+  temperature_min double precision,
+  temperature_max double precision,
+  humidity_avg double precision,
+  humidity_min double precision,
+  humidity_max double precision,
+  windspeed_avg double precision,
+  windspeed_max double precision,
+  rainfall_sum double precision,
+  rainy_readings bigint,
+  light_avg double precision
+)
+language sql stable as $$
+  select
+    count(1),
+    avg(temperature), min(temperature), max(temperature),
+    avg(humidity), min(humidity), max(humidity),
+    avg(windspeed), max(windspeed),
+    sum(rainfall), count(1) filter (where rainfall > 0),
+    avg(light)
+  from weather_readings
+  where created_at >= since;
+$$;
+
+-- บันทึกจำนวนหมูป่วยรายวัน (กรอกมือ ไม่ได้มาจากเซนเซอร์) — ใช้หน้า "บันทึกหมูป่วย"
+-- และให้ AI อ้างอิงตอบคำถามเรื่องสุขภาพหมูได้
+create table if not exists pig_health_log (
+  id bigint generated always as identity primary key,
+  log_date date not null,
+  sick_count integer not null,
+  total_count integer,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists pig_health_log_date_idx
+  on pig_health_log (log_date desc);
+
+-- บันทึกการฉีดวัคซีน/ยาให้หมู (กรอกมือหรือสั่งด้วยเสียงผ่าน Voice AI)
+create table if not exists vaccine_log (
+  id bigint generated always as identity primary key,
+  log_date date not null,
+  vaccine_name text,
+  barn_no text,       -- เลขโรงเรือน
+  pen_no text,        -- เลขคอก
+  pig_count integer,  -- จำนวนหมูที่ฉีด
+  injector text,      -- ผู้ฉีด
+  lot_no text,        -- Lot/Batch วัคซีน
+  dose text,          -- ปริมาณ/ขนาดยา (เช่น "2ml")
+  log_time text,      -- เวลาที่ฉีด (เช่น "09:30")
+  next_due_date date, -- นัดฉีดครั้งถัดไป
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists vaccine_log_date_idx
+  on vaccine_log (log_date desc);
+
+-- รันก้อนนี้แยกถ้าตาราง vaccine_log มีอยู่แล้วก่อนหน้า (เพิ่มคอลัมน์ใหม่โดยไม่ลบข้อมูลเดิม)
+alter table vaccine_log add column if not exists barn_no text;
+alter table vaccine_log add column if not exists pen_no text;
+alter table vaccine_log add column if not exists pig_count integer;
+alter table vaccine_log add column if not exists injector text;
+alter table vaccine_log add column if not exists lot_no text;
+alter table vaccine_log add column if not exists dose text;
+alter table vaccine_log add column if not exists log_time text;
+alter table vaccine_log add column if not exists next_due_date date;
+
+-- กำหนดรอบฉีดซ้ำต่อวัคซีน 1 ชื่อ = 1 กำหนด (ผู้ใช้/สัตวแพทย์เป็นคนตั้งเอง ระบบไม่เดาเอง)
+-- เมื่อบันทึกฉีดวัคซีนที่มีชื่อตรงกับตารางนี้ ระบบจะคำนวณ next_due_date ให้อัตโนมัติ
+create table if not exists vaccine_schedule (
+  vaccine_name text primary key,
+  interval_days integer not null,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+-- ผู้ใช้ admin หลายคน (แทนที่รหัสผ่านเดียวแบบเดิม) — เก็บ password แบบ hash+salt เสมอ ไม่เก็บ plain text
+create table if not exists admin_users (
+  id bigint generated always as identity primary key,
+  username text not null unique,
+  password_hash text not null,
+  password_salt text not null,
+  created_at timestamptz not null default now()
+);
+

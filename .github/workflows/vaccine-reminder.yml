@@ -1,0 +1,28 @@
+# แจ้งเตือนวัคซีนใกล้ครบกำหนดเข้ากลุ่ม LINE ทุกเช้า
+#
+# ทำไมต้องใช้ตัวตั้งเวลาข้างนอก: เซิร์ฟเวอร์แพ็กเกจฟรีของ Render หลับเองเมื่อไม่มีคนใช้
+# ตัวตั้งเวลาที่รันในเซิร์ฟเวอร์เองจึงไม่ทำงานตอนหลับ ต้องมีคนมาเคาะจากข้างนอก
+# (GitHub Actions ฟรีสำหรับ repo สาธารณะ)
+name: แจ้งเตือนวัคซีน
+
+on:
+  schedule:
+    # GitHub ใช้เวลา UTC — 00:00 UTC = 07:00 น. ตามเวลาไทย
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # กดสั่งเองได้จากแท็บ Actions ไว้ทดสอบ
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ปลุกเซิร์ฟเวอร์ให้ตื่นก่อน
+        # เซิร์ฟเวอร์ที่หลับอยู่ใช้เวลาตื่นราวครึ่งนาที ถ้ายิงงานจริงเลยจะไม่ทัน
+        run: |
+          curl -sS --max-time 90 --retry 3 --retry-delay 15 --retry-all-errors \
+            "${{ secrets.API_BASE }}/health" > /dev/null
+
+      - name: ส่งแจ้งเตือนวัคซีนเข้า LINE
+        run: |
+          curl -sS --fail-with-body --max-time 60 \
+            -X POST "${{ secrets.API_BASE }}/cron/vaccine-due-notify?days=3" \
+            -H "X-Cron-Key: ${{ secrets.CRON_KEY }}"

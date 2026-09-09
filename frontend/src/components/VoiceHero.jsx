@@ -15,7 +15,9 @@ export default function VoiceHero() {
     ask, startVoice, voiceError,
   } = useVoiceAI()
 
-  const ready = question.trim().length > 0 && !busy
+  // ระหว่างฟังต้องคงปุ่มไมค์ไว้เสมอ ห้ามสลับเป็นปุ่มส่ง
+  // ไม่งั้นพอระบบได้ยินคำแรก ปุ่มไมค์จะหายไปกลางคัน แล้วผู้ใช้จะกดหยุดพูดไม่ได้
+  const ready = question.trim().length > 0 && !busy && !listening
 
   const submit = (e) => {
     e.preventDefault()
@@ -24,7 +26,11 @@ export default function VoiceHero() {
   }
 
   // สถานะที่แสดงใต้แคปซูล ใช้ถ้อยคำชุดเดียวกับ 5174
-  const statusText = listening ? 'กำลังฟัง...' : busy ? 'กำลังคิด...' : ''
+  const statusText = listening
+    ? 'กำลังฟัง... พูดจบแล้วแตะไมโครโฟนอีกครั้ง'
+    : busy
+      ? 'กำลังคิด...'
+      : ''
 
   // จับคู่คำถาม-คำตอบจากท้ายรายการ ต้องเป็นคู่กันจริง
   // ห้ามหา "คำถามล่าสุด" กับ "คำตอบล่าสุด" แยกกัน เพราะระหว่างรอคำตอบใหม่
@@ -51,21 +57,26 @@ export default function VoiceHero() {
           <div className={`vh-bar ${listening ? 'listening' : ''}`}>
             <i className="ti ti-plus vh-bar-plus" aria-hidden="true" />
 
-            {listening ? (
+            {/* โชว์ข้อความที่ถอดได้ระหว่างพูดด้วย จะได้เห็นว่าระบบฟังถูกไหมก่อนส่ง
+                (เดิมมีแต่คลื่นเสียง พอกดส่งถึงรู้ว่าเพี้ยน) */}
+            <input
+              className="vh-input"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              readOnly={listening}
+              disabled={busy}
+              placeholder={
+                listening ? 'พูดได้เลย...' : 'ถาม Farmy Voice หรือแตะไมโครโฟนเพื่อพูด'
+              }
+              aria-label="ถาม Farmy Voice"
+            />
+
+            {listening && (
               <div className="vh-wave" aria-hidden="true">
-                {[10, 20, 13, 28, 17, 24, 12, 22, 15, 26, 11, 18].map((h, i) => (
+                {[10, 20, 13, 28, 17].map((h, i) => (
                   <span key={i} style={{ height: h, animationDelay: `${(i % 5) * 0.1}s` }} />
                 ))}
               </div>
-            ) : (
-              <input
-                className="vh-input"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                disabled={busy}
-                placeholder="ถาม Farmy Voice หรือแตะไมโครโฟนเพื่อพูด"
-                aria-label="ถาม Farmy Voice"
-              />
             )}
 
             {ready ? (

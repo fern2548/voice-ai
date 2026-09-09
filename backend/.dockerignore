@@ -1,0 +1,10 @@
+# ห้ามส่งของพวกนี้เข้า Docker — ทำให้ build ช้าและอาจพัง
+# (venv มีลิงก์ที่ Windows อ่านไม่ได้ เคยทำให้ build ล้มมาแล้ว)
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.log
+backups/

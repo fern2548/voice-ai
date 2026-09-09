@@ -1,0 +1,102 @@
+# Farmy Voice — ทั้งระบบในชุดเดียว สำหรับวางบนเซิร์ฟเวอร์เครื่องไหนก็ได้
+#
+#   docker compose up -d --build      เริ่มระบบ
+#   docker compose ps                 ดูว่าตัวไหนขึ้นแล้ว
+#   docker compose logs -f api        ดูสิ่งที่เซิร์ฟเวอร์ทำ
+#   docker compose down               หยุด (ข้อมูลยังอยู่)
+#
+# 5 ตัว: ฐานข้อมูล · ประตูอ่านข้อมูล · ประตูหน้าบ้าน · เซิร์ฟเวอร์ · หน้าเว็บ
+# กินหน่วยความจำรวมราว 700 MB — เบากว่าชุดเต็มของ Supabase ราว 5 เท่า
+# เพราะตัดส่วนที่ระบบเราไม่ได้ใช้ออกหมด (ระบบสมาชิก ที่เก็บไฟล์ อัปเดตสด อีเมล)
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: farmy-db
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: postgres
+      TZ: Asia/Bangkok
+    volumes:
+      # ข้อมูลจริงอยู่ในนี้ — ลบ volume นี้เมื่อไหร่ข้อมูลหายทันที
+      - db-data:/var/lib/postgresql/data
+      # ไฟล์ในนี้ถูกรันครั้งเดียวตอนสร้างฐานข้อมูลใหม่ เรียงตามชื่อไฟล์
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    # ไม่เปิดพอร์ตออกข้างนอก ฐานข้อมูลเข้าถึงได้เฉพาะจากตัวอื่นในชุดนี้
+    # อยากต่อด้วยเครื่องมือจัดการฐานข้อมูล ค่อยเปิดเป็น "127.0.0.1:5432:5432"
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: farmy-postgrest
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${DB_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  gateway:
+    image: nginx:alpine
+    container_name: farmy-gateway
+    volumes:
+      - ./gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - postgrest
+    restart: unless-stopped
+
+  api:
+    build: ../backend
+    container_name: farmy-api
+    env_file: .env
+    environment:
+      # ชี้ไปที่ประตูหน้าบ้านในชุดเดียวกัน แทน Supabase คลาวด์
+      SUPABASE_URL: http://gateway
+      TZ: Asia/Bangkok
+    depends_on:
+      - gateway
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../frontend
+      args:
+        VITE_API_BASE: ${PUBLIC_API_URL}
+    container_name: farmy-web
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  backup:
+    image: postgres:17-alpine
+    container_name: farmy-backup
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_HOUR: ${BACKUP_HOUR:-2}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      TZ: Asia/Bangkok
+    volumes:
+      - ./db-backup.sh:/db-backup.sh:ro
+      # ไฟล์สำรองออกมาอยู่นอกคอนเทนเนอร์ ลบคอนเทนเนอร์ทิ้งไฟล์ก็ยังอยู่
+      - ./backups:/backups
+    entrypoint: ["sh", "/db-backup.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:

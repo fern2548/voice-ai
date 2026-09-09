@@ -1,28 +1,61 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAdminAuth } from '../context/AdminAuth.jsx'
 import { useTheme } from '../theme.jsx'
 import { FarmyLogo } from './FarmDecor.jsx'
+import { getSignupEnabled } from '../api.js'
 
 // บล็อกทั้งเว็บไว้จนกว่าจะล็อกอินสำเร็จ — ใช้ตอน deploy ขึ้น URL สาธารณะ
 // กันคนนอกที่ไม่รู้รหัสผ่านเข้ามาดูข้อมูลฟาร์ม
+//
+// มีสองโหมดในหน้าเดียว: เข้าสู่ระบบ กับ สมัครสมาชิก
+// โหมดสมัครจะโผล่ก็ต่อเมื่อผู้ดูแลตั้งรหัสเชิญไว้ในเซิร์ฟเวอร์เท่านั้น
+// (ถ้าเปิดให้ใครสมัครก็ได้ คนนอกที่เจอ URL จะเข้ามาเห็นข้อมูลฟาร์มทั้งหมดทันที)
 export default function AdminLoginGate({ children }) {
-  const { isAdmin, login } = useAdminAuth()
+  const { isAdmin, login, signup } = useAdminAuth()
   const { theme, setTheme } = useTheme()
+  const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [canSignup, setCanSignup] = useState(false)
+
+  // ถามเซิร์ฟเวอร์ว่าเปิดให้สมัครเองไหม ถ้าไม่เปิดก็ไม่ต้องโชว์ลิงก์ให้สับสน
+  useEffect(() => {
+    let alive = true
+    getSignupEnabled()
+      .then((d) => alive && setCanSignup(!!d?.enabled))
+      .catch(() => {}) // ต่อเซิร์ฟเวอร์ไม่ได้ -> ถือว่าปิด ค่อยลองใหม่ตอนรีเฟรช
+    return () => { alive = false }
+  }, [])
 
   if (isAdmin) return children
 
+  const isSignup = mode === 'signup'
+  const ready = password.trim() && username.trim() && (!isSignup || code.trim())
+
+  const switchMode = (next) => {
+    setMode(next)
+    setError('')
+    setPassword('')
+    setCode('')
+    // ชื่อ admin เป็นค่าเริ่มต้นของการล็อกอิน แต่ตอนสมัครต้องให้ผู้ใช้ตั้งเอง
+    setUsername(next === 'signup' ? '' : 'admin')
+  }
+
   const submit = async (e) => {
     e.preventDefault()
-    if (busy || !password.trim()) return
+    if (busy || !ready) return
     setBusy(true)
     setError('')
     try {
-      await login(username.trim(), password)
+      if (isSignup) {
+        await signup(username.trim(), password, code.trim())
+      } else {
+        await login(username.trim(), password)
+      }
     } catch (err) {
       // แยกสองกรณีให้ผู้ใช้รู้ว่าควรทำอะไรต่อ: กรอกผิด vs ต่อเซิร์ฟเวอร์ไม่ได้
       // (เซิร์ฟเวอร์แพ็กเกจฟรีจะหลับเมื่อไม่มีคนใช้ ครั้งแรกจึงช้าและอาจ timeout)
@@ -31,7 +64,7 @@ export default function AdminLoginGate({ children }) {
         offline
           ? 'ติดต่อเซิร์ฟเวอร์ไม่ได้ — เซิร์ฟเวอร์อาจกำลังเริ่มทำงาน รอสักครู่แล้วลองใหม่'
           // ใช้ข้อความจากเซิร์ฟเวอร์ถ้ามี จะได้เห็นว่าเหลือกี่ครั้ง หรือถูกล็อกนานเท่าไหร่
-          : err?.detail || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+          : err?.detail || (isSignup ? 'สมัครไม่สำเร็จ' : 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
       )
     } finally {
       setBusy(false)
@@ -59,8 +92,28 @@ export default function AdminLoginGate({ children }) {
           <span className="lg-name">Farmy<span> Voice</span></span>
         </div>
 
-        <h1 className="lg-title">เข้าสู่ระบบ</h1>
-        <p className="lg-sub">ระบบจัดการฟาร์มสุกรด้วยเสียง</p>
+        <h1 className="lg-title">{isSignup ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'}</h1>
+        <p className="lg-sub">
+          {isSignup ? 'สร้างบัญชีใหม่ด้วยรหัสเชิญจากผู้ดูแล' : 'ระบบจัดการฟาร์มสุกรด้วยเสียง'}
+        </p>
+
+        {isSignup && (
+          <label className="lg-field">
+            <span className="lg-label">รหัสเชิญ</span>
+            <input
+              type="text"
+              className="lg-input"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="ขอจากผู้ดูแลระบบ"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck="false"
+              disabled={busy}
+              autoFocus
+            />
+          </label>
+        )}
 
         <label className="lg-field">
           <span className="lg-label">ชื่อผู้ใช้</span>
@@ -69,7 +122,8 @@ export default function AdminLoginGate({ children }) {
             className="lg-input"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
+            placeholder={isSignup ? 'ภาษาอังกฤษ ตัวเลข _ . - เท่านั้น' : undefined}
+            autoComplete={isSignup ? 'off' : 'username'}
             autoCapitalize="none"
             spellCheck="false"
             disabled={busy}
@@ -84,9 +138,10 @@ export default function AdminLoginGate({ children }) {
               className="lg-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
+              placeholder={isSignup ? 'อย่างน้อย 8 ตัวอักษร' : undefined}
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
               disabled={busy}
-              autoFocus
+              autoFocus={!isSignup}
             />
             <button
               type="button"
@@ -111,19 +166,30 @@ export default function AdminLoginGate({ children }) {
           )}
         </div>
 
-        <button type="submit" className="lg-submit" disabled={busy || !password.trim()}>
+        <button type="submit" className="lg-submit" disabled={busy || !ready}>
           {busy ? (
             <>
               <span className="lg-spinner" aria-hidden="true" />
-              กำลังเข้าสู่ระบบ…
+              {isSignup ? 'กำลังสมัคร…' : 'กำลังเข้าสู่ระบบ…'}
             </>
           ) : (
-            'เข้าสู่ระบบ'
+            isSignup ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'
           )}
         </button>
 
+        {canSignup && (
+          <p className="lg-switch">
+            {isSignup ? 'มีบัญชีอยู่แล้ว?' : 'ยังไม่มีบัญชี?'}{' '}
+            <button type="button" onClick={() => switchMode(isSignup ? 'login' : 'signup')}>
+              {isSignup ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก'}
+            </button>
+          </p>
+        )}
+
         <p className="lg-hint">
-          เปิดครั้งแรกอาจใช้เวลาสักครู่ เนื่องจากเซิร์ฟเวอร์กำลังเริ่มทำงาน
+          {isSignup
+            ? 'ต้องมีรหัสเชิญจากผู้ดูแลระบบจึงจะสมัครได้'
+            : 'เปิดครั้งแรกอาจใช้เวลาสักครู่ เนื่องจากเซิร์ฟเวอร์กำลังเริ่มทำงาน'}
         </p>
       </form>
     </div>

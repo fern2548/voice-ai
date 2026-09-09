@@ -78,8 +78,13 @@ export function VoiceAIProvider({ children }) {
     'network': 'เชื่อมต่อบริการแปลงเสียงไม่ได้ ตรวจสอบอินเทอร์เน็ต',
   }
 
+  // เก็บข้อความล่าสุดที่ถอดได้ไว้นอก state เพราะ onend ต้องอ่านค่าล่าสุดทันที
+  // ถ้าอ่านจาก question (state) จะได้ค่าเก่าค้างใน closure ตอน callback ถูกเรียก
+  const heardRef = useRef('')
+
   const startVoice = () => {
-    // ถ้ากำลังฟังอยู่ ให้กดซ้ำเพื่อ "หยุดฟัง" เอง (continuous mode ไม่หยุดเองทันทีที่เว้นวรรค)
+    // กดซ้ำ = "พูดจบแล้ว" -> สั่งหยุดฟัง แล้วให้ onend ส่งคำถามต่อเอง
+    // (continuous mode ไม่หยุดเองตอนเว้นวรรค ต้องให้ผู้ใช้บอกว่าจบ)
     if (recognizerRef.current) {
       recognizerRef.current.stop()
       return
@@ -90,6 +95,8 @@ export function VoiceAIProvider({ children }) {
       return
     }
     recognizerRef.current = r
+    heardRef.current = ''
+    setQuestion('')
     setVoiceError('')
     setListening(true)
     try {
@@ -102,16 +109,23 @@ export function VoiceAIProvider({ children }) {
     }
     r.onresult = (e) => {
       const t = pickBestTranscript(e.results)
+      heardRef.current = t
       setQuestion(t)
     }
     r.onerror = (e) => {
       recognizerRef.current = null
       setListening(false)
+      // ล้างทิ้งเพื่อไม่ให้ onend (ซึ่งจะถูกเรียกต่อจาก onerror เสมอ) ส่งข้อความที่ค้างอยู่
+      heardRef.current = ''
       setVoiceError(ERROR_TEXT[e?.error] || `ฟังเสียงไม่สำเร็จ (${e?.error || 'ไม่ทราบสาเหตุ'})`)
     }
     r.onend = () => {
       recognizerRef.current = null
       setListening(false)
+      // ส่งให้อัตโนมัติ ผู้ใช้จะได้ไม่ต้องหาปุ่มส่งอีกที (กดไมค์ 2 ครั้งจบ)
+      const t = heardRef.current.trim()
+      heardRef.current = ''
+      if (t) ask(t)
     }
   }
 

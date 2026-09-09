@@ -17,3 +17,18 @@ farmy-voice/dist/
 # ไฟล์ log และไฟล์ทดสอบที่เกิดระหว่างพัฒนา
 *.log
 report-test.png
+
+# Docker / ฐานข้อมูลที่สำรองไว้
+backups/
+
+# ค่าลับและข้อมูลที่ดึงออกมา ห้ามขึ้น git
+backend/.env.cloud
+supabase/local-keys.txt
+supabase/cloud-export/
+supabase/import-data.sql
+
+# ชุดไฟล์ที่แพ็กไว้ส่งมอบ สร้างใหม่ได้เสมอ ไม่ต้องเก็บใน git
+farmy-docker/
+farmy-docker.zip
+farmy-voice-dashboard/
+farmy-voice-dashboard.zip

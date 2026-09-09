@@ -468,16 +468,173 @@ button { font-family: var(--font); cursor: pointer; border: none; }
 .vaccine-due-alert { border-color: rgba(34, 197, 94, 0.4); border-left-color: var(--accent-2); }
 .vaccine-due-alert > .ti { color: var(--accent-2); }
 .vaccine-due-alert .sensor-alert-title { color: var(--accent-2); }
-.vaccine-due-alert-clickable { cursor: pointer; transition: background 0.15s; }
-.vaccine-due-alert-clickable:hover { background: var(--panel-2); }
-.vaccine-due-alert-link {
+
+/* รายการวัคซีนในแถบแจ้งเตือน — แยกทีละบรรทัด กดแยกทีละอันได้ */
+.vd-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vd-item {
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
+  padding: 7px 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-2);
+  border-radius: 8px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.vd-item:hover, .vd-item:focus-visible { background: var(--panel); border-color: var(--accent-2); }
+.vd-item.overdue { border-left-color: var(--danger); }
+.vd-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.vd-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-where { font-size: 11.5px; color: var(--text-dim); }
+.vd-when {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent-2);
+  white-space: nowrap;
+}
+.vd-item.overdue .vd-when { color: var(--danger); }
+.vd-go { flex-shrink: 0; font-size: 14px; color: var(--text-faint); }
+.vd-more {
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-2);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* แผงรายละเอียดในหน้าวัคซีน — การ์ดละรายการ */
+.vd-panel { margin-bottom: 20px; }
+.vd-panel-count { font-size: 12px; color: var(--text-dim); }
+.vd-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+.vd-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent-2);
+  border-radius: 12px;
+}
+.vd-card.overdue { border-left-color: var(--danger); }
+
+/* กล่องบอกว่ากำลังดูรายการไหนอยู่ หลังกดมาจากแถบแจ้งเตือน */
+.vd-focus-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 16px 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 10%, transparent);
+}
+.vd-focus-note > .ti { font-size: 18px; color: var(--accent-2); flex-shrink: 0; margin-top: 1px; }
+.vd-focus-note > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vd-focus-note b { font-size: 13.5px; color: var(--accent-2); }
+.vd-focus-note span { font-size: 13px; color: var(--text-dim); }
+
+/* ใบอื่นจางลง ให้ใบที่เลือกเด่นขึ้นมาเอง */
+.vd-cards.has-focus .vd-card { opacity: 0.45; transition: opacity 0.3s; }
+.vd-cards.has-focus .vd-card.focused { opacity: 1; }
+
+.vd-card { position: relative; }
+.vd-card.focused {
+  border-color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 8%, var(--panel-2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 32%, transparent);
+  animation: vd-pop 1.6s ease-out 2;
+}
+@keyframes vd-pop {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 32%, transparent); }
+  50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--accent-2) 12%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vd-card.focused { animation: none; }
+}
+
+/* ป้ายบนหัวการ์ดที่ถูกเลือก */
+.vd-focus-tag {
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 10px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
+  color: #fff;
+  background: var(--accent-2);
+}
+.vd-focus-tag .ti { font-size: 12px; }
+.vd-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.vd-card-name { margin: 0; font-size: 16px; font-weight: 700; }
+.vd-badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
   color: var(--accent-2);
-  margin-top: 4px;
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+}
+.vd-badge.overdue { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.vd-card-due {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.vd-card-due b { color: var(--text); font-weight: 600; }
+.vd-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.vd-field dt { font-size: 11px; color: var(--text-faint); margin-bottom: 1px; }
+.vd-field dd { margin: 0; font-size: 13.5px; color: var(--text); }
+.vd-clear {
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 /* variant: ต่อ backend ไม่ได้ (ใช้สีเหลือง แยกจาก sensor stale สีแดง) */
@@ -1586,6 +1743,26 @@ button { font-family: var(--font); cursor: pointer; border: none; }
 }
 @keyframes lg-spin { to { transform: rotate(360deg); } }
 
+/* สลับระหว่างเข้าสู่ระบบกับสมัครสมาชิก */
+.lg-switch {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--text-dim);
+}
+.lg-switch button {
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.lg-switch button:hover { opacity: 0.85; }
+
 .lg-hint {
   margin-top: 20px;
   text-align: center;
@@ -2030,8 +2207,15 @@ th, td { font-size: 14px; }
 .vh-input::placeholder { color: var(--text-faint); }
 .vh-input:disabled { opacity: 0.5; }
 
-/* คลื่นเสียงตอนกำลังฟัง (แทนที่ช่องพิมพ์) */
-.vh-wave { flex: 1; height: 44px; display: flex; align-items: center; gap: 3px; }
+/* คลื่นเสียงตอนกำลังฟัง — อยู่ข้างปุ่มไมค์ ไม่แทนช่องข้อความแล้ว
+   เพราะต้องเห็นคำที่ถอดได้ระหว่างพูดไปด้วย */
+.vh-wave {
+  flex-shrink: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
 .vh-wave span {
   width: 3px;
   border-radius: 999px;
