@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { getLabSources, getLabLatest, getLabSeries } from '../api.js'
+import { getLabSources, getLabLatest, getLabSeries, getLabSummary } from '../api.js'
 import usePolling from '../hooks/usePolling.js'
 
 // หน้า "กราฟข้อมูล" — ค่าตอนนี้ + กราฟย้อนหลังของชุดข้อมูลจาก lab.plotnexuslab.com
@@ -35,6 +35,7 @@ export default function SensorsPage() {
   const [series, setSeries] = useState(null)
   const [seriesErr, setSeriesErr] = useState('')
   const [loading, setLoading] = useState(false)
+  const [summary, setSummary] = useState(null)   // ตารางต่ำสุด/เฉลี่ย/สูงสุดของทุกค่า
 
   const source = params.get('source') || 'pig'
   const hours = Number(params.get('hours')) || 24
@@ -77,6 +78,16 @@ export default function SensorsPage() {
       .finally(() => alive && setLoading(false))
     return () => { alive = false }
   }, [src?.id, measure, hours])
+
+  // ตารางสรุป — ดึงพร้อมกราฟ เปลี่ยนชุด/ช่วงเวลาก็ดึงใหม่ (ไม่ขึ้นกับค่าที่เลือก เพราะสรุปทุกค่า)
+  useEffect(() => {
+    if (!src) return
+    let alive = true
+    getLabSummary(src.id, hours)
+      .then((d) => alive && setSummary(d))
+      .catch(() => alive && setSummary(null))
+    return () => { alive = false }
+  }, [src?.id, hours])
 
   // รวมทุกเส้นเข้าเป็นแถวเดียวกันตามเวลา ให้ recharts วาดหลายเส้นในกราฟเดียว
   const chartRows = useMemo(() => {
@@ -251,6 +262,45 @@ export default function SensorsPage() {
             : ''}
         </div>
       </div>
+
+      {/* ตารางสรุปทุกค่าในช่วงที่เลือก — กดแถวไหนก็สลับกราฟไปดูค่านั้น */}
+      {summary?.rows?.length > 0 && (
+        <div className="panel">
+          <div className="panel-head">
+            <span className="panel-title">สรุป · {summary.period || `ย้อนหลัง ${hours} ชม.`}</span>
+            <span className="sx-updated">ต่ำสุด / เฉลี่ย / สูงสุด</span>
+          </div>
+          <div className="table-wrap">
+            <table className="data-table sx-table">
+              <thead>
+                <tr>
+                  <th>ค่า</th>
+                  <th>จุดติดตั้ง</th>
+                  <th className="num">ต่ำสุด</th>
+                  <th className="num">เฉลี่ย</th>
+                  <th className="num">สูงสุด</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.rows.map((r) => (
+                  <tr
+                    key={`${r.site}-${r.id}`}
+                    className={r.id === measure ? 'on' : ''}
+                    onClick={() => setParam('measure', r.id)}
+                    title="กดเพื่อดูกราฟค่านี้"
+                  >
+                    <td>{r.label}</td>
+                    <td className="dim">{r.site_label}</td>
+                    <td className="num">{r.min}<small>{r.unit}</small></td>
+                    <td className="num strong">{r.avg}<small>{r.unit}</small></td>
+                    <td className="num">{r.max}<small>{r.unit}</small></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </>
   )
 }

@@ -1541,6 +1541,35 @@ def lab_series(source: str, measure: str, hours: int = 24):
     }
 
 
+@app.get("/lab/summary")
+def lab_summary_endpoint(source: str, hours: int = 24):
+    """สถิติต่ำสุด/เฉลี่ย/สูงสุดของทุกค่าในชุด — ตารางสรุปบนหน้ากราฟข้อมูล"""
+    if not LAB_API_KEY:
+        raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
+    if source not in _LAB_SOURCE_LABELS:
+        raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
+    hours = max(1, min(hours, 720))
+    data = _lab_summary(source, hours)
+    if not data:
+        raise HTTPException(status_code=502, detail="ดึงสรุปไม่ได้")
+    rows = []
+    for r in data.get("สรุป", []):
+        if r.get("id") in _LAB_SKIP_IDS:
+            continue
+        rows.append({
+            "id": r.get("id"),
+            "label": r.get("ชื่อ") or r.get("id"),
+            "unit": r.get("หน่วย") or "",
+            "site": r.get("จุดติดตั้ง"),
+            "site_label": r.get("ชื่อจุด") or r.get("จุดติดตั้ง"),
+            "min": r.get("ต่ำสุด"),
+            "avg": r.get("เฉลี่ย"),
+            "max": r.get("สูงสุด"),
+            "count": r.get("จำนวนค่า"),
+        })
+    return {"source": source, "hours": hours, "period": data.get("ช่วงเวลา"), "rows": rows}
+
+
 @app.get("/vaccine-due")
 def vaccine_due(days: int = 7):
     """รายการวัคซีนที่ใกล้ครบกำหนดฉีดซ้ำ (next_due_date อยู่ในอีก N วันข้างหน้า หรือเลยกำหนดไปแล้ว)
@@ -1796,6 +1825,9 @@ _LAB_MEASURE_WORDS = [
 
 # คำที่บอกว่าถามเชิงประวัติ ไม่ใช่ค่าตอนนี้
 _LAB_HISTORY_WORDS = ("ย้อนหลัง", "เมื่อวาน", "สูงสุด", "ต่ำสุด", "เฉลี่ย", "แนวโน้ม", "ที่ผ่านมา",
+                      # คำพูดติดปากที่หมายถึงสูงสุด/ต่ำสุด (ไม่ใส่ "สุด" เดี่ยว ๆ เพราะจะไปชน "ล่าสุด")
+                      "ร้อนสุด", "หนาวสุด", "เย็นสุด", "ชื้นสุด", "มากสุด", "น้อยสุด", "แรงสุด",
+                      "ร้อนที่สุด", "หนาวที่สุด", "มากที่สุด", "น้อยที่สุด", "สูงที่สุด", "ต่ำที่สุด",
                       "ชั่วโมง", "วันนี้", "ทั้งวัน", "สัปดาห์", "อาทิตย์", "เปลี่ยนแปลง", "ขึ้นลง",
                       "เพิ่มขึ้น", "ลดลง", "กราฟ", "สถิติ", "ช่วง")
 _LAB_HOURS_RE = re.compile(r"(\d+)\s*(ชั่วโมง|ชม|วัน|สัปดาห์|อาทิตย์)")
@@ -1911,6 +1943,75 @@ def _fmt_lab_series(data: dict) -> str:
             f"สูงสุด {hi}{unit} ({local(hi_t)}), แนวโน้ม{trend}, {len(pts)} ค่า"
         )
     return "\n".join(lines)
+
+
+# ---------- เซนเซอร์ภายนอก: สรุปทุกค่าในครั้งเดียว (summary) ----------
+# ใช้กับคำถามภาพรวม เช่น "สรุปเล้า R วันนี้" "กำแพงเพชรมีอะไรผิดปกติไหม"
+# ที่ไม่ได้เจาะจงค่าเดียว ถ้าใช้ series ต้องยิงทีละค่า 10 กว่าครั้ง summary ยิงครั้งเดียวจบ
+_LAB_OVERVIEW_WORDS = ("สรุป", "ภาพรวม", "เป็นยังไงบ้าง", "เป็นอย่างไรบ้าง", "ผิดปกติ", "ทั้งหมด",
+                       "ทุกค่า", "ทุกอย่าง", "รายงาน", "เช็ค", "ตรวจ", "โอเคไหม", "ปกติไหม")
+_lab_summary_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _lab_summary(source: str, hours: int) -> Optional[dict]:
+    key = f"{source}|{hours}"
+    now = datetime.now(timezone.utc).timestamp()
+    hit = _lab_summary_cache.get(key)
+    if hit and now - hit[0] < LAB_SERIES_CACHE_SECONDS:
+        return hit[1]
+    try:
+        resp = httpx.get(
+            f"{LAB_API_BASE}/api/summary",
+            params={"key": LAB_API_KEY, "source": source, "hours": hours},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        _lab_summary_cache[key] = (now, data)
+        return data
+    except Exception as e:
+        print(f"[warn] ดึงสรุป lab ({source}) ไม่ได้: {e}")
+        return hit[1] if hit else None
+
+
+def _fmt_lab_summary(data: dict) -> str:
+    """สรุปทุกค่า จัดกลุ่มตามจุดติดตั้ง บรรทัดละค่า: ต่ำสุด/เฉลี่ย/สูงสุด"""
+    name = data.get("ชุดข้อมูล", "")
+    period = data.get("ช่วงเวลา", "")
+    by_site: dict[str, list[str]] = {}
+    for r in data.get("สรุป", []):
+        if r.get("id") in _LAB_SKIP_IDS:
+            continue
+        site = r.get("ชื่อจุด") or r.get("จุดติดตั้ง") or "?"
+        u = r.get("หน่วย") or ""
+        by_site.setdefault(site, []).append(
+            f"{r.get('ชื่อ') or r.get('id')} ต่ำสุด {r.get('ต่ำสุด')}{u} เฉลี่ย {r.get('เฉลี่ย')}{u} สูงสุด {r.get('สูงสุด')}{u}"
+        )
+    lines = [f"สรุป {name} {period}:"]
+    for site, vals in by_site.items():
+        lines.append(f"  {site}: " + "; ".join(vals))
+    return "\n".join(lines)
+
+
+def _needs_lab_summary(text: str) -> list[tuple[str, int]]:
+    """คืน (source, hours) เมื่อถามภาพรวมของชุดข้อมูลภายนอก
+    หรือถามเชิงประวัติแต่ไม่ได้ระบุค่าไหน (series หาค่าไม่เจอ) -> ให้สรุปทั้งหมดแทน
+    """
+    sources = _needs_lab(text)
+    if not sources:
+        return []
+    overview = any(w in text for w in _LAB_OVERVIEW_WORDS)
+    history = any(w in text for w in _LAB_HISTORY_WORDS)
+    if not (overview or history):
+        return []
+    hours = _lab_hours(text)
+    out = []
+    for src in sources:
+        # ถ้า series จับค่าเจาะจงได้แล้ว และไม่ได้ถามภาพรวม ก็ไม่ต้องสรุปซ้ำ
+        if not overview and _lab_resolve_measure(src, text):
+            continue
+        out.append((src, hours))
+    return out
 
 
 _PIG_KEYWORDS = ("หมู", "สุกร", "ป่วย", "คอก", "ปศุสัตว์", "วัคซีน", "ฉีดยา")
@@ -2193,7 +2294,8 @@ def _fmt_stats(s: dict) -> str:
 
 
 def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig: bool = False,
-                   lab: Optional[list[str]] = None, lab_series: Optional[list] = None) -> str:
+                   lab: Optional[list[str]] = None, lab_series: Optional[list] = None,
+                   lab_summary: Optional[list] = None) -> str:
     """สร้าง CONTEXT ให้ LLM
     detailed=False -> แนบแค่ค่าปัจจุบัน 1 บรรทัด (ประหยัด token, ใช้กับคำถามทั่วไป)
     detailed=True  -> แนบประวัติย้อนหลัง + ตารางพยากรณ์ (ใช้เฉพาะคำถามพยากรณ์/แนวโน้ม)
@@ -2236,6 +2338,11 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
         d = _lab_series(src, measure, hours)
         if d:
             parts.append(_fmt_lab_series(d))
+    # สรุปทุกค่าของชุดหนึ่ง — ใช้กับคำถามภาพรวม
+    for src, hours in (lab_summary or []):
+        d = _lab_summary(src, hours)
+        if d:
+            parts.append(_fmt_lab_summary(d))
 
     if not detailed:
         return "\n\n".join(parts)
@@ -2269,6 +2376,12 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
 
 def _rule_based_answer(text: str) -> str:
     """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม/สถิติย้อนหลัง/หมู"""
+    # ถามภาพรวมของเซนเซอร์ที่อื่น -> สรุปทุกค่า
+    for src, hours in _needs_lab_summary(text):
+        d = _lab_summary(src, hours)
+        if d:
+            return _fmt_lab_summary(d).replace("\n", " ") + " ครับ"
+
     # ถามย้อนหลังของเซนเซอร์ที่อื่น -> สรุปสถิติให้ตรง ๆ
     for src, measure, _label, hours in _needs_lab_series(text):
         d = _lab_series(src, measure, hours)
@@ -2483,6 +2596,7 @@ def ask(q: Question):
         pig=_needs_pig(text),
         lab=_needs_lab(text),
         lab_series=_needs_lab_series(text),
+        lab_summary=_needs_lab_summary(text),
     )
 
     # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)

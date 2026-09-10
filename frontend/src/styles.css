@@ -2522,3 +2522,13 @@ th, td { font-size: 14px; }
 .sx-val-num { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .sx-val-num small { font-size: 11px; font-weight: 400; color: var(--text-dim); margin-left: 3px; }
 .sx-measures { padding: 12px 16px 0; }
+
+/* ตารางสรุปในหน้ากราฟข้อมูล */
+.sx-table tbody tr { cursor: pointer; transition: background 0.12s; }
+.sx-table tbody tr:hover { background: var(--panel-2); }
+.sx-table tbody tr.on td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.sx-table tbody tr.on td:first-child { color: var(--accent); font-weight: 600; }
+.sx-table td.dim { color: var(--text-dim); }
+.sx-table th.num, .sx-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sx-table td.strong { font-weight: 600; }
+.sx-table td.num small { font-size: 11px; color: var(--text-dim); margin-left: 3px; font-weight: 400; }
