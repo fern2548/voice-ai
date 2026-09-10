@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { askAI } from '../api.js'
 import { speak, isMuted, setMuted, listVoices, getSavedVoiceURI, setSavedVoiceURI } from '../utils/voice.js'
 import { createRecognizer, pickBestTranscript } from '../utils/speech.js'
+import { parseNavCommand, navReply } from '../utils/voiceNav.js'
 
 // ส่งประวัติแค่ไม่กี่เทิร์นล่าสุดให้ backend (backend ก็ตัดซ้ำอีกชั้น) — ประหยัด token/TPM
 const SEND_TURNS = 6 // = 3 คู่ถาม-ตอบล่าสุด
@@ -20,6 +22,7 @@ export function VoiceAIProvider({ children }) {
   const [voices, setVoices] = useState(() => listVoices())
   const [voiceError, setVoiceError] = useState('')
   const recognizerRef = useRef(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const synth = window.speechSynthesis
@@ -45,6 +48,18 @@ export function VoiceAIProvider({ children }) {
     const q = (text ?? question).trim()
     if (!q || busy) return
     setQuestion('')
+
+    // คำสั่งเปิดหน้า ทำในเบราว์เซอร์เลย ไม่ต้องส่งให้เซิร์ฟเวอร์
+    // เปิดได้ทันที และไม่เปลืองโควตา AI กับคำสั่งที่ไม่ต้องคิด
+    const nav = parseNavCommand(q)
+    if (nav) {
+      const reply = navReply(nav)
+      setMessages((prev) => [...prev, { role: 'user', text: q }, { role: 'model', text: reply }])
+      navigate(nav.metric ? `${nav.path}?metric=${nav.metric}` : nav.path)
+      speak(reply)
+      return
+    }
+
     setBusy(true)
 
     const history = messages

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   LineChart,
   Line,
@@ -23,7 +24,18 @@ const SERIES_COLORS = {
 export default function TrendChart() {
   const { data, updatedAt } = usePolling(getHistory, 60000)
   const rows = Array.isArray(data) ? data : []
-  const [active, setActive] = useState('temperature')
+  // สั่งด้วยเสียงว่า "เปิดกราฟความชื้น" จะพามาพร้อม ?metric=humidity
+  // ให้กราฟสลับไปค่านั้นเลย ไม่ต้องมากดเลือกอีกที
+  const [params] = useSearchParams()
+  const wanted = params.get('metric')
+  const isValid = (k) => METRICS.some((m) => m.key === k)
+  const [active, setActive] = useState(isValid(wanted) ? wanted : 'temperature')
+
+  // ถ้าอยู่หน้านี้อยู่แล้ว แล้วสั่งเสียงเปิดค่าอื่น URL เปลี่ยนแต่หน้าไม่โหลดใหม่
+  // ต้องคอยดู params แล้วสลับตาม ไม่งั้นกราฟค้างค่าเดิม
+  useEffect(() => {
+    if (isValid(wanted)) setActive(wanted)
+  }, [wanted])
 
   const metric = METRICS.find((m) => m.key === active)
 
