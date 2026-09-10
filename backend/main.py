@@ -1675,6 +1675,145 @@ def _fmt_lab(data: dict) -> str:
     return "\n".join(lines)
 
 
+# ---------- เซนเซอร์ภายนอก: ข้อมูลย้อนหลัง (series) ----------
+# คำที่บอกว่าอยากรู้ค่าไหน -> ไปหา id จริงจากรายการ "ค่า" ของชุดนั้น
+# ต้องหาแบบนี้เพราะแต่ละชุดตั้งชื่อ id ไม่เหมือนกัน (เสาอากาศแสลงพันใช้ SS300_weather_temperature_300000_)
+# เรียงจากเฉพาะเจาะจงไปกว้าง: "อุณหภูมิดิน" ต้องชนะ "อุณหภูมิ"
+_LAB_MEASURE_WORDS = [
+    (("อุณหภูมิดิน",), "อุณหภูมิดิน"),
+    (("ความชื้นดิน", "ชื้นดิน"), "ความชื้นดิน"),
+    (("แอมโมเนีย", "nh3"), "แอมโมเนีย"),
+    (("คาร์บอน", "co2"), "คาร์บอน"),
+    (("การไหลอากาศ", "ไหลอากาศ", "พัดลม"), "การไหลอากาศ"),
+    (("พลังงานสะสม", "kwh", "กี่หน่วย", "หน่วยไฟ"), "พลังงานสะสม"),
+    (("กำลังไฟ", "ไฟฟ้า", "ค่าไฟ", "ใช้ไฟ"), "กำลังไฟ"),
+    (("ความเร็วลม", "ลมแรง", "ลม"), "ความเร็วลม"),
+    (("ทิศทางลม", "ทิศลม"), "ทิศทางลม"),
+    (("ฝนสะสม", "ฝน"), "ฝน"),
+    (("ความเข้มแสง", "ความสว่าง", "แสง"), "แสง"),
+    (("ความชื้น", "ชื้น"), "ความชื้น"),
+    (("อุณหภูมิ", "ร้อน", "หนาว", "เย็น"), "อุณหภูมิ"),
+]
+
+# คำที่บอกว่าถามเชิงประวัติ ไม่ใช่ค่าตอนนี้
+_LAB_HISTORY_WORDS = ("ย้อนหลัง", "เมื่อวาน", "สูงสุด", "ต่ำสุด", "เฉลี่ย", "แนวโน้ม", "ที่ผ่านมา",
+                      "ชั่วโมง", "วันนี้", "ทั้งวัน", "สัปดาห์", "อาทิตย์", "เปลี่ยนแปลง", "ขึ้นลง",
+                      "เพิ่มขึ้น", "ลดลง", "กราฟ", "สถิติ", "ช่วง")
+_LAB_HOURS_RE = re.compile(r"(\d+)\s*(ชั่วโมง|ชม|วัน|สัปดาห์|อาทิตย์)")
+LAB_SERIES_CACHE_SECONDS = 300  # ข้อมูลย้อนหลังไม่ต้องสดขนาดนั้น
+_lab_series_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _lab_hours(text: str) -> int:
+    """แปลง "3 วัน" / "6 ชั่วโมง" / "เมื่อวาน" เป็นจำนวนชั่วโมง ไม่ระบุ = 24"""
+    m = _LAB_HOURS_RE.search(text)
+    if m:
+        n, unit = int(m.group(1)), m.group(2)
+        if unit.startswith("ชั่ว") or unit == "ชม":
+            return max(1, min(n, 720))
+        if unit == "วัน":
+            return max(1, min(n * 24, 720))
+        return max(1, min(n * 24 * 7, 720))
+    if "เมื่อวาน" in text:
+        return 48  # ต้องดึงถึงเมื่อวานทั้งวัน
+    if "สัปดาห์" in text or "อาทิตย์" in text:
+        return 168
+    return 24
+
+
+def _lab_resolve_measure(source: str, text: str) -> Optional[tuple[str, str]]:
+    """หาว่าถามค่าไหน คืน (id จริงของชุดนั้น, ชื่อไทย) หรือ None ถ้าเดาไม่ออก"""
+    latest = _lab_latest(source)
+    if not latest:
+        return None
+    values = latest.get("ค่า", [])
+    t = text.lower()
+    for words, label_hint in _LAB_MEASURE_WORDS:
+        if not any(w in t for w in words):
+            continue
+        for v in values:
+            name = v.get("ชื่อ") or ""
+            if label_hint in name and v.get("id") not in _LAB_SKIP_IDS:
+                return v["id"], name
+    return None
+
+
+def _needs_lab_series(text: str) -> list[tuple[str, str, str, int]]:
+    """คืนรายการ (source, measure_id, ชื่อไทย, hours) ที่ต้องดึงย้อนหลัง"""
+    if not any(w in text for w in _LAB_HISTORY_WORDS):
+        return []
+    out = []
+    hours = _lab_hours(text)
+    for src in _needs_lab(text):
+        r = _lab_resolve_measure(src, text)
+        if r:
+            out.append((src, r[0], r[1], hours))
+    return out
+
+
+def _lab_series(source: str, measure: str, hours: int) -> Optional[dict]:
+    key = f"{source}|{measure}|{hours}"
+    now = datetime.now(timezone.utc).timestamp()
+    hit = _lab_series_cache.get(key)
+    if hit and now - hit[0] < LAB_SERIES_CACHE_SECONDS:
+        return hit[1]
+    try:
+        resp = httpx.get(
+            f"{LAB_API_BASE}/api/series",
+            params={"key": LAB_API_KEY, "source": source, "measure": measure, "hours": hours},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        _lab_series_cache[key] = (now, data)
+        return data
+    except Exception as e:
+        print(f"[warn] ดึงข้อมูลย้อนหลัง lab ({source}/{measure}) ไม่ได้: {e}")
+        return hit[1] if hit else None
+
+
+def _fmt_lab_series(data: dict) -> str:
+    """สรุปข้อมูลย้อนหลังเป็นสถิติสั้น ๆ ต่อจุดติดตั้ง — ไม่ส่งจุดดิบเป็นร้อยจุดให้ AI"""
+    name = data.get("ชื่อ") or data.get("วัด") or "ค่า"
+    unit = data.get("หน่วย") or ""
+    period = data.get("ช่วงเวลา") or ""
+    dataset = data.get("ชุดข้อมูล") or ""
+    lines = [f"{name} {dataset} {period}:"]
+
+    def local(iso: str) -> str:
+        try:
+            return _parse_dt(iso).astimezone(BANGKOK).strftime("%d/%m %H:%M")
+        except Exception:
+            return iso
+
+    for line in data.get("เส้น", []):
+        pts = [(p.get("t"), p.get("v")) for p in line.get("ข้อมูล", []) if p.get("v") is not None]
+        if not pts:
+            continue
+        site = line.get("ชื่อจุด") or line.get("จุดติดตั้ง") or "?"
+        vals = [v for _, v in pts]
+        lo_t, lo = min(pts, key=lambda x: x[1])
+        hi_t, hi = max(pts, key=lambda x: x[1])
+        avg = sum(vals) / len(vals)
+        latest_t, latest = pts[-1]
+
+        # แนวโน้ม: เทียบเฉลี่ย 1/4 ท้ายกับ 1/4 ต้น
+        q = max(1, len(vals) // 4)
+        head, tail = sum(vals[:q]) / q, sum(vals[-q:]) / q
+        diff = tail - head
+        if abs(diff) < max(0.5, abs(avg) * 0.03):
+            trend = "ทรงตัว"
+        else:
+            trend = f"{'สูงขึ้น' if diff > 0 else 'ลดลง'} {abs(diff):.1f}{unit}"
+
+        lines.append(
+            f"  {site}: ล่าสุด {latest}{unit} ({local(latest_t)}), "
+            f"เฉลี่ย {avg:.1f}{unit}, ต่ำสุด {lo}{unit} ({local(lo_t)}), "
+            f"สูงสุด {hi}{unit} ({local(hi_t)}), แนวโน้ม{trend}, {len(pts)} ค่า"
+        )
+    return "\n".join(lines)
+
+
 _PIG_KEYWORDS = ("หมู", "สุกร", "ป่วย", "คอก", "ปศุสัตว์", "วัคซีน", "ฉีดยา")
 
 
@@ -1955,7 +2094,7 @@ def _fmt_stats(s: dict) -> str:
 
 
 def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig: bool = False,
-                   lab: Optional[list[str]] = None) -> str:
+                   lab: Optional[list[str]] = None, lab_series: Optional[list] = None) -> str:
     """สร้าง CONTEXT ให้ LLM
     detailed=False -> แนบแค่ค่าปัจจุบัน 1 บรรทัด (ประหยัด token, ใช้กับคำถามทั่วไป)
     detailed=True  -> แนบประวัติย้อนหลัง + ตารางพยากรณ์ (ใช้เฉพาะคำถามพยากรณ์/แนวโน้ม)
@@ -1993,6 +2132,11 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
         d = _lab_latest(src)
         if d:
             parts.append(_fmt_lab(d))
+    # ข้อมูลย้อนหลังจากเซนเซอร์ภายนอก — สรุปเป็นสถิติ ไม่ส่งจุดดิบ
+    for src, measure, _label, hours in (lab_series or []):
+        d = _lab_series(src, measure, hours)
+        if d:
+            parts.append(_fmt_lab_series(d))
 
     if not detailed:
         return "\n\n".join(parts)
@@ -2026,6 +2170,12 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
 
 def _rule_based_answer(text: str) -> str:
     """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม/สถิติย้อนหลัง/หมู"""
+    # ถามย้อนหลังของเซนเซอร์ที่อื่น -> สรุปสถิติให้ตรง ๆ
+    for src, measure, _label, hours in _needs_lab_series(text):
+        d = _lab_series(src, measure, hours)
+        if d:
+            return _fmt_lab_series(d).replace("\n", " ") + " ครับ"
+
     # ถามถึงเซนเซอร์ที่อื่น -> อ่านค่าสดมาบอกตรง ๆ (แบบไม่มี AI เรียบเรียง)
     for src in _needs_lab(text):
         d = _lab_latest(src)
@@ -2233,6 +2383,7 @@ def ask(q: Question):
         stats_days=_needs_stats(text),
         pig=_needs_pig(text),
         lab=_needs_lab(text),
+        lab_series=_needs_lab_series(text),
     )
 
     # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)
