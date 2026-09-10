@@ -57,10 +57,12 @@ export default function SensorsPage() {
     () => catalog?.sources?.find((s) => s.id === source) || catalog?.sources?.[0] || null,
     [catalog, source],
   )
-  // ค่าที่ดู: ใช้จาก URL ถ้ามีในชุดนี้ ไม่งั้นเอาตัวแรก
+  // ค่าที่ดู: รับทั้ง id จริงและรหัสสั้นจาก URL ("temperature" ใช้ได้ทุกชุด)
+  // ไม่มีในชุดนี้ก็เอาตัวแรก — เช่นสลับจากเล้าหมูไปดิน ค่า "แอมโมเนีย" ไม่มี ก็ไปดูค่าแรกของดินแทน
   const measure = useMemo(() => {
     if (!src) return ''
-    return src.measures.some((m) => m.id === measureParam) ? measureParam : (src.measures[0]?.id || '')
+    const hit = src.measures.find((m) => m.id === measureParam || m.short === measureParam)
+    return hit ? hit.id : (src.measures[0]?.id || '')
   }, [src, measureParam])
 
   // ค่าตอนนี้ — ถามซ้ำทุก 60 วิ เหมือนหน้าอื่น

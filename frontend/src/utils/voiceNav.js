@@ -119,6 +119,12 @@ export function parseNavCommand(text) {
         else if (/กำลังไฟ|ไฟฟ้า|ค่าไฟ|ใช้ไฟ/.test(t)) result.measure = 'power_kw'
         else if (/ความชื้นดิน|ชื้นดิน/.test(t)) result.measure = 'soil_moisture'
         else if (/อุณหภูมิดิน/.test(t)) result.measure = 'soil_temperature'
+        else if (/ทิศทางลม|ทิศลม/.test(t)) result.measure = 'wind_direction'
+        else if (/ลม/.test(t)) result.measure = 'wind_speed'
+        else if (/ฝนสะสม/.test(t)) result.measure = result.source === 'weather' ? 'rainfall_24hr' : 'rainfall_24h'
+        else if (/ฝน/.test(t)) result.measure = 'rainfall'
+        else if (/ความเข้มแสง/.test(t)) result.measure = 'enegy_intensity'
+        else if (/แสง|สว่าง/.test(t)) result.measure = 'light'
         else if (/ชื้น/.test(t)) result.measure = 'humidity'
         else if (/อุณหภูมิ|ร้อน/.test(t)) result.measure = 'temperature'
         if (/สัปดาห์|7 ?วัน|อาทิตย์/.test(t)) result.hours = 168

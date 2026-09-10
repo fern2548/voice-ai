@@ -1461,15 +1461,7 @@ def lab_sources():
         return {"enabled": False, "sources": []}
     out = []
     for src, label in _LAB_SOURCE_LABELS.items():
-        latest = _lab_latest(src)
-        measures, seen = [], set()
-        for v in (latest or {}).get("ค่า", []):
-            vid = v.get("id")
-            if not vid or vid in _LAB_SKIP_IDS or vid in seen:
-                continue
-            seen.add(vid)
-            measures.append({"id": vid, "label": v.get("ชื่อ") or vid, "unit": v.get("หน่วย") or ""})
-        out.append({"id": src, "label": label, "measures": measures})
+        out.append({"id": src, "label": label, "measures": _lab_measures(src)})
     return {"enabled": True, "sources": out}
 
 
@@ -1512,7 +1504,11 @@ def lab_series(source: str, measure: str, hours: int = 24):
     if source not in _LAB_SOURCE_LABELS:
         raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
     hours = max(1, min(hours, 720))
-    data = _lab_series(source, measure, hours)
+    # รับรหัสสั้นได้ ("temperature") แปลงเป็น id จริงของชุดนั้นให้
+    real = _lab_measure_id(source, measure)
+    if not real:
+        raise HTTPException(status_code=400, detail="ชุดข้อมูลนี้ไม่มีค่าที่ขอ")
+    data = _lab_series(source, real, hours)
     if not data:
         raise HTTPException(status_code=502, detail="ดึงข้อมูลย้อนหลังไม่ได้")
     lines = []
@@ -1533,7 +1529,7 @@ def lab_series(source: str, measure: str, hours: int = 24):
         })
     return {
         "source": source,
-        "measure": measure,
+        "measure": real,
         "label": data.get("ชื่อ") or measure,
         "unit": data.get("หน่วย") or "",
         "hours": hours,
@@ -1803,6 +1799,53 @@ def _fmt_lab(data: dict) -> str:
     return "\n".join(lines)
 
 
+# ---------- เซนเซอร์ภายนอก: รายการค่าที่วัดได้ (measures) ----------
+# /api/measures ให้ id จริง + ชื่อไทย + หน่วย + "รหัสสั้น" ของทุกค่าในชุด
+# ดีกว่าเดาจาก latest เพราะ latest เห็นเฉพาะค่าที่มีข้อมูล ณ ตอนนั้น (เซนเซอร์เงียบไปก็หาย)
+# รหัสสั้นทำให้เรียก "temperature" ได้ทุกชุด ไม่ต้องรู้ว่าเสาอากาศแสลงพันใช้ id ยาว ๆ
+_lab_measures_cache: dict[str, tuple[float, list]] = {}
+LAB_MEASURES_CACHE_SECONDS = 3600  # รายการค่าแทบไม่เปลี่ยน
+
+
+def _lab_measures(source: str) -> list[dict]:
+    """คืน [{id, label, unit, short}] ของชุดนั้น (ตัดค่าไฟฟ้ารายเฟสที่ไม่มีชื่อไทยออกแล้ว)"""
+    now = datetime.now(timezone.utc).timestamp()
+    hit = _lab_measures_cache.get(source)
+    if hit and now - hit[0] < LAB_MEASURES_CACHE_SECONDS:
+        return hit[1]
+    try:
+        resp = httpx.get(
+            f"{LAB_API_BASE}/api/measures",
+            params={"key": LAB_API_KEY, "source": source},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        out = []
+        for m in resp.json().get("วัดอะไรบ้าง", []):
+            mid = m.get("id")
+            if not mid or mid in _LAB_SKIP_IDS:
+                continue
+            out.append({
+                "id": mid,
+                "label": m.get("ชื่อ") or mid,
+                "unit": m.get("หน่วย") or "",
+                "short": m.get("รหัสสั้น") or mid,
+            })
+        _lab_measures_cache[source] = (now, out)
+        return out
+    except Exception as e:
+        print(f"[warn] ดึงรายการค่า lab ({source}) ไม่ได้: {e}")
+        return hit[1] if hit else []
+
+
+def _lab_measure_id(source: str, key: str) -> Optional[str]:
+    """รับ id จริงหรือรหัสสั้นก็ได้ คืน id จริงที่ API ต้องการ · None ถ้าไม่มีค่านี้ในชุด"""
+    for m in _lab_measures(source):
+        if key in (m["id"], m["short"]):
+            return m["id"]
+    return None
+
+
 # ---------- เซนเซอร์ภายนอก: ข้อมูลย้อนหลัง (series) ----------
 # คำที่บอกว่าอยากรู้ค่าไหน -> ไปหา id จริงจากรายการ "ค่า" ของชุดนั้น
 # ต้องหาแบบนี้เพราะแต่ละชุดตั้งชื่อ id ไม่เหมือนกัน (เสาอากาศแสลงพันใช้ SS300_weather_temperature_300000_)
@@ -1854,18 +1897,16 @@ def _lab_hours(text: str) -> int:
 
 def _lab_resolve_measure(source: str, text: str) -> Optional[tuple[str, str]]:
     """หาว่าถามค่าไหน คืน (id จริงของชุดนั้น, ชื่อไทย) หรือ None ถ้าเดาไม่ออก"""
-    latest = _lab_latest(source)
-    if not latest:
+    measures = _lab_measures(source)
+    if not measures:
         return None
-    values = latest.get("ค่า", [])
     t = text.lower()
     for words, label_hint in _LAB_MEASURE_WORDS:
         if not any(w in t for w in words):
             continue
-        for v in values:
-            name = v.get("ชื่อ") or ""
-            if label_hint in name and v.get("id") not in _LAB_SKIP_IDS:
-                return v["id"], name
+        for m in measures:
+            if label_hint in m["label"]:
+                return m["id"], m["label"]
     return None
 
 
