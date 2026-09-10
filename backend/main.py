@@ -386,6 +386,14 @@ PUBLIC_REPORT_KEY = os.environ.get("PUBLIC_REPORT_KEY", "")
 # ใครเห็นลิงก์ก็จะสั่งให้ระบบยิงข้อความเข้ากลุ่มรัว ๆ ได้ ถ้าใช้คีย์เดียวกัน
 CRON_KEY = os.environ.get("CRON_KEY", "")
 
+# ---------- แหล่งข้อมูลเซนเซอร์ภายนอก (lab.plotnexuslab.com) ----------
+# API รวมเซนเซอร์หลายที่: ดินแสลงพัน · เล้าหมูกำแพงเพชร · เสาอากาศแสลงพัน
+# ดึงสดตอนถามเท่านั้น ไม่ได้เก็บลงฐานข้อมูลเรา เพราะเขามีฐานข้อมูลของตัวเองอยู่แล้ว
+# ไม่ตั้ง LAB_API_KEY = ไม่ใช้ ระบบตอบจากเซนเซอร์ของเราเองเหมือนเดิม
+LAB_API_BASE = os.environ.get("LAB_API_BASE", "https://lab.plotnexuslab.com").rstrip("/")
+LAB_API_KEY = os.environ.get("LAB_API_KEY", "")
+LAB_CACHE_SECONDS = 60  # เซนเซอร์อัปเดตทุกนาที ดึงถี่กว่านี้ก็ได้ค่าเดิม
+
 # รหัสเชิญสำหรับให้ผู้ใช้สมัครบัญชีเอง
 # ไม่ตั้งค่า = ปิดการสมัครเอง (ค่าเริ่มต้น) ผู้ดูแลต้องเป็นคนสร้างบัญชีให้เท่านั้น
 #
@@ -585,6 +593,7 @@ def health():
         "llm_model": GEMINI_MODEL,
         # บอกว่า AI ของ CPF ต่อไว้หรือยัง จะได้ไล่ปัญหาได้โดยไม่ต้องเปิด log
         "cpf_configured": bool(CPF_API_BASE and CPF_API_KEY),
+        "lab_configured": bool(LAB_API_KEY),
         # None = ยังไม่เคยพัง (หรือยังไม่มีใครถาม) / มีข้อความ = ครั้งล่าสุดพังเพราะอะไร
         "llm_last_error": _LAST_LLM_ERROR,
     }
@@ -1547,6 +1556,8 @@ SYSTEM_PROMPT = (
     "- ถ้าถามเรื่องหมูป่วย/สุขภาพหมู ให้ดูจากบันทึกหมูป่วยรายวันใน CONTEXT สรุปจำนวน แนวโน้ม (เพิ่มขึ้น/ลดลง) และเตือนถ้าตัวเลขสูงผิดปกติ\n"
     "- ถ้าถามเรื่องการฉีดวัคซีน ให้ดูจากบันทึกการฉีดวัคซีนใน CONTEXT บอกวันที่ฉีดล่าสุดและชื่อวัคซีนตามนั้น\n"
     "- ถ้าถามเรื่องสายพันธุ์หมู/ชนิดหมู ให้ดูจาก 'ความรู้อ้างอิง' ใน CONTEXT แล้วตอบตามนั้นตรง ๆ\n"
+    "- CONTEXT อาจมีข้อมูลจากหลายสถานที่ (ฟาร์มเรา, ดินแสลงพัน, เล้าหมูกำแพงเพชร, เสาอากาศแสลงพัน) "
+    "ให้ระบุชื่อสถานที่ในคำตอบเสมอเมื่อมีมากกว่าหนึ่งที่ กันสับสนว่าเป็นค่าของที่ไหน\n"
     "- ถ้าผู้ใช้ขอคำแนะนำ (เช่น การดูแลพืช/หมู ตากผ้า รดน้ำ) ให้แนะนำโดยอิงจากข้อมูลปัจจุบัน/พยากรณ์ ตามความรู้ทั่วไปได้\n"
     "- ห้ามแต่งตัวเลขที่ไม่มีใน CONTEXT ถ้าไม่มีข้อมูลค่านั้นให้บอกตรง ๆ ว่ายังไม่มีข้อมูล\n"
     "- ตอบสั้น 1-4 ประโยค เหมาะกับการอ่านออกเสียง (ไม่ใส่ตาราง/markdown)"
@@ -1588,6 +1599,82 @@ def _needs_stats(text: str) -> Optional[int]:
 
 
 # คำที่บ่งบอกว่าผู้ใช้ถามเรื่องหมู/สุขภาพหมู/วัคซีน -> ต้องแนบบันทึกหมูป่วย+วัคซีนให้ LLM
+# ---------- เซนเซอร์ภายนอก: ดึง/จัดรูป/ตรวจว่าคำถามเกี่ยวไหม ----------
+# คำที่บ่งบอกว่าถามถึงชุดข้อมูลไหน — ต้องเจอคำเฉพาะของที่นั่นจริง ๆ
+# ไม่ใช้คำกว้าง ๆ อย่าง "อุณหภูมิ" เพราะจะไปดึงข้อมูลทุกที่ทั้งที่ถามแค่ฟาร์มเรา
+_LAB_SOURCE_KEYWORDS = {
+    "soil": ("ดิน", "แปลงดิน", "ความชื้นดิน", "อุณหภูมิดิน", "แปลง"),
+    "pig": ("กำแพงเพชร", "เล้า", "แอมโมเนีย", "คาร์บอน", "co2", "nh3",
+            "การไหลอากาศ", "ไหลอากาศ", "พัดลม", "ไฟฟ้า", "กำลังไฟ", "พลังงาน", "kwh", "ค่าไฟ"),
+    "weather": ("แสลงพัน", "เสาอากาศ", "สระบุรี", "สะบุรี", "ความเข้มแสง", "ทิศทางลม", "ทิศลม"),
+}
+
+# ค่าที่ไม่มีชื่อไทยกำกับ (ไฟฟ้าเฟส A/B/C ฯลฯ) ตัดออก ไม่งั้น AI ได้ตัวเลขรกไปหมด
+_LAB_SKIP_IDS = {
+    "current_a", "current_b", "current_c", "current_avg",
+    "voltage_ab", "voltage_bc", "voltage_ca", "voltage_avg",
+    "frequency", "power_factor", "active_slave",
+}
+
+_lab_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _needs_lab(text: str) -> list[str]:
+    """คืนรายชื่อชุดข้อมูลภายนอกที่คำถามพูดถึง (ว่าง = ไม่ต้องดึง)"""
+    if not LAB_API_KEY:
+        return []
+    t = text.lower()
+    return [src for src, words in _LAB_SOURCE_KEYWORDS.items() if any(w in t for w in words)]
+
+
+def _lab_latest(source: str) -> Optional[dict]:
+    """ดึงค่าล่าสุดของชุดข้อมูลหนึ่ง แคชไว้ 60 วิ คืน None ถ้าดึงไม่ได้ (ไม่ทำให้คำถามพัง)"""
+    now = datetime.now(timezone.utc).timestamp()
+    hit = _lab_cache.get(source)
+    if hit and now - hit[0] < LAB_CACHE_SECONDS:
+        return hit[1]
+    try:
+        resp = httpx.get(
+            f"{LAB_API_BASE}/api/latest",
+            params={"key": LAB_API_KEY, "source": source},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        _lab_cache[source] = (now, data)
+        return data
+    except Exception as e:
+        print(f"[warn] ดึงข้อมูล lab ({source}) ไม่ได้: {e}")
+        return hit[1] if hit else None  # มีของเก่าก็ใช้ไปก่อน ดีกว่าไม่มีเลย
+
+
+def _fmt_lab(data: dict) -> str:
+    """แปลง JSON จาก lab API เป็นข้อความสั้น ๆ จัดกลุ่มตามจุดติดตั้ง ให้ AI อ่านง่าย"""
+    name = data.get("ชุดข้อมูล", "เซนเซอร์ภายนอก")
+    updated = data.get("อัปเดตล่าสุด", "")
+    try:
+        when = _parse_dt(updated).astimezone(BANGKOK).strftime("%d/%m %H:%M")
+    except Exception:
+        when = updated
+
+    by_site: dict[str, list[str]] = {}
+    seen = set()
+    for v in data.get("ค่า", []):
+        vid = v.get("id", "")
+        site = v.get("ชื่อจุด") or v.get("จุดติดตั้ง") or "?"
+        if vid in _LAB_SKIP_IDS or (vid, site) in seen:
+            continue
+        seen.add((vid, site))
+        label = v.get("ชื่อ") or vid
+        unit = v.get("หน่วย") or ""
+        by_site.setdefault(site, []).append(f"{label} {v.get('ค่า')}{unit}")
+
+    lines = [f"{name} (อัปเดต {when}):"]
+    for site, vals in by_site.items():
+        lines.append(f"  {site}: " + ", ".join(vals))
+    return "\n".join(lines)
+
+
 _PIG_KEYWORDS = ("หมู", "สุกร", "ป่วย", "คอก", "ปศุสัตว์", "วัคซีน", "ฉีดยา")
 
 
@@ -1867,7 +1954,8 @@ def _fmt_stats(s: dict) -> str:
     )
 
 
-def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig: bool = False) -> str:
+def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig: bool = False,
+                   lab: Optional[list[str]] = None) -> str:
     """สร้าง CONTEXT ให้ LLM
     detailed=False -> แนบแค่ค่าปัจจุบัน 1 บรรทัด (ประหยัด token, ใช้กับคำถามทั่วไป)
     detailed=True  -> แนบประวัติย้อนหลัง + ตารางพยากรณ์ (ใช้เฉพาะคำถามพยากรณ์/แนวโน้ม)
@@ -1899,6 +1987,12 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
             parts.append(_fmt_vaccine_log(_recent_vaccine_log()))
         except Exception:
             pass
+
+    # เซนเซอร์ภายนอก — แนบเฉพาะชุดที่คำถามพูดถึง ดึงสดตอนถาม
+    for src in (lab or []):
+        d = _lab_latest(src)
+        if d:
+            parts.append(_fmt_lab(d))
 
     if not detailed:
         return "\n\n".join(parts)
@@ -1932,6 +2026,12 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
 
 def _rule_based_answer(text: str) -> str:
     """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม/สถิติย้อนหลัง/หมู"""
+    # ถามถึงเซนเซอร์ที่อื่น -> อ่านค่าสดมาบอกตรง ๆ (แบบไม่มี AI เรียบเรียง)
+    for src in _needs_lab(text):
+        d = _lab_latest(src)
+        if d:
+            return _fmt_lab(d).replace("\n", " ") + " ครับ"
+
     w = read_sensor()
 
     if _needs_pig(text):
@@ -2132,6 +2232,7 @@ def ask(q: Question):
         detailed=_needs_forecast(text),
         stats_days=_needs_stats(text),
         pig=_needs_pig(text),
+        lab=_needs_lab(text),
     )
 
     # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)
