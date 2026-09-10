@@ -1477,7 +1477,7 @@ def lab_sources():
 def lab_latest(source: str):
     """ค่าล่าสุดของชุดหนึ่ง จัดกลุ่มตามจุดติดตั้งแล้ว"""
     if not LAB_API_KEY:
-        raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้เซนเซอร์ภายนอก")
+        raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
     if source not in _LAB_SOURCE_LABELS:
         raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
     data = _lab_latest(source)
@@ -1508,7 +1508,7 @@ def lab_latest(source: str):
 def lab_series(source: str, measure: str, hours: int = 24):
     """ข้อมูลย้อนหลังสำหรับวาดกราฟ — คืนเป็นเส้นละจุดติดตั้ง"""
     if not LAB_API_KEY:
-        raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้เซนเซอร์ภายนอก")
+        raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
     if source not in _LAB_SOURCE_LABELS:
         raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
     hours = max(1, min(hours, 720))

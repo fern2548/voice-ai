@@ -24,7 +24,7 @@ const NAV = [
   { to: '/vaccine', label: 'วัคซีน' },
   { to: '/history', label: 'รายงาน' },
   { to: '/forecast', label: 'พยากรณ์อากาศ' },
-  { to: '/sensors', label: 'เซนเซอร์ภายนอก' },
+  { to: '/sensors', label: 'กราฟข้อมูล' },
   { to: '/settings', label: 'ตั้งค่า' },
 ]
 

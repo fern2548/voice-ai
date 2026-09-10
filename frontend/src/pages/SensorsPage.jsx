@@ -6,7 +6,7 @@ import {
 import { getLabSources, getLabLatest, getLabSeries } from '../api.js'
 import usePolling from '../hooks/usePolling.js'
 
-// หน้า "เซนเซอร์ภายนอก" — ค่าตอนนี้ + กราฟย้อนหลังของชุดข้อมูลจาก lab.plotnexuslab.com
+// หน้า "กราฟข้อมูล" — ค่าตอนนี้ + กราฟย้อนหลังของชุดข้อมูลจาก lab.plotnexuslab.com
 // เลือกได้ 3 อย่าง: ชุดข้อมูล · ค่าที่ดู · ช่วงเวลา และรับค่าจาก URL ด้วย
 // เพื่อให้สั่งเสียงว่า "เปิดกราฟเล้า R" แล้วมาถึงพร้อมตั้งค่าให้เสร็จ
 
@@ -95,8 +95,8 @@ export default function SensorsPage() {
   if (catalog && !catalog.enabled) {
     return (
       <div className="panel">
-        <div className="panel-head"><span className="panel-title">เซนเซอร์ภายนอก · EXTERNAL</span></div>
-        <div className="empty-note">ยังไม่ได้เปิดใช้เซนเซอร์ภายนอก — ผู้ดูแลต้องตั้งค่า LAB_API_KEY ที่เซิร์ฟเวอร์ก่อน</div>
+        <div className="panel-head"><span className="panel-title">กราฟข้อมูล · DATA</span></div>
+        <div className="empty-note">ยังไม่ได้เปิดใช้กราฟข้อมูล — ผู้ดูแลต้องตั้งค่า LAB_API_KEY ที่เซิร์ฟเวอร์ก่อน</div>
       </div>
     )
   }
