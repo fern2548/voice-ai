@@ -1442,6 +1442,105 @@ def cron_vaccine_due_notify(days: int = 3, x_cron_key: str = Header(default=""))
     return {"sent": ok, "due_count": len(rows)}
 
 
+# ---------- เซนเซอร์ภายนอก: ให้หน้าเว็บดึงผ่านเรา ----------
+# หน้าเว็บห้ามเรียก lab API ตรง ๆ เพราะต้องแนบคีย์ ซึ่งจะไปโผล่ในเบราว์เซอร์ให้ใครก็เห็น
+# ให้เรียกผ่านสามช่องทางนี้แทน คีย์อยู่ที่เซิร์ฟเวอร์ที่เดียว และต้องล็อกอินก่อนเหมือนช่องทางอื่น
+
+# ชื่อค่าที่คนทั่วไปเข้าใจ ใช้ทำปุ่มเลือกบนหน้ากราฟ
+_LAB_SOURCE_LABELS = {
+    "soil": "ดิน แสลงพัน",
+    "pig": "เล้าหมู กำแพงเพชร",
+    "weather": "เสาอากาศ แสลงพัน",
+}
+
+
+@app.get("/lab/sources")
+def lab_sources():
+    """ชุดข้อมูลที่เปิดให้ดู + ค่าที่แต่ละชุดวัดได้ (เอาไปทำปุ่มเลือก)"""
+    if not LAB_API_KEY:
+        return {"enabled": False, "sources": []}
+    out = []
+    for src, label in _LAB_SOURCE_LABELS.items():
+        latest = _lab_latest(src)
+        measures, seen = [], set()
+        for v in (latest or {}).get("ค่า", []):
+            vid = v.get("id")
+            if not vid or vid in _LAB_SKIP_IDS or vid in seen:
+                continue
+            seen.add(vid)
+            measures.append({"id": vid, "label": v.get("ชื่อ") or vid, "unit": v.get("หน่วย") or ""})
+        out.append({"id": src, "label": label, "measures": measures})
+    return {"enabled": True, "sources": out}
+
+
+@app.get("/lab/latest")
+def lab_latest(source: str):
+    """ค่าล่าสุดของชุดหนึ่ง จัดกลุ่มตามจุดติดตั้งแล้ว"""
+    if not LAB_API_KEY:
+        raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้เซนเซอร์ภายนอก")
+    if source not in _LAB_SOURCE_LABELS:
+        raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
+    data = _lab_latest(source)
+    if not data:
+        raise HTTPException(status_code=502, detail="ดึงข้อมูลจากเซนเซอร์ภายนอกไม่ได้")
+    sites: dict[str, dict] = {}
+    for v in data.get("ค่า", []):
+        vid = v.get("id")
+        if not vid or vid in _LAB_SKIP_IDS:
+            continue
+        site_id = v.get("จุดติดตั้ง") or "?"
+        site = sites.setdefault(site_id, {"id": site_id, "label": v.get("ชื่อจุด") or site_id, "values": []})
+        if any(x["id"] == vid for x in site["values"]):
+            continue
+        site["values"].append({
+            "id": vid, "label": v.get("ชื่อ") or vid, "value": v.get("ค่า"),
+            "unit": v.get("หน่วย") or "", "time": v.get("เวลา"),
+        })
+    return {
+        "source": source,
+        "label": _LAB_SOURCE_LABELS[source],
+        "updated_at": data.get("อัปเดตล่าสุด"),
+        "sites": list(sites.values()),
+    }
+
+
+@app.get("/lab/series")
+def lab_series(source: str, measure: str, hours: int = 24):
+    """ข้อมูลย้อนหลังสำหรับวาดกราฟ — คืนเป็นเส้นละจุดติดตั้ง"""
+    if not LAB_API_KEY:
+        raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้เซนเซอร์ภายนอก")
+    if source not in _LAB_SOURCE_LABELS:
+        raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
+    hours = max(1, min(hours, 720))
+    data = _lab_series(source, measure, hours)
+    if not data:
+        raise HTTPException(status_code=502, detail="ดึงข้อมูลย้อนหลังไม่ได้")
+    lines = []
+    for ln in data.get("เส้น", []):
+        pts = []
+        for pnt in ln.get("ข้อมูล", []):
+            if pnt.get("v") is None:
+                continue
+            try:
+                t_local = _parse_dt(pnt["t"]).astimezone(BANGKOK).isoformat()
+            except Exception:
+                t_local = pnt.get("t")
+            pts.append({"t": t_local, "v": pnt["v"]})
+        lines.append({
+            "site": ln.get("จุดติดตั้ง"),
+            "label": ln.get("ชื่อจุด") or ln.get("จุดติดตั้ง"),
+            "points": pts,
+        })
+    return {
+        "source": source,
+        "measure": measure,
+        "label": data.get("ชื่อ") or measure,
+        "unit": data.get("หน่วย") or "",
+        "hours": hours,
+        "lines": lines,
+    }
+
+
 @app.get("/vaccine-due")
 def vaccine_due(days: int = 7):
     """รายการวัคซีนที่ใกล้ครบกำหนดฉีดซ้ำ (next_due_date อยู่ในอีก N วันข้างหน้า หรือเลยกำหนดไปแล้ว)

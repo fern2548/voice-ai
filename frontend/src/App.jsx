@@ -15,6 +15,7 @@ import HistoryPage from './pages/HistoryPage.jsx'
 import PigHealthPage from './pages/PigHealthPage.jsx'
 import VaccinePage from './pages/VaccinePage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
+import SensorsPage from './pages/SensorsPage.jsx'
 
 const NAV = [
   { to: '/overview', label: 'หน้าแรก' },
@@ -23,6 +24,7 @@ const NAV = [
   { to: '/vaccine', label: 'วัคซีน' },
   { to: '/history', label: 'รายงาน' },
   { to: '/forecast', label: 'พยากรณ์อากาศ' },
+  { to: '/sensors', label: 'เซนเซอร์ภายนอก' },
   { to: '/settings', label: 'ตั้งค่า' },
 ]
 
@@ -50,6 +52,7 @@ function AppShell() {
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/pig-log" element={<PigHealthPage />} />
             <Route path="/vaccine" element={<VaccinePage />} />
+            <Route path="/sensors" element={<SensorsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>

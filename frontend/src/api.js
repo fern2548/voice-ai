@@ -70,6 +70,12 @@ export const sendVaccineReportToLine = () => post('/line/send-vaccine-report', {
 export const getVaccineSchedule = () => get('/vaccine-schedule')
 export const getVaccineDue = (days = 7) => get(`/vaccine-due?days=${days}`)
 
+// เซนเซอร์ภายนอก (ดินแสลงพัน · เล้าหมูกำแพงเพชร · เสาอากาศแสลงพัน) ผ่านเซิร์ฟเวอร์เรา
+export const getLabSources = () => get('/lab/sources')
+export const getLabLatest = (source) => get(`/lab/latest?source=${encodeURIComponent(source)}`)
+export const getLabSeries = (source, measure, hours = 24) =>
+  get(`/lab/series?source=${encodeURIComponent(source)}&measure=${encodeURIComponent(measure)}&hours=${hours}`)
+
 // history: อาร์เรย์ของ { role: 'user'|'model', text } ไม่กี่เทิร์นล่าสุด (ประหยัด token)
 export const askAI = async (text, history = []) => {
   try {

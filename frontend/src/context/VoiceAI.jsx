@@ -55,7 +55,12 @@ export function VoiceAIProvider({ children }) {
     if (nav) {
       const reply = navReply(nav)
       setMessages((prev) => [...prev, { role: 'user', text: q }, { role: 'model', text: reply }])
-      navigate(nav.metric ? `${nav.path}?metric=${nav.metric}` : nav.path)
+      const qs = new URLSearchParams()
+      if (nav.metric) qs.set('metric', nav.metric)
+      if (nav.source) qs.set('source', nav.source)
+      if (nav.measure) qs.set('measure', nav.measure)
+      if (nav.hours) qs.set('hours', String(nav.hours))
+      navigate(qs.toString() ? `${nav.path}?${qs}` : nav.path)
       speak(reply)
       return
     }

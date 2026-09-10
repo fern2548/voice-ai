@@ -17,6 +17,14 @@ const NAV_VERBS = [
 // เช่น "ดูกราฟ" ไม่มีทางเป็นคำถามเรื่องข้อมูล มันคือขอเปิดกราฟ
 const PAGES = [
   {
+    // เซนเซอร์ภายนอก — ต้องมาก่อน /history เพราะ "กราฟเล้า R" มีคำว่ากราฟเหมือนกัน
+    // แต่ต้องไปหน้านี้ ไม่ใช่กราฟฟาร์มเรา (ดูลำดับตรวจใน parseNavCommand)
+    path: '/sensors',
+    label: 'เซนเซอร์ภายนอก',
+    strong: ['เซนเซอร์ภายนอก', 'หน้าเซนเซอร์', 'เล้าอาร์', 'เล้า r', 'เล้าr', 'กำแพงเพชร', 'แสลงพัน', 'แปลงดิน', 'ความชื้นดิน'],
+    weak: ['เซนเซอร์', 'ดิน', 'เล้า'],
+  },
+  {
     path: '/history',
     label: 'กราฟข้อมูลย้อนหลัง',
     strong: ['กราฟ', 'หน้ารายงาน', 'ข้อมูลย้อนหลัง', 'ข้อมูลดิบ'],
@@ -99,6 +107,24 @@ export function parseNavCommand(text) {
     const weakHit = page.weak.some((w) => t.includes(w))
     if (strongHit || (weakHit && hasStrongVerb)) {
       const result = { path: page.path, label: page.label }
+      if (page.path === '/sensors') {
+        // เดาชุดข้อมูลกับค่าที่อยากดู เพื่อพามาถึงพร้อมตั้งค่าเสร็จ
+        if (/ดิน|แปลง/.test(t)) result.source = 'soil'
+        else if (/แสลงพัน|เสาอากาศ/.test(t)) result.source = 'weather'
+        else result.source = 'pig'
+        if (/แอมโมเนีย|nh3/.test(t)) result.measure = 'nh3'
+        else if (/คาร์บอน|co2/.test(t)) result.measure = 'co2'
+        else if (/ไหลอากาศ|พัดลม/.test(t)) result.measure = 'airflow'
+        else if (/kwh|พลังงาน|กี่หน่วย/.test(t)) result.measure = 'energy_kwh'
+        else if (/กำลังไฟ|ไฟฟ้า|ค่าไฟ|ใช้ไฟ/.test(t)) result.measure = 'power_kw'
+        else if (/ความชื้นดิน|ชื้นดิน/.test(t)) result.measure = 'soil_moisture'
+        else if (/อุณหภูมิดิน/.test(t)) result.measure = 'soil_temperature'
+        else if (/ชื้น/.test(t)) result.measure = 'humidity'
+        else if (/อุณหภูมิ|ร้อน/.test(t)) result.measure = 'temperature'
+        if (/สัปดาห์|7 ?วัน|อาทิตย์/.test(t)) result.hours = 168
+        else if (/3 ?วัน/.test(t)) result.hours = 72
+        else if (/6 ?ชั่วโมง|6 ?ชม/.test(t)) result.hours = 6
+      }
       if (page.path === '/history') {
         const m = METRICS.find((x) => x.words.some((w) => t.includes(w)))
         if (m) result.metric = m.key
@@ -117,6 +143,10 @@ export function navReply(nav) {
   }[nav.metric]
   if (nav.path === '/history' && metricLabel) {
     return `เปิดกราฟ${metricLabel}ให้แล้วครับ`
+  }
+  if (nav.path === '/sensors') {
+    const where = { soil: 'ดินแสลงพัน', pig: 'เล้าหมูกำแพงเพชร', weather: 'เสาอากาศแสลงพัน' }[nav.source] || 'เซนเซอร์ภายนอก'
+    return `เปิดกราฟ${where}ให้แล้วครับ`
   }
   return `เปิดหน้า${nav.label}ให้แล้วครับ`
 }
