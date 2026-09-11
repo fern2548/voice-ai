@@ -95,7 +95,7 @@ const METRICS = [
  * คืน { path, label, metric? } ถ้าใช่ · null ถ้าเป็นคำถามธรรมดา
  */
 export function parseNavCommand(text) {
-  const t = (text || '').replace(/\s+/g, '')
+  const t = (text || '').replace(/\s+/g, '').toLowerCase()
   if (!t) return null
 
   const hasVerb = NAV_VERBS.some((v) => t.includes(v))
@@ -110,6 +110,7 @@ export function parseNavCommand(text) {
       if (page.path === '/sensors') {
         // เดาชุดข้อมูลกับค่าที่อยากดู เพื่อพามาถึงพร้อมตั้งค่าเสร็จ
         if (/ดิน|แปลง/.test(t)) result.source = 'soil'
+        else if (/กำแพงเพชร|เล้า/.test(t)) result.source = 'pig'
         else if (/แสลงพัน|เสาอากาศ/.test(t)) result.source = 'weather'
         else result.source = 'pig'
         if (/แอมโมเนีย|nh3/.test(t)) result.measure = 'nh3'
@@ -127,6 +128,11 @@ export function parseNavCommand(text) {
         else if (/แสง|สว่าง/.test(t)) result.measure = 'light'
         else if (/ชื้น/.test(t)) result.measure = 'humidity'
         else if (/อุณหภูมิ|ร้อน/.test(t)) result.measure = 'temperature'
+        // เจาะจงจุดติดตั้ง
+        if (/จุดที่1|จุด1|จุดแรก/.test(t)) result.location = 'slangpun_soil_node1'
+        else if (/จุดที่2|จุด2|จุดสอง/.test(t)) result.location = 'slangpun_soil_node2'
+        else if (/เสาอากาศกำแพงเพชร|ออฟฟิศ/.test(t)) result.location = 'kamphaengphet_office'
+        else if (/เล้าr|เล้าอาร์|ในเล้า/.test(t)) result.location = 'barn_R'
         if (/สัปดาห์|7 ?วัน|อาทิตย์/.test(t)) result.hours = 168
         else if (/3 ?วัน/.test(t)) result.hours = 72
         else if (/6 ?ชั่วโมง|6 ?ชม/.test(t)) result.hours = 6

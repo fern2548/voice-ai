@@ -40,6 +40,7 @@ export default function SensorsPage() {
   const source = params.get('source') || 'pig'
   const hours = Number(params.get('hours')) || 24
   const measureParam = params.get('measure') || ''
+  const locationParam = params.get('location') || ''
 
   const setParam = (k, v) => {
     const next = new URLSearchParams(params)
@@ -65,8 +66,15 @@ export default function SensorsPage() {
     return hit ? hit.id : (src.measures[0]?.id || '')
   }, [src, measureParam])
 
+  // จุดติดตั้งที่เลือก: ต้องมีจริงในชุดนี้ ไม่งั้นถือว่าดูทุกจุด
+  // (สลับจากเล้าหมูไปดิน ค่า barn_R ไม่มีในดิน ก็กลับเป็นทุกจุด)
+  const location = useMemo(() => {
+    if (!src?.locations?.some((l) => l.id === locationParam)) return ''
+    return locationParam
+  }, [src, locationParam])
+
   // ค่าตอนนี้ — ถามซ้ำทุก 60 วิ เหมือนหน้าอื่น
-  const { data: latest } = usePolling(() => getLabLatest(source), 60000, source)
+  const { data: latest } = usePolling(() => getLabLatest(source, location), 60000, `${source}|${location}`)
 
   // กราฟ — ดึงใหม่เมื่อเปลี่ยนชุด/ค่า/ช่วงเวลา
   useEffect(() => {
@@ -74,22 +82,22 @@ export default function SensorsPage() {
     let alive = true
     setLoading(true)
     setSeriesErr('')
-    getLabSeries(src.id, measure, hours)
+    getLabSeries(src.id, measure, hours, location)
       .then((d) => alive && setSeries(d))
       .catch(() => alive && setSeriesErr('ดึงข้อมูลย้อนหลังไม่ได้ ลองใหม่อีกครั้ง'))
       .finally(() => alive && setLoading(false))
     return () => { alive = false }
-  }, [src?.id, measure, hours])
+  }, [src?.id, measure, hours, location])
 
   // ตารางสรุป — ดึงพร้อมกราฟ เปลี่ยนชุด/ช่วงเวลาก็ดึงใหม่ (ไม่ขึ้นกับค่าที่เลือก เพราะสรุปทุกค่า)
   useEffect(() => {
     if (!src) return
     let alive = true
-    getLabSummary(src.id, hours)
+    getLabSummary(src.id, hours, location)
       .then((d) => alive && setSummary(d))
       .catch(() => alive && setSummary(null))
     return () => { alive = false }
-  }, [src?.id, hours])
+  }, [src?.id, hours, location])
 
   // รวมทุกเส้นเข้าเป็นแถวเดียวกันตามเวลา ให้ recharts วาดหลายเส้นในกราฟเดียว
   const chartRows = useMemo(() => {
@@ -131,6 +139,28 @@ export default function SensorsPage() {
           </button>
         ))}
       </div>
+
+      {/* เลือกจุดติดตั้ง — โชว์เฉพาะชุดที่มีมากกว่าหนึ่งจุด */}
+      {src?.locations?.length > 1 && (
+        <div className="chip-row sx-locs">
+          <i className="ti ti-map-pin" aria-hidden="true" />
+          <button
+            className={`chip ${!location ? 'chip-on' : ''}`}
+            onClick={() => setParam('location', '')}
+          >
+            ทุกจุด
+          </button>
+          {src.locations.map((l) => (
+            <button
+              key={l.id}
+              className={`chip ${l.id === location ? 'chip-on' : ''}`}
+              onClick={() => setParam('location', l.id)}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ค่าตอนนี้ แยกตามจุดติดตั้ง */}
       <div className="panel">

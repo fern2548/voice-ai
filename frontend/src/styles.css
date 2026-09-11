@@ -2532,3 +2532,7 @@ th, td { font-size: 14px; }
 .sx-table th.num, .sx-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sx-table td.strong { font-weight: 600; }
 .sx-table td.num small { font-size: 11px; color: var(--text-dim); margin-left: 3px; font-weight: 400; }
+
+/* แถวเลือกจุดติดตั้งในหน้ากราฟข้อมูล */
+.sx-locs { align-items: center; margin: -6px 0 14px; padding: 0 4px; }
+.sx-locs > .ti { color: var(--text-dim); font-size: 15px; margin-right: 2px; }

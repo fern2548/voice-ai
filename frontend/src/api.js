@@ -72,11 +72,14 @@ export const getVaccineDue = (days = 7) => get(`/vaccine-due?days=${days}`)
 
 // เซนเซอร์ภายนอก (ดินแสลงพัน · เล้าหมูกำแพงเพชร · เสาอากาศแสลงพัน) ผ่านเซิร์ฟเวอร์เรา
 export const getLabSources = () => get('/lab/sources')
-export const getLabLatest = (source) => get(`/lab/latest?source=${encodeURIComponent(source)}`)
-export const getLabSummary = (source, hours = 24) =>
-  get(`/lab/summary?source=${encodeURIComponent(source)}&hours=${hours}`)
-export const getLabSeries = (source, measure, hours = 24) =>
-  get(`/lab/series?source=${encodeURIComponent(source)}&measure=${encodeURIComponent(measure)}&hours=${hours}`)
+// location ว่าง = ทุกจุดติดตั้ง
+const loc = (l) => (l ? `&location=${encodeURIComponent(l)}` : '')
+export const getLabLatest = (source, location = '') =>
+  get(`/lab/latest?source=${encodeURIComponent(source)}${loc(location)}`)
+export const getLabSummary = (source, hours = 24, location = '') =>
+  get(`/lab/summary?source=${encodeURIComponent(source)}&hours=${hours}${loc(location)}`)
+export const getLabSeries = (source, measure, hours = 24, location = '') =>
+  get(`/lab/series?source=${encodeURIComponent(source)}&measure=${encodeURIComponent(measure)}&hours=${hours}${loc(location)}`)
 
 // history: อาร์เรย์ของ { role: 'user'|'model', text } ไม่กี่เทิร์นล่าสุด (ประหยัด token)
 export const askAI = async (text, history = []) => {

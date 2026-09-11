@@ -60,6 +60,7 @@ export function VoiceAIProvider({ children }) {
       if (nav.source) qs.set('source', nav.source)
       if (nav.measure) qs.set('measure', nav.measure)
       if (nav.hours) qs.set('hours', String(nav.hours))
+      if (nav.location) qs.set('location', nav.location)
       navigate(qs.toString() ? `${nav.path}?${qs}` : nav.path)
       speak(reply)
       return

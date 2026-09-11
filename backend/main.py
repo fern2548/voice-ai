@@ -1461,18 +1461,19 @@ def lab_sources():
         return {"enabled": False, "sources": []}
     out = []
     for src, label in _LAB_SOURCE_LABELS.items():
-        out.append({"id": src, "label": label, "measures": _lab_measures(src)})
+        out.append({"id": src, "label": label, "measures": _lab_measures(src),
+                    "locations": _lab_locations(src)})
     return {"enabled": True, "sources": out}
 
 
 @app.get("/lab/latest")
-def lab_latest(source: str):
-    """ค่าล่าสุดของชุดหนึ่ง จัดกลุ่มตามจุดติดตั้งแล้ว"""
+def lab_latest(source: str, location: Optional[str] = None):
+    """ค่าล่าสุดของชุดหนึ่ง จัดกลุ่มตามจุดติดตั้งแล้ว (กรองจุดได้)"""
     if not LAB_API_KEY:
         raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
     if source not in _LAB_SOURCE_LABELS:
         raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
-    data = _lab_latest(source)
+    data = _lab_latest(source, _lab_location_id(source, location))
     if not data:
         raise HTTPException(status_code=502, detail="ดึงข้อมูลจากเซนเซอร์ภายนอกไม่ได้")
     sites: dict[str, dict] = {}
@@ -1497,7 +1498,7 @@ def lab_latest(source: str):
 
 
 @app.get("/lab/series")
-def lab_series(source: str, measure: str, hours: int = 24):
+def lab_series(source: str, measure: str, hours: int = 24, location: Optional[str] = None):
     """ข้อมูลย้อนหลังสำหรับวาดกราฟ — คืนเป็นเส้นละจุดติดตั้ง"""
     if not LAB_API_KEY:
         raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
@@ -1508,7 +1509,7 @@ def lab_series(source: str, measure: str, hours: int = 24):
     real = _lab_measure_id(source, measure)
     if not real:
         raise HTTPException(status_code=400, detail="ชุดข้อมูลนี้ไม่มีค่าที่ขอ")
-    data = _lab_series(source, real, hours)
+    data = _lab_series(source, real, hours, _lab_location_id(source, location))
     if not data:
         raise HTTPException(status_code=502, detail="ดึงข้อมูลย้อนหลังไม่ได้")
     lines = []
@@ -1538,14 +1539,14 @@ def lab_series(source: str, measure: str, hours: int = 24):
 
 
 @app.get("/lab/summary")
-def lab_summary_endpoint(source: str, hours: int = 24):
+def lab_summary_endpoint(source: str, hours: int = 24, location: Optional[str] = None):
     """สถิติต่ำสุด/เฉลี่ย/สูงสุดของทุกค่าในชุด — ตารางสรุปบนหน้ากราฟข้อมูล"""
     if not LAB_API_KEY:
         raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
     if source not in _LAB_SOURCE_LABELS:
         raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
     hours = max(1, min(hours, 720))
-    data = _lab_summary(source, hours)
+    data = _lab_summary(source, hours, _lab_location_id(source, location))
     if not data:
         raise HTTPException(status_code=502, detail="ดึงสรุปไม่ได้")
     rows = []
@@ -1751,21 +1752,21 @@ def _needs_lab(text: str) -> list[str]:
     return [src for src, words in _LAB_SOURCE_KEYWORDS.items() if any(w in t for w in words)]
 
 
-def _lab_latest(source: str) -> Optional[dict]:
+def _lab_latest(source: str, location: Optional[str] = None) -> Optional[dict]:
     """ดึงค่าล่าสุดของชุดข้อมูลหนึ่ง แคชไว้ 60 วิ คืน None ถ้าดึงไม่ได้ (ไม่ทำให้คำถามพัง)"""
     now = datetime.now(timezone.utc).timestamp()
-    hit = _lab_cache.get(source)
+    key = f"{source}|{location or ''}"
+    hit = _lab_cache.get(key)
     if hit and now - hit[0] < LAB_CACHE_SECONDS:
         return hit[1]
     try:
-        resp = httpx.get(
-            f"{LAB_API_BASE}/api/latest",
-            params={"key": LAB_API_KEY, "source": source},
-            timeout=10,
-        )
+        params = {"key": LAB_API_KEY, "source": source}
+        if location:
+            params["location"] = location
+        resp = httpx.get(f"{LAB_API_BASE}/api/latest", params=params, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-        _lab_cache[source] = (now, data)
+        _lab_cache[key] = (now, data)
         return data
     except Exception as e:
         print(f"[warn] ดึงข้อมูล lab ({source}) ไม่ได้: {e}")
@@ -1846,6 +1847,64 @@ def _lab_measure_id(source: str, key: str) -> Optional[str]:
     return None
 
 
+# ---------- เซนเซอร์ภายนอก: จุดติดตั้ง (locations) ----------
+# บางชุดมีหลายจุด (เล้า R กับเสาอากาศกำแพงเพชร / แปลงดินจุดที่ 1 กับ 2)
+# ถ้าถามเจาะจงจุด ก็ดึงเฉพาะจุดนั้น AI จะได้ไม่ต้องคัดเอง และหน้ากราฟกรองได้
+_lab_locations_cache: dict[str, tuple[float, list]] = {}
+
+
+def _lab_locations(source: str) -> list[dict]:
+    """คืน [{id, label}] ของชุดนั้น"""
+    now = datetime.now(timezone.utc).timestamp()
+    hit = _lab_locations_cache.get(source)
+    if hit and now - hit[0] < LAB_MEASURES_CACHE_SECONDS:
+        return hit[1]
+    try:
+        resp = httpx.get(
+            f"{LAB_API_BASE}/api/locations",
+            params={"key": LAB_API_KEY, "source": source},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        out = [{"id": l.get("id"), "label": l.get("ชื่อ") or l.get("id")}
+               for l in resp.json().get("จุดติดตั้ง", []) if l.get("id")]
+        _lab_locations_cache[source] = (now, out)
+        return out
+    except Exception as e:
+        print(f"[warn] ดึงจุดติดตั้ง lab ({source}) ไม่ได้: {e}")
+        return hit[1] if hit else []
+
+
+def _lab_location_id(source: str, key: Optional[str]) -> Optional[str]:
+    """ตรวจว่า id จุดติดตั้งมีจริงในชุดนี้ · None ถ้าไม่ระบุหรือไม่รู้จัก"""
+    if not key:
+        return None
+    return next((l["id"] for l in _lab_locations(source) if l["id"] == key), None)
+
+
+# คำพูดที่หมายถึงจุดติดตั้ง -> ข้อความที่ต้องเจอในชื่อจุด
+_LAB_LOCATION_WORDS = [
+    (("จุดที่1", "จุด1", "จุดแรก", "โหนด1", "node1"), "จุดที่ 1"),
+    (("จุดที่2", "จุด2", "จุดสอง", "โหนด2", "node2"), "จุดที่ 2"),
+    (("เล้าr", "เล้าอาร์", "ในเล้า"), "เล้า R"),
+    (("เสาอากาศกำแพงเพชร", "หน้าออฟฟิศ", "ออฟฟิศ"), "เสาอากาศ กำแพงเพชร"),
+]
+
+
+def _lab_resolve_location(source: str, text: str) -> Optional[str]:
+    """ถ้าประโยคเจาะจงจุดติดตั้ง คืน id ของจุดนั้น ไม่งั้น None (= เอาทุกจุด)"""
+    t = text.lower().replace(" ", "")
+    locs = _lab_locations(source)
+    if len(locs) < 2:
+        return None  # มีจุดเดียว ไม่ต้องกรอง
+    for words, label_hint in _LAB_LOCATION_WORDS:
+        if any(w in t for w in words):
+            for l in locs:
+                if label_hint in l["label"]:
+                    return l["id"]
+    return None
+
+
 # ---------- เซนเซอร์ภายนอก: ข้อมูลย้อนหลัง (series) ----------
 # คำที่บอกว่าอยากรู้ค่าไหน -> ไปหา id จริงจากรายการ "ค่า" ของชุดนั้น
 # ต้องหาแบบนี้เพราะแต่ละชุดตั้งชื่อ id ไม่เหมือนกัน (เสาอากาศแสลงพันใช้ SS300_weather_temperature_300000_)
@@ -1923,18 +1982,17 @@ def _needs_lab_series(text: str) -> list[tuple[str, str, str, int]]:
     return out
 
 
-def _lab_series(source: str, measure: str, hours: int) -> Optional[dict]:
-    key = f"{source}|{measure}|{hours}"
+def _lab_series(source: str, measure: str, hours: int, location: Optional[str] = None) -> Optional[dict]:
+    key = f"{source}|{measure}|{hours}|{location or ''}"
     now = datetime.now(timezone.utc).timestamp()
     hit = _lab_series_cache.get(key)
     if hit and now - hit[0] < LAB_SERIES_CACHE_SECONDS:
         return hit[1]
     try:
-        resp = httpx.get(
-            f"{LAB_API_BASE}/api/series",
-            params={"key": LAB_API_KEY, "source": source, "measure": measure, "hours": hours},
-            timeout=15,
-        )
+        params = {"key": LAB_API_KEY, "source": source, "measure": measure, "hours": hours}
+        if location:
+            params["location"] = location
+        resp = httpx.get(f"{LAB_API_BASE}/api/series", params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         _lab_series_cache[key] = (now, data)
@@ -1994,18 +2052,17 @@ _LAB_OVERVIEW_WORDS = ("สรุป", "ภาพรวม", "เป็นยั
 _lab_summary_cache: dict[str, tuple[float, dict]] = {}
 
 
-def _lab_summary(source: str, hours: int) -> Optional[dict]:
-    key = f"{source}|{hours}"
+def _lab_summary(source: str, hours: int, location: Optional[str] = None) -> Optional[dict]:
+    key = f"{source}|{hours}|{location or ''}"
     now = datetime.now(timezone.utc).timestamp()
     hit = _lab_summary_cache.get(key)
     if hit and now - hit[0] < LAB_SERIES_CACHE_SECONDS:
         return hit[1]
     try:
-        resp = httpx.get(
-            f"{LAB_API_BASE}/api/summary",
-            params={"key": LAB_API_KEY, "source": source, "hours": hours},
-            timeout=15,
-        )
+        params = {"key": LAB_API_KEY, "source": source, "hours": hours}
+        if location:
+            params["location"] = location
+        resp = httpx.get(f"{LAB_API_BASE}/api/summary", params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         _lab_summary_cache[key] = (now, data)
@@ -2336,7 +2393,7 @@ def _fmt_stats(s: dict) -> str:
 
 def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig: bool = False,
                    lab: Optional[list[str]] = None, lab_series: Optional[list] = None,
-                   lab_summary: Optional[list] = None) -> str:
+                   lab_summary: Optional[list] = None, text: str = "") -> str:
     """สร้าง CONTEXT ให้ LLM
     detailed=False -> แนบแค่ค่าปัจจุบัน 1 บรรทัด (ประหยัด token, ใช้กับคำถามทั่วไป)
     detailed=True  -> แนบประวัติย้อนหลัง + ตารางพยากรณ์ (ใช้เฉพาะคำถามพยากรณ์/แนวโน้ม)
@@ -2344,6 +2401,7 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
     pig            -> ถ้า True จะแนบบันทึกสุขภาพหมูย้อนหลัง (ใช้เฉพาะคำถามเกี่ยวกับหมู)
     """
     parts = []
+    _ctx_text = text or ""
 
     cur = weather()
     parts.append(
@@ -2371,17 +2429,17 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
 
     # เซนเซอร์ภายนอก — แนบเฉพาะชุดที่คำถามพูดถึง ดึงสดตอนถาม
     for src in (lab or []):
-        d = _lab_latest(src)
+        d = _lab_latest(src, _lab_resolve_location(src, _ctx_text))
         if d:
             parts.append(_fmt_lab(d))
     # ข้อมูลย้อนหลังจากเซนเซอร์ภายนอก — สรุปเป็นสถิติ ไม่ส่งจุดดิบ
     for src, measure, _label, hours in (lab_series or []):
-        d = _lab_series(src, measure, hours)
+        d = _lab_series(src, measure, hours, _lab_resolve_location(src, _ctx_text))
         if d:
             parts.append(_fmt_lab_series(d))
     # สรุปทุกค่าของชุดหนึ่ง — ใช้กับคำถามภาพรวม
     for src, hours in (lab_summary or []):
-        d = _lab_summary(src, hours)
+        d = _lab_summary(src, hours, _lab_resolve_location(src, _ctx_text))
         if d:
             parts.append(_fmt_lab_summary(d))
 
@@ -2419,19 +2477,19 @@ def _rule_based_answer(text: str) -> str:
     """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม/สถิติย้อนหลัง/หมู"""
     # ถามภาพรวมของเซนเซอร์ที่อื่น -> สรุปทุกค่า
     for src, hours in _needs_lab_summary(text):
-        d = _lab_summary(src, hours)
+        d = _lab_summary(src, hours, _lab_resolve_location(src, text))
         if d:
             return _fmt_lab_summary(d).replace("\n", " ") + " ครับ"
 
     # ถามย้อนหลังของเซนเซอร์ที่อื่น -> สรุปสถิติให้ตรง ๆ
     for src, measure, _label, hours in _needs_lab_series(text):
-        d = _lab_series(src, measure, hours)
+        d = _lab_series(src, measure, hours, _lab_resolve_location(src, text))
         if d:
             return _fmt_lab_series(d).replace("\n", " ") + " ครับ"
 
     # ถามถึงเซนเซอร์ที่อื่น -> อ่านค่าสดมาบอกตรง ๆ (แบบไม่มี AI เรียบเรียง)
     for src in _needs_lab(text):
-        d = _lab_latest(src)
+        d = _lab_latest(src, _lab_resolve_location(src, text))
         if d:
             return _fmt_lab(d).replace("\n", " ") + " ครับ"
 
@@ -2638,6 +2696,7 @@ def ask(q: Question):
         lab=_needs_lab(text),
         lab_series=_needs_lab_series(text),
         lab_summary=_needs_lab_summary(text),
+        text=text,
     )
 
     # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)
