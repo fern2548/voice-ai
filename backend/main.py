@@ -394,6 +394,13 @@ LAB_API_BASE = os.environ.get("LAB_API_BASE", "https://lab.plotnexuslab.com").rs
 LAB_API_KEY = os.environ.get("LAB_API_KEY", "")
 LAB_CACHE_SECONDS = 60  # เซนเซอร์อัปเดตทุกนาที ดึงถี่กว่านี้ก็ได้ค่าเดิม
 
+# ส่งข้อมูลฟาร์มเราขึ้น "พื้นที่ของฉัน" บน lab — ใช้บัญชี lab ไม่ใช่คีย์อ่าน (labro_)
+# ไม่ตั้ง LAB_PASSWORD = ไม่ส่ง ระบบทำงานเหมือนเดิมทุกอย่าง
+LAB_USER = os.environ.get("LAB_USER", "")
+LAB_PASSWORD = os.environ.get("LAB_PASSWORD", "")
+LAB_WRITE_TABLE = os.environ.get("LAB_WRITE_TABLE", "farmy")  # ชื่อตารางในพื้นที่ของฉัน
+LAB_WRITE_LOCATION = os.environ.get("LAB_WRITE_LOCATION", "saraburi_farm")
+
 # รหัสเชิญสำหรับให้ผู้ใช้สมัครบัญชีเอง
 # ไม่ตั้งค่า = ปิดการสมัครเอง (ค่าเริ่มต้น) ผู้ดูแลต้องเป็นคนสร้างบัญชีให้เท่านั้น
 #
@@ -745,6 +752,11 @@ def delete_admin_user(username: str, x_admin_token: str = Header(...)):
 def ingest(w: Weather):
     """Node-RED เรียก endpoint นี้ทุกครั้งที่อ่านค่าเซนเซอร์ใหม่ได้"""
     supabase.table("weather_readings").insert(w.model_dump()).execute()
+    # สำเนาขึ้น lab ด้วย จะได้ดูรวมกับชุดอื่นในที่เดียว (ทำเบื้องหลัง ไม่ถ่วง Node-RED)
+    _lab_write([
+        ("temperature", w.temperature, None), ("humidity", w.humidity, None),
+        ("windspeed", w.windspeed, None), ("rainfall", w.rainfall, None), ("light", w.light, None),
+    ])
     return w
 
 
@@ -952,6 +964,7 @@ def save_pig_health(p: PigHealth):
     """บันทึกจำนวนหมูป่วยรายวัน (กรอกมือจากหน้าเว็บ ไม่ใช่จากเซนเซอร์)"""
     data = p.model_dump(mode="json")
     supabase.table("pig_health_log").insert(data).execute()
+    _lab_write([("sick_count", p.sick_count, None), ("total_count", p.total_count, None)])
     return p
 
 
@@ -1457,6 +1470,15 @@ _LAB_FALLBACK_SOURCES = {
 _lab_sources_cache: Optional[tuple[float, dict]] = None
 
 
+def _lab_params(source: str) -> dict:
+    """"mine:farmy" -> {source: mine, table: farmy} · ชุดปกติ -> {source: ...}
+    พื้นที่ของฉันมีได้หลายตาราง เลยตั้ง id เป็น mine:<ตาราง> ให้ใช้กับทุกฟังก์ชันเหมือนชุดปกติ
+    """
+    if source.startswith("mine:"):
+        return {"source": "mine", "table": source.split(":", 1)[1]}
+    return {"source": source}
+
+
 def _lab_sources() -> dict[str, str]:
     """คืน {id: ชื่อไทย} ของชุดที่เรียกดูได้ตรง ๆ"""
     global _lab_sources_cache
@@ -1469,7 +1491,17 @@ def _lab_sources() -> dict[str, str]:
         out = {}
         for src in resp.json().get("ชุดข้อมูล", []):
             sid = src.get("id")
-            if not sid or src.get("ต้องระบุ table"):
+            if not sid:
+                continue
+            if src.get("ต้องระบุ table"):
+                # พื้นที่ของฉัน: แตกเป็นชุดละตาราง (ว่างก็ไม่โผล่)
+                try:
+                    tr = httpx.get(f"{LAB_API_BASE}/api/tables",
+                                   params={"key": LAB_API_KEY, "source": sid}, timeout=10)
+                    for tbl in tr.json().get("ตาราง", []):
+                        out[f"{sid}:{tbl}"] = f"{src.get('ชื่อ') or sid} · {tbl}"
+                except Exception as e:
+                    print(f"[warn] อ่านตารางใน {sid} ไม่ได้: {e}")
                 continue
             out[sid] = src.get("ชื่อ") or sid
         if out:
@@ -1791,7 +1823,7 @@ def _lab_latest(source: str, location: Optional[str] = None) -> Optional[dict]:
     if hit and now - hit[0] < LAB_CACHE_SECONDS:
         return hit[1]
     try:
-        params = {"key": LAB_API_KEY, "source": source}
+        params = {"key": LAB_API_KEY, **_lab_params(source)}
         if location:
             params["location"] = location
         resp = httpx.get(f"{LAB_API_BASE}/api/latest", params=params, timeout=10)
@@ -1831,6 +1863,50 @@ def _fmt_lab(data: dict) -> str:
     return "\n".join(lines)
 
 
+# ---------- เซนเซอร์ภายนอก: ส่งข้อมูลเราขึ้น lab (write) ----------
+# lab รับข้อมูลแบบ line protocol: <ตาราง>,measure=<ค่า>,location=<จุด> value=<ตัวเลข>
+# บรรทัดละค่า ส่งหลายบรรทัดในครั้งเดียวได้ เวลาให้เซิร์ฟเวอร์ประทับให้เอง
+def _lp_tag(v) -> str:
+    """หนีอักขระที่ line protocol ใช้เป็นตัวคั่น ไม่งั้นค่าที่มีช่องว่างจะทำให้บรรทัดพัง"""
+    return str(v).replace("\\", "\\\\").replace(" ", "\\ ").replace(",", "\\,").replace("=", "\\=")
+
+
+def _lab_write(points: list[tuple[str, float, Optional[str]]]) -> None:
+    """ส่ง [(measure, value, location)] ขึ้น lab — ทำเบื้องหลัง ไม่ทำให้คำขอหลักช้าหรือพัง
+    ถ้าไม่ได้ตั้งบัญชีไว้ก็เงียบ ๆ ข้ามไป
+    """
+    if not (LAB_USER and LAB_PASSWORD) or not points:
+        return
+    lines = []
+    for measure, value, location in points:
+        if value is None:
+            continue
+        try:
+            num = float(value)
+        except (TypeError, ValueError):
+            continue
+        loc = _lp_tag(location or LAB_WRITE_LOCATION)
+        lines.append(f"{_lp_tag(LAB_WRITE_TABLE)},measure={_lp_tag(measure)},location={loc} value={num}")
+    if not lines:
+        return
+
+    def run():
+        try:
+            resp = httpx.post(
+                f"{LAB_API_BASE}/write",
+                params={"db": f"lab_{LAB_USER}"},
+                auth=(LAB_USER, LAB_PASSWORD),
+                content="\n".join(lines).encode("utf-8"),
+                timeout=10,
+            )
+            if resp.status_code >= 300:
+                print(f"[warn] ส่งข้อมูลขึ้น lab ไม่สำเร็จ ({resp.status_code}): {resp.text[:120]}")
+        except Exception as e:
+            print(f"[warn] ส่งข้อมูลขึ้น lab ไม่สำเร็จ: {e}")
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 # ---------- เซนเซอร์ภายนอก: รายการค่าที่วัดได้ (measures) ----------
 # /api/measures ให้ id จริง + ชื่อไทย + หน่วย + "รหัสสั้น" ของทุกค่าในชุด
 # ดีกว่าเดาจาก latest เพราะ latest เห็นเฉพาะค่าที่มีข้อมูล ณ ตอนนั้น (เซนเซอร์เงียบไปก็หาย)
@@ -1848,7 +1924,7 @@ def _lab_measures(source: str) -> list[dict]:
     try:
         resp = httpx.get(
             f"{LAB_API_BASE}/api/measures",
-            params={"key": LAB_API_KEY, "source": source},
+            params={"key": LAB_API_KEY, **_lab_params(source)},
             timeout=10,
         )
         resp.raise_for_status()
@@ -1893,7 +1969,7 @@ def _lab_locations(source: str) -> list[dict]:
     try:
         resp = httpx.get(
             f"{LAB_API_BASE}/api/locations",
-            params={"key": LAB_API_KEY, "source": source},
+            params={"key": LAB_API_KEY, **_lab_params(source)},
             timeout=10,
         )
         resp.raise_for_status()
@@ -2020,7 +2096,7 @@ def _lab_series(source: str, measure: str, hours: int, location: Optional[str] =
     if hit and now - hit[0] < LAB_SERIES_CACHE_SECONDS:
         return hit[1]
     try:
-        params = {"key": LAB_API_KEY, "source": source, "measure": measure, "hours": hours}
+        params = {"key": LAB_API_KEY, **_lab_params(source), "measure": measure, "hours": hours}
         if location:
             params["location"] = location
         resp = httpx.get(f"{LAB_API_BASE}/api/series", params=params, timeout=15)
@@ -2090,7 +2166,7 @@ def _lab_summary(source: str, hours: int, location: Optional[str] = None) -> Opt
     if hit and now - hit[0] < LAB_SERIES_CACHE_SECONDS:
         return hit[1]
     try:
-        params = {"key": LAB_API_KEY, "source": source, "hours": hours}
+        params = {"key": LAB_API_KEY, **_lab_params(source), "hours": hours}
         if location:
             params["location"] = location
         resp = httpx.get(f"{LAB_API_BASE}/api/summary", params=params, timeout=15)
