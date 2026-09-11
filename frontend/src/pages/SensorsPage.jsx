@@ -17,6 +17,9 @@ const HOURS = [
   { h: 168, label: '7 วัน' },
 ]
 
+// ไอคอนของชุดที่รู้จัก — ชุดใหม่จาก API ที่ยังไม่มีไอคอนจะใช้กราฟทั่วไป
+const SOURCE_ICONS = { soil: 'ti-plant-2', pig: 'ti-building-warehouse', weather: 'ti-antenna' }
+
 // สีแยกเส้นตามจุดติดตั้ง — ชุดหนึ่งมีไม่เกิน 3 จุด
 const LINE_COLORS = ['#4aca89', '#4da6ff', '#ffc857', '#ff6b6b']
 
@@ -134,7 +137,7 @@ export default function SensorsPage() {
             className={`tab-btn ${s.id === src?.id ? 'on' : ''}`}
             onClick={() => { setParam('source', s.id) }}
           >
-            <i className={`ti ${s.id === 'soil' ? 'ti-plant-2' : s.id === 'pig' ? 'ti-building-warehouse' : 'ti-antenna'}`} aria-hidden="true" />
+            <i className={`ti ${SOURCE_ICONS[s.id] || 'ti-chart-line'}`} aria-hidden="true" />
             {s.label}
           </button>
         ))}

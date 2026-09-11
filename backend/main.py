@@ -1446,12 +1446,38 @@ def cron_vaccine_due_notify(days: int = 3, x_cron_key: str = Header(default=""))
 # หน้าเว็บห้ามเรียก lab API ตรง ๆ เพราะต้องแนบคีย์ ซึ่งจะไปโผล่ในเบราว์เซอร์ให้ใครก็เห็น
 # ให้เรียกผ่านสามช่องทางนี้แทน คีย์อยู่ที่เซิร์ฟเวอร์ที่เดียว และต้องล็อกอินก่อนเหมือนช่องทางอื่น
 
-# ชื่อค่าที่คนทั่วไปเข้าใจ ใช้ทำปุ่มเลือกบนหน้ากราฟ
-_LAB_SOURCE_LABELS = {
+# รายชื่อชุดข้อมูล — ดึงจาก /api/sources ไม่ฝังในโค้ด ชุดใหม่จะโผล่เองโดยไม่ต้องแก้อะไร
+# ชุดที่ "ต้องระบุ table" (พื้นที่ของฉัน) ข้ามไปก่อน เพราะรูปแบบเรียกต่างจากชุดอื่น
+# ถ้าดึงไม่ได้ใช้รายชื่อสำรอง 3 ชุดที่รู้จัก ระบบจะได้ไม่พังเพราะ API ล่มชั่วคราว
+_LAB_FALLBACK_SOURCES = {
     "soil": "ดิน แสลงพัน",
     "pig": "เล้าหมู กำแพงเพชร",
     "weather": "เสาอากาศ แสลงพัน",
 }
+_lab_sources_cache: Optional[tuple[float, dict]] = None
+
+
+def _lab_sources() -> dict[str, str]:
+    """คืน {id: ชื่อไทย} ของชุดที่เรียกดูได้ตรง ๆ"""
+    global _lab_sources_cache
+    now = datetime.now(timezone.utc).timestamp()
+    if _lab_sources_cache and now - _lab_sources_cache[0] < LAB_MEASURES_CACHE_SECONDS:
+        return _lab_sources_cache[1]
+    try:
+        resp = httpx.get(f"{LAB_API_BASE}/api/sources", params={"key": LAB_API_KEY}, timeout=10)
+        resp.raise_for_status()
+        out = {}
+        for src in resp.json().get("ชุดข้อมูล", []):
+            sid = src.get("id")
+            if not sid or src.get("ต้องระบุ table"):
+                continue
+            out[sid] = src.get("ชื่อ") or sid
+        if out:
+            _lab_sources_cache = (now, out)
+            return out
+    except Exception as e:
+        print(f"[warn] ดึงรายชื่อชุดข้อมูล lab ไม่ได้: {e}")
+    return _lab_sources_cache[1] if _lab_sources_cache else dict(_LAB_FALLBACK_SOURCES)
 
 
 @app.get("/lab/sources")
@@ -1460,7 +1486,7 @@ def lab_sources():
     if not LAB_API_KEY:
         return {"enabled": False, "sources": []}
     out = []
-    for src, label in _LAB_SOURCE_LABELS.items():
+    for src, label in _lab_sources().items():
         out.append({"id": src, "label": label, "measures": _lab_measures(src),
                     "locations": _lab_locations(src)})
     return {"enabled": True, "sources": out}
@@ -1471,7 +1497,7 @@ def lab_latest(source: str, location: Optional[str] = None):
     """ค่าล่าสุดของชุดหนึ่ง จัดกลุ่มตามจุดติดตั้งแล้ว (กรองจุดได้)"""
     if not LAB_API_KEY:
         raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
-    if source not in _LAB_SOURCE_LABELS:
+    if source not in _lab_sources():
         raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
     data = _lab_latest(source, _lab_location_id(source, location))
     if not data:
@@ -1491,7 +1517,7 @@ def lab_latest(source: str, location: Optional[str] = None):
         })
     return {
         "source": source,
-        "label": _LAB_SOURCE_LABELS[source],
+        "label": _lab_sources().get(source, source),
         "updated_at": data.get("อัปเดตล่าสุด"),
         "sites": list(sites.values()),
     }
@@ -1502,7 +1528,7 @@ def lab_series(source: str, measure: str, hours: int = 24, location: Optional[st
     """ข้อมูลย้อนหลังสำหรับวาดกราฟ — คืนเป็นเส้นละจุดติดตั้ง"""
     if not LAB_API_KEY:
         raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
-    if source not in _LAB_SOURCE_LABELS:
+    if source not in _lab_sources():
         raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
     hours = max(1, min(hours, 720))
     # รับรหัสสั้นได้ ("temperature") แปลงเป็น id จริงของชุดนั้นให้
@@ -1543,7 +1569,7 @@ def lab_summary_endpoint(source: str, hours: int = 24, location: Optional[str] =
     """สถิติต่ำสุด/เฉลี่ย/สูงสุดของทุกค่าในชุด — ตารางสรุปบนหน้ากราฟข้อมูล"""
     if not LAB_API_KEY:
         raise HTTPException(status_code=404, detail="ยังไม่ได้เปิดใช้กราฟข้อมูล")
-    if source not in _LAB_SOURCE_LABELS:
+    if source not in _lab_sources():
         raise HTTPException(status_code=400, detail="ไม่รู้จักชุดข้อมูลนี้")
     hours = max(1, min(hours, 720))
     data = _lab_summary(source, hours, _lab_location_id(source, location))
@@ -1749,7 +1775,12 @@ def _needs_lab(text: str) -> list[str]:
     if not LAB_API_KEY:
         return []
     t = text.lower()
-    return [src for src, words in _LAB_SOURCE_KEYWORDS.items() if any(w in t for w in words)]
+    hit = [src for src, words in _LAB_SOURCE_KEYWORDS.items() if any(w in t for w in words)]
+    # ชุดใหม่ที่ยังไม่มีคำสำคัญกำหนดไว้ ให้จับจากชื่อชุดตรง ๆ (เช่นพูดชื่อชุดเต็ม ๆ)
+    for sid, label in _lab_sources().items():
+        if sid not in hit and sid not in _LAB_SOURCE_KEYWORDS and label.replace(" ", "") in t.replace(" ", ""):
+            hit.append(sid)
+    return hit
 
 
 def _lab_latest(source: str, location: Optional[str] = None) -> Optional[dict]:
