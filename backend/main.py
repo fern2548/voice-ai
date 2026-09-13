@@ -370,7 +370,8 @@ app.add_middleware(
 _PUBLIC_PATHS = {"/admin/login", "/admin/signup", "/admin/signup-enabled", "/health", "/line/webhook"}  # webhook: LINE เรียกเข้ามาเอง ตรวจด้วยลายเซ็นแทน
 # /ingest = อุปกรณ์เซนเซอร์/Node-RED ใช้ INGEST_TOKEN ของตัวเองแยกต่างหากอยู่แล้ว
 # /r      = ลิงก์รายงานสำหรับปุ่มริชเมนู LINE (ดูหมายเหตุที่ PUBLIC_REPORT_KEY ด้านล่าง)
-_PUBLIC_PREFIXES = ("/ingest", "/r/", "/cron/")  # /cron/: ตัวตั้งเวลาภายนอกเรียก ตรวจด้วย CRON_KEY แทน
+_PUBLIC_PREFIXES = ("/ingest", "/r/", "/cron/")
+_SERVE_WEB = False  # เปลี่ยนเป็น True ท้ายไฟล์ถ้ามี frontend/dist ให้เสิร์ฟ  # /cron/: ตัวตั้งเวลาภายนอกเรียก ตรวจด้วย CRON_KEY แทน
 
 # ---------- ลิงก์รายงานถาวรสำหรับปุ่มริชเมนู LINE ----------
 # ปุ่มริชเมนูที่สร้างจากหน้า LINE OA Manager ใส่ได้แค่ "ลิงก์" ธรรมดา
@@ -449,6 +450,16 @@ async def _require_admin_login(request, call_next):
 
     # ลิงก์ดาวน์โหลดที่แนบ token ชั่วคราวมา (เปิดจาก LINE/มือถือได้โดยไม่ต้องล็อกอิน)
     if path.startswith("/export/") and _valid_download_token(request.query_params.get("t")):
+        return await call_next(request)
+
+    # หน้าเว็บเอง (ตอนเสิร์ฟจากพอร์ตเดียว) — เบราว์เซอร์ขอหน้า HTML ให้ผ่านได้
+    # แยกจาก API ด้วย Accept: เบราว์เซอร์เปิดหน้าขอ text/html ส่วนโค้ดเรียก API ขอ application/json
+    # ข้อมูลยังปลอดภัยเพราะ API ทุกตัวยังต้องมีบัตรผ่านเหมือนเดิม หน้าเว็บเปล่า ๆ ไม่มีข้อมูลอะไร
+    if (
+        _SERVE_WEB
+        and request.method == "GET"
+        and "text/html" in request.headers.get("accept", "")
+    ):
         return await call_next(request)
 
     token = request.headers.get("x-admin-token")
@@ -2873,6 +2884,33 @@ def ask(q: Question):
 
     # 4) rule-based — ด่านสุดท้าย ตอบได้เสมอ ไม่มีทางพัง
     return Answer(answer=_rule_based_answer(text))
+
+
+# ---------- เสิร์ฟหน้าเว็บจากเซิร์ฟเวอร์เดียวกัน (พอร์ตเดียว) ----------
+# สำหรับวางบนเครื่องที่เปิดได้พอร์ตเดียว (เช่นกล่องบริษัทที่ให้แค่ 8000)
+# ถ้ามีโฟลเดอร์ frontend/dist (ผลจาก npm run build) จะเสิร์ฟหน้าเว็บจากที่นี่เลย
+# ไม่มีก็ข้าม — ตอน dev ใช้ Vite แยกพอร์ตเหมือนเดิม, บน Render ก็แยก Static Site เหมือนเดิม
+_WEB_DIST = os.environ.get("WEB_DIST") or os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.isdir(_WEB_DIST):
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    app.mount("/assets", StaticFiles(directory=os.path.join(_WEB_DIST, "assets")), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def _spa(path: str):
+        """ทุกที่อยู่ที่ไม่ใช่ API ส่งกลับ index.html ให้ React จัดการเอง
+        (เปิด /vaccine ตรง ๆ จะได้ไม่เจอ 404) ไฟล์จริงในโฟลเดอร์ก็เสิร์ฟตรง ๆ
+        """
+        full = os.path.join(_WEB_DIST, path)
+        if path and os.path.isfile(full):
+            return FileResponse(full)
+        return FileResponse(os.path.join(_WEB_DIST, "index.html"))
+
+    # หน้าเว็บต้องเปิดได้โดยไม่ต้องล็อกอิน (หน้าล็อกอินก็อยู่ในนั้น) — เพิ่มเข้า allowlist ของด่านตรวจ
+    _PUBLIC_PREFIXES = _PUBLIC_PREFIXES + ("/assets",)
+    _SERVE_WEB = True
+    print(f"[info] เสิร์ฟหน้าเว็บจาก {_WEB_DIST}")
 
 
 if __name__ == "__main__":
