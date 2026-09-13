@@ -24,6 +24,36 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq git python3 python3-venv python3-pip nodejs npm curl > /dev/null
 
+# ---------- 1.5) ของเก่าที่รันอยู่บนกล่อง ----------
+# กล่องนี้อาจมี Farmy รุ่นเก่ารันอยู่ที่พอร์ต 8000 แล้ว (ผ่าน docker หรือ python ตรง ๆ)
+# ต้องหยุดก่อน ไม่งั้นรุ่นใหม่เปิดพอร์ตไม่ได้ และยืมไฟล์ตั้งค่าของเก่ามาใช้ จะได้ไม่ต้องพิมพ์ค่าลับใหม่
+say "ตรวจของเก่าที่พอร์ต $PORT"
+OLD_ENV=""
+# docker: หยุดคอนเทนเนอร์ที่ชื่อขึ้นต้น farmy หรือที่จับพอร์ตนี้อยู่
+if command -v docker >/dev/null 2>&1; then
+  for c in $(docker ps --format '{{.Names}}' 2>/dev/null | grep -E '^farmy|voice' || true); do
+    echo "  หยุดคอนเทนเนอร์เก่า: $c"; docker stop "$c" >/dev/null 2>&1 || true
+  done
+  for c in $(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | grep ":$PORT->" | awk '{print $1}' || true); do
+    echo "  หยุดคอนเทนเนอร์ที่จับพอร์ต $PORT: $c"; docker stop "$c" >/dev/null 2>&1 || true
+  done
+fi
+# systemd อื่นที่ชื่อคล้ายกัน
+for u in $(systemctl list-units --type=service --all --no-legend 2>/dev/null | awk '{print $1}' | grep -Ei 'farmy|voice-ai' | grep -v "^$SERVICE.service" || true); do
+  echo "  หยุดบริการเก่า: $u"; systemctl stop "$u" || true; systemctl disable "$u" >/dev/null 2>&1 || true
+done
+# โปรเซสอื่นที่ยังจับพอร์ตอยู่ (uvicorn/python ที่รันมือ)
+PIDS=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u || true)
+for pid in $PIDS; do
+  echo "  หยุดโปรเซสที่จับพอร์ต $PORT: pid $pid ($(ps -o comm= -p "$pid" 2>/dev/null))"
+  kill "$pid" 2>/dev/null || true
+done
+# หาไฟล์ .env เก่า (เอาอันที่มี SUPABASE_URL) ไว้คัดลอกมาใช้
+for f in /home/dev/*/backend/.env /home/dev/*/deploy/.env /home/dev/*/.env /root/*/backend/.env /root/*/.env; do
+  [ -f "$f" ] && grep -q '^SUPABASE_URL=' "$f" 2>/dev/null && [ "$f" != "$APP_DIR/backend/.env" ] && { OLD_ENV="$f"; break; }
+done
+[ -n "$OLD_ENV" ] && echo "  พบไฟล์ตั้งค่าเก่า: $OLD_ENV (จะคัดลอกมาใช้)"
+
 # ---------- 2) โค้ด ----------
 mkdir -p "$(dirname "$APP_DIR")"
 if [ -d "$APP_DIR/.git" ]; then
@@ -51,9 +81,19 @@ cd ..
 
 # ---------- 5) ไฟล์ตั้งค่า ----------
 if [ ! -f backend/.env ]; then
-  say "สร้างไฟล์ตั้งค่า backend/.env — ต้องเติมค่าลับก่อนใช้งาน"
-  cp backend/.env.example backend/.env
-  NEED_ENV=1
+  if [ -n "$OLD_ENV" ]; then
+    say "คัดลอกค่าลับจากของเก่า: $OLD_ENV"
+    cp "$OLD_ENV" backend/.env
+    # ค่าที่รุ่นใหม่ต้องใช้แต่ของเก่าอาจยังไม่มี — เติมให้ครบ (ว่างไว้ให้เติมทีหลัง)
+    for k in SIGNUP_CODE LAB_API_KEY PUBLIC_SITE_URL CRON_KEY; do
+      grep -q "^$k=" backend/.env || echo "$k=" >> backend/.env
+    done
+    NEED_ENV=0
+  else
+    say "สร้างไฟล์ตั้งค่า backend/.env — ต้องเติมค่าลับก่อนใช้งาน"
+    cp backend/.env.example backend/.env
+    NEED_ENV=1
+  fi
 else
   NEED_ENV=0
 fi
