@@ -21,8 +21,20 @@ say() { printf '\n\033[1;32m==> %s\033[0m\n' "$1"; }
 # ---------- 1) โปรแกรมพื้นฐาน ----------
 say "ติดตั้งโปรแกรมที่ต้องใช้ (git · python3 · node)"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq git python3 python3-venv python3-pip nodejs npm curl > /dev/null
+apt-get update -qq || true
+# ลงทีละกลุ่ม — node จาก apt ของ Ubuntu มักชนกัน (held broken packages) เลยแยกออกมา
+apt-get install -y -qq git python3 python3-venv python3-pip curl ca-certificates > /dev/null
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  echo "  ลง Node.js จาก NodeSource (ของ Ubuntu เองชนกัน)"
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1     && apt-get install -y -qq nodejs > /dev/null 2>&1 || true
+fi
+if ! command -v node >/dev/null 2>&1; then
+  echo "  ⚠️  ลง Node ไม่ได้ — จะข้ามการสร้างหน้าเว็บ (backend ยังใช้ได้ หน้าเว็บใช้จาก Render ไปก่อน)"
+  SKIP_WEB=1
+else
+  SKIP_WEB=0
+  echo "  node $(node -v) · npm $(npm -v)"
+fi
 
 # ---------- 1.5) ของเก่าที่รันอยู่บนกล่อง ----------
 # กล่องนี้อาจมี Farmy รุ่นเก่ารันอยู่ที่พอร์ต 8000 แล้ว (ผ่าน docker หรือ python ตรง ๆ)
@@ -72,12 +84,14 @@ backend/venv/bin/pip install -q --upgrade pip
 backend/venv/bin/pip install -q -r backend/requirements.txt
 
 # ---------- 4) หน้าเว็บ (build ให้เสิร์ฟจากพอร์ตเดียวกับเซิร์ฟเวอร์) ----------
-say "สร้างหน้าเว็บ"
-cd frontend
-npm ci --silent
-# VITE_API_BASE ว่าง = หน้าเว็บเรียก API ที่โดเมนเดียวกัน (พอร์ตเดียว)
-VITE_API_BASE="" npm run build --silent
-cd ..
+if [ "$SKIP_WEB" = 0 ]; then
+  say "สร้างหน้าเว็บ"
+  cd frontend
+  npm ci --silent
+  # VITE_API_BASE ว่าง = หน้าเว็บเรียก API ที่โดเมนเดียวกัน (พอร์ตเดียว)
+  VITE_API_BASE="" npm run build --silent
+  cd ..
+fi
 
 # ---------- 5) ไฟล์ตั้งค่า ----------
 if [ ! -f backend/.env ]; then
