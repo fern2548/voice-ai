@@ -79,6 +79,17 @@ if [ -d "$APP_DIR/.git" ]; then
   say "ดึงโค้ดใหม่"
   git -C "$APP_DIR" pull --ff-only
 else
+  if [ -d "$APP_DIR" ] && [ -n "$(ls -A "$APP_DIR" 2>/dev/null)" ]; then
+    # ของเก่าวางอยู่ที่เดียวกันแต่ไม่ใช่ git — ย้ายไปเก็บไว้ก่อน ไม่ลบ เผื่อต้องกลับไปดู
+    OLD_DIR="${APP_DIR}.old-$(date +%Y%m%d-%H%M%S)"
+    say "พบของเก่าที่ $APP_DIR — ย้ายไปเก็บที่ $OLD_DIR"
+    mv "$APP_DIR" "$OLD_DIR"
+    # ค่าลับของเก่าส่วนใหญ่อยู่ในนี้แหละ
+    for f in "$OLD_DIR/backend/.env" "$OLD_DIR/.env" "$OLD_DIR/deploy/.env"; do
+      [ -z "$OLD_ENV" ] && [ -f "$f" ] && grep -q '^SUPABASE_URL=' "$f" 2>/dev/null && OLD_ENV="$f"
+    done
+    [ -n "$OLD_ENV" ] && echo "  พบไฟล์ตั้งค่าเก่า: $OLD_ENV (จะคัดลอกมาใช้)"
+  fi
   say "ดาวน์โหลดโค้ดครั้งแรก"
   git clone --depth 1 "$REPO" "$APP_DIR"
 fi
