@@ -37,6 +37,10 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 INGEST_TOKEN = os.environ["INGEST_TOKEN"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+# ฐานข้อมูลบนเซิร์ฟเวอร์เราเอง (PostgREST เปล่า ๆ) ไม่มีคำนำหน้า /rest/v1 แบบ Supabase คลาวด์
+# ตั้ง SUPABASE_REST_DIRECT=1 แล้วชี้ SUPABASE_URL ไปที่ PostgREST ตรง ๆ ได้เลย ไม่ต้องมี nginx คั่น
+if os.environ.get("SUPABASE_REST_DIRECT") == "1":
+    supabase.rest_url = supabase.supabase_url
 
 # ---------- LLM (Gemini) ----------
 # ถ้ามี GEMINI_API_KEY จะใช้ Gemini ตอบแบบครอบคลุม
