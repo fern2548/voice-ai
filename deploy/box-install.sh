@@ -22,8 +22,15 @@ say() { printf '\n\033[1;32m==> %s\033[0m\n' "$1"; }
 say "ติดตั้งโปรแกรมที่ต้องใช้ (git · python3 · node)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq || true
-# ลงทีละกลุ่ม — node จาก apt ของ Ubuntu มักชนกัน (held broken packages) เลยแยกออกมา
-apt-get install -y -qq git python3 python3-venv python3-pip curl ca-certificates > /dev/null
+apt-get -f install -y -qq > /dev/null 2>&1 || true   # ซ่อมแพ็กเกจที่ค้าง ถ้ามี
+# ลงทีละตัว ตัวไหนลงไม่ได้ก็ข้าม (บนกล่องบางตัวมีอยู่แล้ว หรือ apt ติดค้าง)
+for pkg in git python3 python3-venv python3-pip curl ca-certificates; do
+  apt-get install -y -qq "$pkg" > /dev/null 2>&1 || echo "  (ข้าม $pkg — ลงไม่ได้ อาจมีอยู่แล้ว)"
+done
+# ต้องมีอย่างน้อยสองตัวนี้ ไม่งั้นไปต่อไม่ได้
+for need in git python3; do
+  command -v "$need" >/dev/null 2>&1 || { echo "❌ ไม่มี $need บนกล่องและลงไม่ได้ — ต้องให้เจ้าของกล่องช่วยลง"; exit 1; }
+done
 if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
   echo "  ลง Node.js จาก NodeSource (ของ Ubuntu เองชนกัน)"
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1     && apt-get install -y -qq nodejs > /dev/null 2>&1 || true
@@ -79,7 +86,13 @@ cd "$APP_DIR"
 
 # ---------- 3) เซิร์ฟเวอร์ Python ----------
 say "ติดตั้งไลบรารี Python"
-[ -d backend/venv ] || python3 -m venv backend/venv
+if [ ! -d backend/venv ]; then
+  python3 -m venv backend/venv 2>/dev/null || python3 -m venv --without-pip backend/venv
+fi
+if [ ! -x backend/venv/bin/pip ]; then
+  # venv ไม่มี pip มาด้วย (ubuntu ตัดออก) — โหลดมาลงเอง
+  curl -fsSL https://bootstrap.pypa.io/get-pip.py | backend/venv/bin/python - -q
+fi
 backend/venv/bin/pip install -q --upgrade pip
 backend/venv/bin/pip install -q -r backend/requirements.txt
 
