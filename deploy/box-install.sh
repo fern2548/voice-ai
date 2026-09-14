@@ -137,8 +137,23 @@ else
 fi
 
 # ---------- 6) ให้รันตลอดและเปิดเองตอนกล่องรีสตาร์ท ----------
-say "ตั้งบริการให้รันตลอด"
-cat > /etc/systemd/system/$SERVICE.service <<EOF
+# กล่องบางตัวเป็นคอนเทนเนอร์ ไม่มี systemd — ใช้สคริปต์เริ่ม + autostart.sh ของกล่องแทน
+cat > "$APP_DIR/start.sh" <<EOF
+#!/bin/bash
+# เริ่ม Farmy Voice (ใช้ได้ทั้งรันมือและจาก autostart)
+cd "$APP_DIR/backend"
+export PYTHONIOENCODING=utf-8
+# ปิดตัวเก่าก่อน ถ้ายังรันอยู่
+pkill -f "uvicorn main:app" 2>/dev/null || true
+sleep 1
+nohup "$APP_DIR/backend/venv/bin/uvicorn" main:app --host 0.0.0.0 --port $PORT   >> "$APP_DIR/farmy.log" 2>&1 &
+echo "farmy started (pid \$!) · log: $APP_DIR/farmy.log"
+EOF
+chmod +x "$APP_DIR/start.sh"
+
+if [ -d /run/systemd/system ]; then
+  say "ตั้งบริการให้รันตลอด (systemd)"
+  cat > /etc/systemd/system/$SERVICE.service <<EOF
 [Unit]
 Description=Farmy Voice
 After=network-online.target
@@ -155,9 +170,17 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload
-systemctl enable -q $SERVICE
-systemctl restart $SERVICE
+  systemctl daemon-reload
+  systemctl enable -q $SERVICE
+  systemctl restart $SERVICE
+else
+  say "กล่องนี้ไม่มี systemd — ใช้ start.sh + autostart.sh ของกล่องแทน"
+  AUTOSTART=/home/dev/autostart.sh
+  touch "$AUTOSTART"; chmod +x "$AUTOSTART"
+  grep -q "farmy/start.sh" "$AUTOSTART" || echo "bash $APP_DIR/start.sh" >> "$AUTOSTART"
+  echo "  เพิ่มใน $AUTOSTART แล้ว (เปิดเองตอนกล่องรีสตาร์ท)"
+  bash "$APP_DIR/start.sh"
+fi
 
 sleep 4
 say "ตรวจสถานะ"
@@ -166,7 +189,11 @@ if curl -fsS "http://127.0.0.1:$PORT/health" ; then
   echo "✅ Farmy Voice ทำงานแล้วที่พอร์ต $PORT"
 else
   echo
-  echo "⚠️  ยังไม่ตอบ ดู log ด้วย:  journalctl -u $SERVICE -n 40 --no-pager"
+  if [ -d /run/systemd/system ]; then
+    echo "⚠️  ยังไม่ตอบ ดู log ด้วย:  journalctl -u $SERVICE -n 40 --no-pager"
+  else
+    echo "⚠️  ยังไม่ตอบ ดู log ด้วย:  tail -40 $APP_DIR/farmy.log"
+  fi
 fi
 
 if [ "$NEED_ENV" = 1 ]; then
@@ -180,7 +207,7 @@ if [ "$NEED_ENV" = 1 ]; then
 │  อย่างน้อยต้องมี SUPABASE_URL · SUPABASE_SERVICE_KEY         │
 │  · INGEST_TOKEN · ADMIN_PASSWORD  แล้วสั่ง                   │
 │                                                              │
-│    systemctl restart farmy                                   │
+│    bash /home/dev/farmy/start.sh   (หรือ systemctl restart farmy) │
 └──────────────────────────────────────────────────────────────┘
 MSG
 fi
