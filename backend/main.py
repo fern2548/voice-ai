@@ -2524,7 +2524,7 @@ def _fmt_stats(s: dict) -> str:
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "gemini-embedding-001")
 EMBED_DIM = 768
 RAG_TOP_K = 4           # แนบให้ AI กี่ท่อน
-RAG_MIN_SCORE = 0.72    # ความใกล้ต่ำกว่านี้ถือว่าไม่เกี่ยว ไม่แนบ (วัดจริง: ตรงเรื่อง ≥0.76, คนละเรื่อง ≤0.70)
+RAG_MIN_SCORE = 0.70    # ความใกล้ต่ำกว่านี้ถือว่าไม่เกี่ยว ไม่แนบ (วัดจริง: ตรงเรื่อง 0.70-0.81, คนละเรื่อง ≤0.60)
 RAG_CHUNK_CHARS = 900   # ขนาดท่อนโดยประมาณ — เล็กพอให้ค้นแม่น ใหญ่พอให้ความหมายครบ
 _rag_cache: Optional[list[dict]] = None   # โหลดทุกท่อนไว้ในหน่วยความจำ ค้นเร็วกว่าถามฐานข้อมูลทุกครั้ง
 _rag_fail_until = 0.0                     # โหลดไม่ได้ (เช่นยังไม่ได้สร้างตาราง) พักไว้ก่อน ไม่ยิงซ้ำทุกคำถาม
@@ -2679,6 +2679,10 @@ def _extract_text(filename: str, data: bytes) -> str:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(data))
         text = "\n\n".join((pg.extract_text() or "") for pg in reader.pages)
+        # PDF ไทยส่วนใหญ่ดึงออกมาแล้ว "ำ" แตกเป็น " า" (สำหรับ → ส าหรับ) ต้องต่อกลับ
+        # ไม่งั้นค้นคำว่า "สำหรับ" ไม่เจอ — คำไทยไม่มีทางขึ้นต้นด้วย "า" จึงแทนได้ปลอดภัย
+        text = re.sub(r"([ก-ฮ][่-์]?)\s+า", "\\1ำ", text)      # ส าหรับ / น้ า
+        text = re.sub(r"([ก-ฮ][่-์]?)\s*ํ\s*า", "\\1ำ", text)   # นิคหิต + า
         if len(text.strip()) < 20:
             raise HTTPException(status_code=400, detail="PDF นี้ไม่มีตัวหนังสือ (น่าจะเป็นสแกนรูป) ต้อง OCR ก่อน")
         return text
