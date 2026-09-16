@@ -25,7 +25,7 @@ from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fpdf import FPDF
 from pydantic import BaseModel
@@ -1754,6 +1754,8 @@ SYSTEM_PROMPT = (
     "- ถ้าถามเรื่องหมูป่วย/สุขภาพหมู ให้ดูจากบันทึกหมูป่วยรายวันใน CONTEXT สรุปจำนวน แนวโน้ม (เพิ่มขึ้น/ลดลง) และเตือนถ้าตัวเลขสูงผิดปกติ\n"
     "- ถ้าถามเรื่องการฉีดวัคซีน ให้ดูจากบันทึกการฉีดวัคซีนใน CONTEXT บอกวันที่ฉีดล่าสุดและชื่อวัคซีนตามนั้น\n"
     "- ถ้าถามเรื่องสายพันธุ์หมู/ชนิดหมู ให้ดูจาก 'ความรู้อ้างอิง' ใน CONTEXT แล้วตอบตามนั้นตรง ๆ\n"
+    "- ถ้า CONTEXT มี 'เอกสารของฟาร์ม' และคำถามเกี่ยวข้อง ให้ตอบตามเอกสารนั้นก่อนความรู้ทั่วไป "
+    "และปิดท้ายสั้น ๆ ว่าอ้างอิงจากเอกสารชื่ออะไร ถ้าเอกสารไม่ได้พูดถึงเรื่องที่ถาม ห้ามอ้างว่ามาจากเอกสาร\n"
     "- CONTEXT อาจมีข้อมูลจากหลายสถานที่ (ฟาร์มเรา, ดินแสลงพัน, เล้าหมูกำแพงเพชร, เสาอากาศแสลงพัน) "
     "ให้ระบุชื่อสถานที่ในคำตอบเสมอเมื่อมีมากกว่าหนึ่งที่ กันสับสนว่าเป็นค่าของที่ไหน\n"
     "- ถ้าผู้ใช้ขอคำแนะนำ (เช่น การดูแลพืช/หมู ตากผ้า รดน้ำ) ให้แนะนำโดยอิงจากข้อมูลปัจจุบัน/พยากรณ์ ตามความรู้ทั่วไปได้\n"
@@ -2513,9 +2515,225 @@ def _fmt_stats(s: dict) -> str:
     )
 
 
+# ---------- คลังความรู้ (RAG) ----------
+# เก็บเอกสารของฟาร์ม (คู่มือวัคซีน โรคหมู SOP ฯลฯ) ให้ AI ค้นมาใช้ตอบ
+#   ตอนเก็บ: หั่นเอกสารเป็นท่อน → แปลงแต่ละท่อนเป็น vector ด้วย Gemini → เก็บลงฐานข้อมูล
+#   ตอนถาม: แปลงคำถามเป็น vector แบบเดียวกัน → หาท่อนที่ความหมายใกล้ที่สุด → แนบให้ AI
+# เก็บ vector เป็น jsonb ธรรมดา แล้วคำนวณความใกล้ใน Python — ไม่ต้องพึ่ง pgvector
+# ใช้ได้ทั้ง Supabase คลาวด์และ Postgres บนกล่อง เอกสารระดับพันท่อนยังตอบใน ~50ms
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "gemini-embedding-001")
+EMBED_DIM = 768
+RAG_TOP_K = 4           # แนบให้ AI กี่ท่อน
+RAG_MIN_SCORE = 0.72    # ความใกล้ต่ำกว่านี้ถือว่าไม่เกี่ยว ไม่แนบ (วัดจริง: ตรงเรื่อง ≥0.76, คนละเรื่อง ≤0.70)
+RAG_CHUNK_CHARS = 900   # ขนาดท่อนโดยประมาณ — เล็กพอให้ค้นแม่น ใหญ่พอให้ความหมายครบ
+_rag_cache: Optional[list[dict]] = None   # โหลดทุกท่อนไว้ในหน่วยความจำ ค้นเร็วกว่าถามฐานข้อมูลทุกครั้ง
+_rag_fail_until = 0.0                     # โหลดไม่ได้ (เช่นยังไม่ได้สร้างตาราง) พักไว้ก่อน ไม่ยิงซ้ำทุกคำถาม
+_rag_lock = threading.Lock()
+
+
+class KnowledgeText(BaseModel):
+    title: str
+    text: str
+
+
+def _rag_chunks(text: str) -> list[str]:
+    """หั่นข้อความเป็นท่อน ~RAG_CHUNK_CHARS ตัวอักษร โดยพยายามตัดตามย่อหน้า ไม่ตัดกลางประโยค"""
+    paras = [p.strip() for p in re.split(r"\n\s*\n|\r\n\s*\r\n", text) if p.strip()]
+    out, buf = [], ""
+    for p in paras:
+        # ย่อหน้าเดียวยาวเกิน — หั่นที่ช่องว่าง/ขึ้นบรรทัดใกล้ขอบ
+        while len(p) > RAG_CHUNK_CHARS * 1.5:
+            cut = max(p.rfind("\n", 0, RAG_CHUNK_CHARS), p.rfind(" ", 0, RAG_CHUNK_CHARS))
+            if cut < RAG_CHUNK_CHARS // 2:
+                cut = RAG_CHUNK_CHARS
+            piece, p = p[:cut].strip(), p[cut:].strip()
+            if buf:
+                out.append(buf); buf = ""
+            out.append(piece)
+        if buf and len(buf) + len(p) + 1 > RAG_CHUNK_CHARS:
+            out.append(buf); buf = p
+        else:
+            buf = f"{buf}\n{p}" if buf else p
+    if buf:
+        out.append(buf)
+    return [c for c in out if len(c) >= 20]
+
+
+def _embed(texts: list[str], task: str) -> list[list[float]]:
+    """แปลงข้อความเป็น vector — task = RETRIEVAL_DOCUMENT ตอนเก็บ / RETRIEVAL_QUERY ตอนถาม"""
+    if _llm is None:
+        raise HTTPException(status_code=503, detail="ยังไม่ได้ตั้งค่า GEMINI_API_KEY จึงยังใช้คลังความรู้ไม่ได้")
+    vecs: list[list[float]] = []
+    for i in range(0, len(texts), 50):   # API รับได้ครั้งละไม่เกิน 100
+        resp = _llm.models.embed_content(
+            model=EMBED_MODEL,
+            contents=texts[i:i + 50],
+            config={"task_type": task, "output_dimensionality": EMBED_DIM},
+        )
+        vecs.extend([list(e.values) for e in resp.embeddings])
+    return vecs
+
+
+def _unit(v: list[float]) -> list[float]:
+    n = sum(x * x for x in v) ** 0.5 or 1.0
+    return [x / n for x in v]
+
+
+def _rag_load() -> list[dict]:
+    global _rag_cache, _rag_fail_until
+    with _rag_lock:
+        if _rag_cache is not None:
+            return _rag_cache
+        now = datetime.now(timezone.utc).timestamp()
+        if now < _rag_fail_until:
+            return []
+        try:
+            _rag_cache = _rag_fetch_all()
+        except Exception as e:
+            _rag_fail_until = now + 300
+            raise
+        return _rag_cache
+
+
+def _rag_fetch_all() -> list[dict]:
+    """ดึงทุกท่อนจากฐานข้อมูล (ทีละ 500 แถว) พร้อมทำ vector ให้ยาวหนึ่งหน่วย จะได้คูณหาความใกล้ได้เลย"""
+    rows, page = [], 0
+    while True:
+        r = (supabase.table("knowledge_chunks").select("id, doc_id, title, content, embedding")
+             .order("id").range(page * 500, page * 500 + 499).execute())
+        rows.extend(r.data or [])
+        if len(r.data or []) < 500:
+            break
+        page += 1
+    return [
+        {"id": r["id"], "doc_id": r["doc_id"], "title": r["title"], "content": r["content"],
+         "vec": _unit(r["embedding"])}
+        for r in rows if isinstance(r.get("embedding"), list)
+    ]
+
+
+def _rag_invalidate() -> None:
+    global _rag_cache, _rag_fail_until
+    with _rag_lock:
+        _rag_cache = None
+        _rag_fail_until = 0.0
+
+
+def _rag_search(question: str, k: int = RAG_TOP_K) -> list[dict]:
+    """คืนท่อนเอกสารที่เกี่ยวกับคำถามมากที่สุด [{title, content, score}] — พังเมื่อไหร่คืน [] ไม่ทำให้ /ask ล้ม"""
+    try:
+        chunks = _rag_load()
+        if not chunks or _llm is None:
+            return []
+        q = _unit(_embed([question], "RETRIEVAL_QUERY")[0])
+        scored = []
+        for c in chunks:
+            v = c["vec"]
+            score = sum(a * b for a, b in zip(q, v))
+            if score >= RAG_MIN_SCORE:
+                scored.append((score, c))
+        scored.sort(key=lambda x: -x[0])
+        return [{"title": c["title"], "content": c["content"], "score": round(sc, 3), "doc_id": c["doc_id"]}
+                for sc, c in scored[:k]]
+    except Exception as e:
+        print(f"[warn] ค้นคลังความรู้ไม่สำเร็จ: {e}")
+        return []
+
+
+def _fmt_docs(hits: list[dict]) -> str:
+    lines = [f"[{h['title']}] {h['content']}" for h in hits]
+    return "เอกสารของฟาร์ม (ค้นมาให้ตามคำถาม ใช้ตอบก่อนความรู้ทั่วไปถ้าเกี่ยวข้อง):\n" + "\n---\n".join(lines)
+
+
+def _knowledge_add(title: str, text: str, source: str) -> dict:
+    title = (title or "").strip()[:200] or "ไม่มีชื่อ"
+    text = (text or "").strip()
+    chunks = _rag_chunks(text)
+    if not chunks:
+        raise HTTPException(status_code=400, detail="เอกสารสั้นเกินไปหรือไม่มีข้อความ")
+    if len(chunks) > 400:
+        raise HTTPException(status_code=400, detail=f"เอกสารยาวเกินไป ({len(chunks)} ท่อน) แบ่งเป็นหลายไฟล์ก่อน")
+    vecs = _embed(chunks, "RETRIEVAL_DOCUMENT")
+    doc = supabase.table("knowledge_docs").insert({
+        "title": title, "source": source, "chars": len(text), "chunk_count": len(chunks),
+    }).execute().data[0]
+    rows = [{"doc_id": doc["id"], "idx": i, "title": title, "content": c, "embedding": v}
+            for i, (c, v) in enumerate(zip(chunks, vecs))]
+    for i in range(0, len(rows), 100):
+        supabase.table("knowledge_chunks").insert(rows[i:i + 100]).execute()
+    _rag_invalidate()
+    return {"id": doc["id"], "title": title, "chunks": len(chunks), "chars": len(text)}
+
+
+def _extract_text(filename: str, data: bytes) -> str:
+    """อ่านข้อความจากไฟล์ที่อัปโหลด — txt/md/pdf/docx"""
+    ext = (filename or "").rsplit(".", 1)[-1].lower()
+    if ext in ("txt", "md", "csv"):
+        for enc in ("utf-8-sig", "utf-8", "cp874"):
+            try:
+                return data.decode(enc)
+            except UnicodeDecodeError:
+                continue
+        raise HTTPException(status_code=400, detail="อ่านตัวอักษรในไฟล์ไม่ได้ (ลองบันทึกเป็น UTF-8)")
+    if ext == "pdf":
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(data))
+        text = "\n\n".join((pg.extract_text() or "") for pg in reader.pages)
+        if len(text.strip()) < 20:
+            raise HTTPException(status_code=400, detail="PDF นี้ไม่มีตัวหนังสือ (น่าจะเป็นสแกนรูป) ต้อง OCR ก่อน")
+        return text
+    if ext == "docx":
+        import docx
+        d = docx.Document(io.BytesIO(data))
+        parts = [p.text for p in d.paragraphs]
+        for t in d.tables:
+            for row in t.rows:
+                parts.append(" | ".join(c.text for c in row.cells))
+        return "\n\n".join(p for p in parts if p.strip())
+    raise HTTPException(status_code=400, detail="รองรับเฉพาะ .txt .md .pdf .docx")
+
+
+@app.get("/knowledge")
+def knowledge_list():
+    """รายการเอกสารในคลังความรู้"""
+    r = supabase.table("knowledge_docs").select("*").order("created_at", desc=True).execute()
+    return {"enabled": _llm is not None, "docs": r.data or []}
+
+
+@app.post("/knowledge")
+def knowledge_add_text(body: KnowledgeText):
+    """เพิ่มเอกสารจากข้อความที่วางมา"""
+    return _knowledge_add(body.title, body.text, "text")
+
+
+@app.post("/knowledge/upload")
+async def knowledge_upload(file: UploadFile = File(...), title: str = Form("")):
+    """เพิ่มเอกสารจากไฟล์ (.txt .md .pdf .docx) ไม่เกิน 10MB"""
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="ไฟล์ใหญ่เกิน 10MB")
+    text = _extract_text(file.filename or "", data)
+    return _knowledge_add(title or (file.filename or "").rsplit(".", 1)[0], text, f"file:{file.filename}")
+
+
+@app.delete("/knowledge/{doc_id}")
+def knowledge_delete(doc_id: int):
+    supabase.table("knowledge_chunks").delete().eq("doc_id", doc_id).execute()
+    supabase.table("knowledge_docs").delete().eq("id", doc_id).execute()
+    _rag_invalidate()
+    return {"ok": True}
+
+
+@app.get("/knowledge/search")
+def knowledge_search(q: str):
+    """ทดสอบว่าคำถามนี้จะค้นเจอท่อนไหน — ไว้เช็คว่าเอกสารที่ใส่ใช้งานได้"""
+    return {"hits": _rag_search(q, k=5)}
+
+
 def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig: bool = False,
                    lab: Optional[list[str]] = None, lab_series: Optional[list] = None,
-                   lab_summary: Optional[list] = None, text: str = "") -> str:
+                   lab_summary: Optional[list] = None, text: str = "",
+                   docs: Optional[list[dict]] = None) -> str:
     """สร้าง CONTEXT ให้ LLM
     detailed=False -> แนบแค่ค่าปัจจุบัน 1 บรรทัด (ประหยัด token, ใช้กับคำถามทั่วไป)
     detailed=True  -> แนบประวัติย้อนหลัง + ตารางพยากรณ์ (ใช้เฉพาะคำถามพยากรณ์/แนวโน้ม)
@@ -2564,6 +2782,10 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
         d = _lab_summary(src, hours, _lab_resolve_location(src, _ctx_text))
         if d:
             parts.append(_fmt_lab_summary(d))
+
+    # เอกสารของฟาร์มที่ค้นมาได้ตามคำถาม (RAG)
+    if docs:
+        parts.append(_fmt_docs(docs))
 
     if not detailed:
         return "\n\n".join(parts)
@@ -2811,6 +3033,8 @@ def ask(q: Question):
     if _needs_pig_breed_info(text):
         return Answer(answer=_PIG_BREEDS_INFO.replace("ความรู้อ้างอิง: ", "") + " ครับ")
 
+    # ค้นคลังความรู้ (เอกสารของฟาร์ม) ทุกคำถาม — ไม่เจอก็ได้ลิสต์ว่าง ไม่มีผลอะไร
+    docs = _rag_search(text)
     context = _build_context(
         detailed=_needs_forecast(text),
         stats_days=_needs_stats(text),
@@ -2819,6 +3043,7 @@ def ask(q: Question):
         lab_series=_needs_lab_series(text),
         lab_summary=_needs_lab_summary(text),
         text=text,
+        docs=docs,
     )
 
     # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)
@@ -2887,6 +3112,9 @@ def ask(q: Question):
         return Answer(answer=ollama_answer)
 
     # 4) rule-based — ด่านสุดท้าย ตอบได้เสมอ ไม่มีทางพัง
+    #    ถ้าค้นเอกสารเจอ ให้อ่านท่อนที่ตรงที่สุดตรง ๆ ยังดีกว่าตอบตามกฎที่ไม่รู้เรื่องนั้น
+    if docs and docs[0]["score"] >= 0.75:
+        return Answer(answer=f"จากเอกสาร {docs[0]['title']}: {docs[0]['content'][:400]}")
     return Answer(answer=_rule_based_answer(text))
 
 

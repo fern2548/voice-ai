@@ -2536,3 +2536,28 @@ th, td { font-size: 14px; }
 /* แถวเลือกจุดติดตั้งในหน้ากราฟข้อมูล */
 .sx-locs { align-items: center; margin: -6px 0 14px; padding: 0 4px; }
 .sx-locs > .ti { color: var(--text-dim); font-size: 15px; margin-right: 2px; }
+
+/* ---------- คลังความรู้ (RAG) ---------- */
+.kb-intro { margin: 0; padding: 12px 16px 0; font-size: 13.5px; color: var(--text-dim); line-height: 1.6; }
+.kb-warn {
+  margin: 12px 16px 0; padding: 10px 12px; border-radius: 8px; font-size: 13px;
+  color: var(--warn); border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent);
+  display: flex; align-items: center; gap: 8px;
+}
+.kb-grow { grid-column: 1 / -1; }
+.kb-textarea { resize: vertical; min-height: 120px; line-height: 1.6; font-family: inherit; }
+.kb-actions { flex-wrap: wrap; }
+.kb-upload { cursor: pointer; gap: 8px; }
+.kb-upload.off { opacity: 0.6; cursor: not-allowed; }
+.kb-dim { color: var(--text-dim); font-size: 13px; }
+.kb-search { display: flex; gap: 10px; padding: 12px 16px 16px; }
+.kb-search .chat-input { flex: 1; min-width: 0; }
+.kb-hits { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 16px; }
+.kb-hit { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--panel-2); }
+.kb-hit-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 13px; }
+.kb-hit-title { font-weight: 700; color: var(--accent); }
+.kb-hit-score { color: var(--text-dim); }
+.kb-hit-body { font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; color: var(--text); }
+@media (max-width: 600px) {
+  .kb-search { flex-direction: column; }
+}

@@ -119,3 +119,26 @@ create table if not exists admin_users (
   created_at timestamptz not null default now()
 );
 
+
+-- คลังความรู้ (RAG): เอกสารของฟาร์มที่ให้ AI ค้นมาใช้ตอบ
+-- knowledge_docs = 1 แถวต่อเอกสาร · knowledge_chunks = เอกสารหั่นเป็นท่อน พร้อม vector (jsonb 768 ตัวเลข)
+create table if not exists knowledge_docs (
+  id bigint generated always as identity primary key,
+  title text not null,
+  source text,
+  chars int,
+  chunk_count int,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists knowledge_chunks (
+  id bigint generated always as identity primary key,
+  doc_id bigint not null references knowledge_docs(id) on delete cascade,
+  idx int not null,
+  title text not null,
+  content text not null,
+  embedding jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists knowledge_chunks_doc_idx on knowledge_chunks (doc_id);

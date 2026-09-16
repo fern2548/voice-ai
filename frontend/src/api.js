@@ -30,7 +30,12 @@ async function post(url, body) {
     body: JSON.stringify(body),
   })
   checkAuth(res)
-  if (!res.ok) throw httpError(url, res)
+  if (!res.ok) {
+    // เซิร์ฟเวอร์ส่งเหตุผลมาใน detail (เช่น "เอกสารสั้นเกินไป") — แนบไปให้หน้าจอโชว์ได้
+    const err = httpError(url, res)
+    try { err.detail = (await res.json()).detail || '' } catch { /* ไม่ใช่ JSON */ }
+    throw err
+  }
   return res.json()
 }
 
@@ -101,3 +106,25 @@ export const changeAdminPassword = (current_password, new_password) =>
 export const getAdminUsers = () => get('/admin/users')
 export const createAdminUser = (username, password) => post('/admin/users', { username, password })
 export const deleteAdminUser = (username) => del(`/admin/users/${encodeURIComponent(username)}`)
+
+// คลังความรู้ (RAG) — เอกสารของฟาร์มที่ AI ค้นมาใช้ตอบ
+export const getKnowledge = () => get('/knowledge')
+export const addKnowledgeText = (title, text) => post('/knowledge', { title, text })
+export const deleteKnowledge = (id) => del(`/knowledge/${id}`)
+export const searchKnowledge = (q) => get(`/knowledge/search?q=${encodeURIComponent(q)}`)
+// อัปโหลดไฟล์ต้องส่งเป็น multipart — ห้ามใส่ Content-Type เอง เบราว์เซอร์จะใส่ boundary ให้
+export const uploadKnowledge = async (file, title = '') => {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('title', title)
+  const res = await fetch(apiUrl('/knowledge/upload'), { method: 'POST', headers: adminHeaders(), body: fd })
+  checkAuth(res)
+  if (!res.ok) {
+    let detail = ''
+    try { detail = (await res.json()).detail || '' } catch { /* ไม่ใช่ JSON */ }
+    const err = httpError('/knowledge/upload', res)
+    err.detail = detail
+    throw err
+  }
+  return res.json()
+}

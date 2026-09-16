@@ -16,6 +16,7 @@ import PigHealthPage from './pages/PigHealthPage.jsx'
 import VaccinePage from './pages/VaccinePage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import SensorsPage from './pages/SensorsPage.jsx'
+import KnowledgePage from './pages/KnowledgePage.jsx'
 
 const NAV = [
   { to: '/overview', label: 'หน้าแรก' },
@@ -25,6 +26,7 @@ const NAV = [
   { to: '/history', label: 'รายงาน' },
   { to: '/forecast', label: 'พยากรณ์อากาศ' },
   { to: '/sensors', label: 'กราฟข้อมูล' },
+  { to: '/knowledge', label: 'คลังความรู้' },
   { to: '/settings', label: 'ตั้งค่า' },
 ]
 
@@ -53,6 +55,7 @@ function AppShell() {
             <Route path="/pig-log" element={<PigHealthPage />} />
             <Route path="/vaccine" element={<VaccinePage />} />
             <Route path="/sensors" element={<SensorsPage />} />
+            <Route path="/knowledge" element={<KnowledgePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/overview" replace />} />
           </Routes>

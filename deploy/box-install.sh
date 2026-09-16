@@ -136,6 +136,18 @@ else
   NEED_ENV=0
 fi
 
+# ---------- 5.5) ฐานข้อมูลบนกล่อง (ถ้าเคยรัน box-db-install.sh) ----------
+# โค้ดรุ่นใหม่อาจมีตารางเพิ่ม — รันสคริปต์ตารางซ้ำ (มี if not exists ทั้งหมด ไม่กระทบข้อมูลเดิม)
+if [ -x /home/dev/farmy-db/start-db.sh ]; then
+  say "อัปเดตตารางฐานข้อมูลบนกล่อง"
+  su postgres -c "psql -tAc 'select 1'" >/dev/null 2>&1 || bash /home/dev/farmy-db/start-db.sh >/dev/null 2>&1 || true
+  su postgres -c "psql -q -v ON_ERROR_STOP=1 -d farmy -f $APP_DIR/deploy/db/02-schema.sql" > /dev/null \
+    && su postgres -c "psql -q -v ON_ERROR_STOP=1 -d farmy -f $APP_DIR/deploy/db/03-grants.sql" > /dev/null \
+    && echo "  ตารางครบ" || echo "  ⚠️  อัปเดตตารางไม่สำเร็จ — ลองรัน box-db-install.sh อีกครั้ง"
+  # PostgREST จำโครงสร้างตารางไว้ ต้องบอกให้อ่านใหม่ ไม่งั้นมองไม่เห็นตารางที่เพิ่งเพิ่ม
+  su postgres -c "psql -q -d farmy -c \"notify pgrst, 'reload schema'\"" > /dev/null 2>&1 || true
+fi
+
 # ---------- 6) ให้รันตลอดและเปิดเองตอนกล่องรีสตาร์ท ----------
 # กล่องบางตัวเป็นคอนเทนเนอร์ ไม่มี systemd — ใช้สคริปต์เริ่ม + autostart.sh ของกล่องแทน
 cat > "$APP_DIR/start.sh" <<EOF
