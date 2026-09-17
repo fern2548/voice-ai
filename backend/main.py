@@ -513,6 +513,18 @@ class VaccineLog(BaseModel):
     note: Optional[str] = None
 
 
+class VaccineFollowup(BaseModel):
+    vaccine_log_id: int
+    check_date: Optional[date] = None      # ไม่ระบุ = วันนี้
+    swelling: Optional[str] = None         # none | mild | moderate | severe
+    fever: Optional[bool] = None
+    appetite: Optional[str] = None         # normal | reduced | none
+    lethargy: Optional[bool] = None
+    affected_count: Optional[int] = None   # จำนวนตัวที่มีอาการ
+    note: Optional[str] = None
+    checked_by: Optional[str] = None
+
+
 class VaccineSchedule(BaseModel):
     vaccine_name: str
     interval_days: int
@@ -1052,6 +1064,178 @@ def vaccine_log_log(page: int = 0, page_size: int = 100):
         "page": page,
         "page_size": page_size,
     }
+
+
+# ---------- ติดตามอาการหลังฉีดวัคซีน ----------
+# หลังฉีดต้องไปดูว่าหมูมีอาการข้างเคียงไหม (บวมตรงที่ฉีด ไข้ ซึม ไม่กินอาหาร)
+# ระบบเตือนให้ไปตรวจตามวันที่กำหนด แล้วบันทึกผลไว้เทียบย้อนหลังได้ว่าวัคซีน/ล็อตไหนมีปัญหาบ่อย
+#
+# รอบตรวจมาตรฐาน: วันที่ 1 (24 ชม. แรก เจออาการแพ้เฉียบพลัน), วันที่ 3 (บวมชัดที่สุด), วันที่ 7 (ควรยุบแล้ว)
+FOLLOWUP_DAYS = sorted({
+    int(d) for d in os.environ.get("FOLLOWUP_DAYS", "1,3,7").split(",") if d.strip().isdigit()
+}) or [1, 3, 7]
+
+_SWELLING_LABEL = {"none": "ไม่บวม", "mild": "บวมเล็กน้อย", "moderate": "บวมปานกลาง", "severe": "บวมมาก"}
+_APPETITE_LABEL = {"normal": "กินปกติ", "reduced": "กินน้อยลง", "none": "ไม่กินเลย"}
+
+
+def _followup_severity(f: dict) -> str:
+    """แปลอาการเป็นระดับความร้ายแรง — ตัดสินด้วยกฎตายตัว ไม่ผ่าน AI เพราะต้องแม่นและอธิบายได้
+
+    ต้องดูแล  = อาการที่ต้องตามสัตวแพทย์ (บวมมาก / ไข้ร่วมกับซึม / ไม่กินเลย)
+    เฝ้าระวัง = มีอาการแต่ยังอยู่ในเกณฑ์ที่พบได้ปกติหลังฉีด
+    ปกติ      = ไม่มีอาการ
+    """
+    if f.get("swelling") == "severe" or f.get("appetite") == "none" or (f.get("fever") and f.get("lethargy")):
+        return "ต้องดูแล"
+    if f.get("swelling") in ("mild", "moderate") or f.get("appetite") == "reduced" or f.get("fever") or f.get("lethargy"):
+        return "เฝ้าระวัง"
+    return "ปกติ"
+
+
+def _fmt_followup(f: dict) -> str:
+    """สรุปอาการเป็นข้อความสั้น ใช้ทั้งในคำตอบเสียง หน้าเว็บ และ LINE"""
+    bits = []
+    if f.get("swelling"):
+        bits.append(_SWELLING_LABEL.get(f["swelling"], f["swelling"]))
+    if f.get("fever"):
+        bits.append("มีไข้")
+    if f.get("lethargy"):
+        bits.append("ซึม")
+    if f.get("appetite") and f["appetite"] != "normal":
+        bits.append(_APPETITE_LABEL.get(f["appetite"], f["appetite"]))
+    if f.get("affected_count"):
+        bits.append(f"{f['affected_count']} ตัว")
+    return ", ".join(bits) or "ไม่มีอาการผิดปกติ"
+
+
+def _followup_due_rows(days_ahead: int = 0) -> list[dict]:
+    """รายการฉีดวัคซีนที่ถึงรอบต้องไปตรวจอาการแล้วแต่ยังไม่ได้บันทึกผล
+
+    ดูย้อนหลังแค่ช่วงรอบตรวจที่ยาวที่สุด + 3 วัน — เลยจากนั้นถือว่าพ้นช่วงเฝ้าระวังแล้ว
+    ไม่ต้องตามเก็บย้อนหลังเป็นเดือน (จะกลายเป็นรายการค้างที่ไม่มีใครเคลียร์)
+    """
+    today = datetime.now(BANGKOK).date()
+    window = max(FOLLOWUP_DAYS) + 3
+    since = (today - timedelta(days=window)).isoformat()
+    logs = (
+        supabase.table("vaccine_log").select("*")
+        .gte("log_date", since).order("log_date", desc=True).execute()
+    ).data or []
+    if not logs:
+        return []
+    ids = [l["id"] for l in logs]
+    done = (
+        supabase.table("vaccine_followup").select("vaccine_log_id, days_after")
+        .in_("vaccine_log_id", ids).execute()
+    ).data or []
+    done_set = {(d["vaccine_log_id"], d.get("days_after")) for d in done}
+
+    out = []
+    for l in logs:
+        try:
+            log_date = date.fromisoformat(str(l["log_date"]))
+        except (TypeError, ValueError):
+            continue
+        age = (today - log_date).days
+        for d in FOLLOWUP_DAYS:
+            if d > age + days_ahead:       # ยังไม่ถึงรอบนี้
+                continue
+            if (l["id"], d) in done_set:   # ตรวจรอบนี้ไปแล้ว
+                continue
+            out.append({
+                "vaccine_log_id": l["id"],
+                "log_date": l["log_date"],
+                "vaccine_name": l.get("vaccine_name"),
+                "barn_no": l.get("barn_no"),
+                "pen_no": l.get("pen_no"),
+                "pig_count": l.get("pig_count"),
+                "lot_no": l.get("lot_no"),
+                "days_after": d,
+                "due_date": (log_date + timedelta(days=d)).isoformat(),
+                "overdue_days": max(0, age - d),
+            })
+    out.sort(key=lambda r: (r["due_date"], r["vaccine_log_id"]))
+    return out
+
+
+@app.post("/vaccine-followup", dependencies=[Depends(verify_admin_token)])
+def save_vaccine_followup(f: VaccineFollowup):
+    """บันทึกผลตรวจอาการหลังฉีดวัคซีน 1 ครั้ง"""
+    log = (
+        supabase.table("vaccine_log").select("*").eq("id", f.vaccine_log_id).limit(1).execute()
+    ).data
+    if not log:
+        raise HTTPException(status_code=404, detail="ไม่พบรายการฉีดวัคซีนนี้")
+
+    data = f.model_dump(mode="json")
+    check_date = date.fromisoformat(data["check_date"]) if data.get("check_date") else datetime.now(BANGKOK).date()
+    data["check_date"] = check_date.isoformat()
+    try:
+        data["days_after"] = (check_date - date.fromisoformat(str(log[0]["log_date"]))).days
+    except (TypeError, ValueError):
+        data["days_after"] = None
+    # เก็บระดับความร้ายแรงลงตารางเลย จะได้กรอง/นับย้อนหลังได้โดยไม่ต้องคำนวณใหม่ทุกครั้ง
+    data["severity"] = _followup_severity(data)
+    row = supabase.table("vaccine_followup").insert(data).execute().data[0]
+    row["summary"] = _fmt_followup(row)
+    return row
+
+
+@app.get("/vaccine-followup")
+def list_vaccine_followup(log_id: Optional[int] = None, limit: int = 100):
+    """ผลตรวจอาการที่บันทึกไว้ — ระบุ log_id เพื่อดูเฉพาะของการฉีดครั้งนั้น"""
+    q = supabase.table("vaccine_followup").select("*").order("check_date", desc=True)
+    if log_id:
+        q = q.eq("vaccine_log_id", log_id)
+    rows = q.limit(max(1, min(500, limit))).execute().data or []
+    # แนบชื่อวัคซีน/โรงเรือนมาด้วย หน้าเว็บจะได้ไม่ต้องยิงถามอีกรอบต่อแถว
+    ids = list({r["vaccine_log_id"] for r in rows})
+    logs = {}
+    if ids:
+        for l in (supabase.table("vaccine_log").select("*").in_("id", ids).execute().data or []):
+            logs[l["id"]] = l
+    for r in rows:
+        l = logs.get(r["vaccine_log_id"], {})
+        r["vaccine_name"] = l.get("vaccine_name")
+        r["barn_no"] = l.get("barn_no")
+        r["pen_no"] = l.get("pen_no")
+        r["log_date"] = l.get("log_date")
+        r["summary"] = _fmt_followup(r)
+    return {"rows": rows}
+
+
+@app.delete("/vaccine-followup/{followup_id}", dependencies=[Depends(verify_admin_token)])
+def delete_vaccine_followup(followup_id: int):
+    supabase.table("vaccine_followup").delete().eq("id", followup_id).execute()
+    return {"ok": True}
+
+
+@app.get("/vaccine-followup-due")
+def vaccine_followup_due(days_ahead: int = 0):
+    """รายการที่ถึงรอบต้องไปตรวจอาการแล้วแต่ยังไม่ได้บันทึก"""
+    return {"rows": _followup_due_rows(max(0, min(7, days_ahead))), "followup_days": FOLLOWUP_DAYS}
+
+
+@app.post("/cron/vaccine-followup-notify")
+def cron_vaccine_followup_notify(x_cron_key: str = Header(default="")):
+    """แจ้งเตือนทาง LINE ว่ามีอะไรต้องไปตรวจอาการหลังฉีดบ้าง (เรียกจาก GitHub Actions ทุกเช้า)"""
+    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    rows = _followup_due_rows()
+    if not rows:
+        return {"ok": True, "sent": False, "count": 0}
+    lines = ["🩺 ตรวจอาการหลังฉีดวัคซีนวันนี้"]
+    for r in rows[:10]:
+        where = " ".join(x for x in [r.get("barn_no"), r.get("pen_no")] if x) or "ไม่ระบุจุด"
+        late = f" (เลย {r['overdue_days']} วัน)" if r["overdue_days"] else ""
+        lines.append(f"• {r.get('vaccine_name') or 'วัคซีน'} · {where} · วันที่ {r['days_after']} หลังฉีด{late}")
+    if len(rows) > 10:
+        lines.append(f"…และอีก {len(rows) - 10} รายการ")
+    if PUBLIC_SITE_URL:
+        lines.append(f"บันทึกผลตรวจ: {PUBLIC_SITE_URL}/vaccine")
+    _send_line_broadcast("\n".join(lines))
+    return {"ok": True, "sent": True, "count": len(rows)}
 
 
 @app.get("/export/vaccine-log.png")
@@ -1753,6 +1937,9 @@ SYSTEM_PROMPT = (
     "- ถ้าถามเชิงประวัติ/สถิติอากาศ (เช่น สัปดาห์นี้ร้อนสุดกี่องศา, เดือนนี้ฝนตกกี่ครั้ง) ให้ดูจากสถิติย้อนหลังใน CONTEXT\n"
     "- ถ้าถามเรื่องหมูป่วย/สุขภาพหมู ให้ดูจากบันทึกหมูป่วยรายวันใน CONTEXT สรุปจำนวน แนวโน้ม (เพิ่มขึ้น/ลดลง) และเตือนถ้าตัวเลขสูงผิดปกติ\n"
     "- ถ้าถามเรื่องการฉีดวัคซีน ให้ดูจากบันทึกการฉีดวัคซีนใน CONTEXT บอกวันที่ฉีดล่าสุดและชื่อวัคซีนตามนั้น\n"
+    "- ถ้าถามเรื่องอาการหลังฉีดวัคซีน (บวม ไข้ ซึม ไม่กินอาหาร) ให้ดูจาก 'ผลตรวจอาการหลังฉีดวัคซีน' ใน CONTEXT "
+    "บอกอาการที่พบพร้อมวันที่และโรงเรือน ถ้ามีรายการระดับ 'ต้องดูแล' ให้เตือนว่าควรตามสัตวแพทย์ "
+    "และถ้ามีรายการที่ยังไม่ได้ตรวจ ให้บอกว่าเหลือกี่รายการ\n"
     "- ถ้าถามเรื่องสายพันธุ์หมู/ชนิดหมู ให้ดูจาก 'ความรู้อ้างอิง' ใน CONTEXT แล้วตอบตามนั้นตรง ๆ\n"
     "- ถ้า CONTEXT มี 'เอกสารของฟาร์ม' และคำถามเกี่ยวข้อง ให้ตอบตามเอกสารนั้นก่อนความรู้ทั่วไป "
     "และปิดท้ายสั้น ๆ ว่าอ้างอิงจากเอกสารชื่ออะไร ถ้าเอกสารไม่ได้พูดถึงเรื่องที่ถาม ห้ามอ้างว่ามาจากเอกสาร\n"
@@ -2236,7 +2423,8 @@ def _needs_lab_summary(text: str) -> list[tuple[str, int]]:
     return out
 
 
-_PIG_KEYWORDS = ("หมู", "สุกร", "ป่วย", "คอก", "ปศุสัตว์", "วัคซีน", "ฉีดยา")
+_PIG_KEYWORDS = ("หมู", "สุกร", "ป่วย", "คอก", "ปศุสัตว์", "วัคซีน", "ฉีดยา",
+                 "บวม", "หลังฉีด", "ข้างเคียง", "ตรวจอาการ")
 
 
 def _needs_pig(text: str) -> bool:
@@ -2331,6 +2519,99 @@ def _extract_interval_days(text: str) -> Optional[int]:
     if m:
         return int(m.group(1)) * 7
     return None
+
+
+# บันทึกอาการหลังฉีดด้วยเสียง — ต้องมีทั้ง "คำสั่งบันทึก" และ "คำว่าหลังฉีด"
+# กันชนกับคำสั่งบันทึกการฉีดวัคซีนปกติ (เช็คตัวนี้ก่อนเสมอ เพราะเจาะจงกว่า)
+_FOLLOWUP_TRIGGER_WORDS = ("หลังฉีด", "หลังจากฉีด", "หลังได้วัคซีน", "อาการข้างเคียง", "ผลข้างเคียง")
+_FOLLOWUP_RECORD_VERBS = ("บันทึก", "จด", "รายงาน", "แจ้ง")
+
+
+def _is_followup_record_command(text: str) -> bool:
+    return (
+        any(v in text for v in _FOLLOWUP_RECORD_VERBS)
+        and any(w in text for w in _FOLLOWUP_TRIGGER_WORDS)
+    )
+
+
+def _parse_followup_symptoms(text: str) -> dict:
+    """อ่านอาการจากประโยคพูด — เทียบคำตรง ๆ ไม่ให้ AI ตีความ เพราะเป็นข้อมูลที่ต้องแม่น"""
+    t = text.replace(" ", "")
+    out: dict = {}
+    if any(w in t for w in ("ไม่บวม", "ไม่มีอาการ", "ปกติดี", "ยุบแล้ว", "หายบวม")):
+        out["swelling"] = "none"
+    elif any(w in t for w in ("บวมมาก", "บวมเยอะ", "บวมรุนแรง", "บวมใหญ่")):
+        out["swelling"] = "severe"
+    elif any(w in t for w in ("บวมปานกลาง", "บวมพอสมควร")):
+        out["swelling"] = "moderate"
+    elif any(w in t for w in ("บวมเล็กน้อย", "บวมนิดหน่อย", "บวมนิด")):
+        out["swelling"] = "mild"
+    elif "บวม" in t:
+        out["swelling"] = "mild"   # พูดแค่ "บวม" เฉย ๆ ถือว่าเล็กน้อยไว้ก่อน แก้ในหน้าเว็บได้
+
+    if any(w in t for w in ("มีไข้", "ตัวร้อน", "เป็นไข้")):
+        out["fever"] = True
+    if any(w in t for w in ("ซึม", "ไม่ค่อยเดิน", "นอนนิ่ง", "อ่อนแรง")):
+        out["lethargy"] = True
+    if any(w in t for w in ("ไม่กินอาหาร", "ไม่กินเลย", "ไม่ยอมกิน")):
+        out["appetite"] = "none"
+    elif any(w in t for w in ("กินน้อย", "กินลดลง", "เบื่ออาหาร")):
+        out["appetite"] = "reduced"
+    elif "กินปกติ" in t:
+        out["appetite"] = "normal"
+
+    m = re.search(r"(\d+)\s*ตัว", text)
+    if m:
+        out["affected_count"] = int(m.group(1))
+    return out
+
+
+def _record_followup_from_voice(text: str) -> str:
+    """บันทึกอาการหลังฉีดจากคำสั่งเสียง — เดารายการที่พูดถึงจากโรงเรือน/ชื่อวัคซีน ไม่งั้นใช้รายการที่ค้างตรวจอยู่"""
+    due = _followup_due_rows(days_ahead=7)
+    t = text.replace(" ", "")
+
+    def matches(r: dict) -> bool:
+        barn = (r.get("barn_no") or "").replace(" ", "")
+        name = (r.get("vaccine_name") or "").replace(" ", "")
+        # "โรงเรือน 2" พูดเป็น "เล้า 2" ก็ได้ — เทียบเฉพาะตัวเลขท้ายชื่อ
+        num = re.sub(r"\D", "", barn)
+        if barn and (barn in t or (num and re.search(rf"(?:โรงเรือน|เล้า|คอก){num}\b", t))):
+            return True
+        return bool(name and name in t)
+
+    target = next((r for r in due if matches(r)), None)
+    if not target:
+        hits = [r for r in due]
+        if not hits:
+            return "ยังไม่มีรายการฉีดวัคซีนที่ต้องตรวจอาการครับ ถ้าต้องการบันทึกย้อนหลัง เพิ่มจากหน้าวัคซีนได้ครับ"
+        if len({h["vaccine_log_id"] for h in hits}) > 1:
+            names = ", ".join(sorted({f"{h.get('vaccine_name') or 'วัคซีน'} {h.get('barn_no') or ''}".strip() for h in hits})[:3])
+            return f"ตอนนี้มีหลายรายการที่ต้องตรวจ ({names}) ช่วยบอกโรงเรือนหรือชื่อวัคซีนด้วยครับ"
+        target = hits[0]
+
+    symptoms = _parse_followup_symptoms(text)
+    if not symptoms:
+        return "ยังไม่ได้ยินอาการครับ ลองพูดใหม่ เช่น บันทึกอาการหลังฉีด โรงเรือน 2 บวมเล็กน้อย 3 ตัว"
+
+    data = {
+        "vaccine_log_id": target["vaccine_log_id"],
+        "check_date": datetime.now(BANGKOK).date().isoformat(),
+        "days_after": target["days_after"],
+        "checked_by": "บันทึกด้วยเสียง",
+        **symptoms,
+    }
+    data["severity"] = _followup_severity(data)
+    supabase.table("vaccine_followup").insert(data).execute()
+
+    where = target.get("barn_no") or "ไม่ระบุโรงเรือน"
+    reply = (
+        f"บันทึกอาการหลังฉีด {target.get('vaccine_name') or 'วัคซีน'} ที่{where} "
+        f"วันที่ {target['days_after']} หลังฉีดแล้วครับ: {_fmt_followup(data)}"
+    )
+    if data["severity"] == "ต้องดูแล":
+        reply += " อาการค่อนข้างหนัก แนะนำให้ติดต่อสัตวแพทย์ครับ"
+    return reply
 
 
 def _record_vaccine_from_voice(text: str) -> str:
@@ -2500,6 +2781,43 @@ def _fmt_vaccine_log(rows: list[dict]) -> str:
         for r in rows
     ]
     return "บันทึกการฉีดวัคซีน (ล่าสุดก่อน):\n" + "\n".join(lines)
+
+
+def _recent_followups(limit: int = 10) -> list[dict]:
+    rows = (
+        supabase.table("vaccine_followup").select("*")
+        .order("check_date", desc=True).limit(limit).execute()
+    ).data or []
+    ids = list({r["vaccine_log_id"] for r in rows})
+    names = {}
+    if ids:
+        for l in (supabase.table("vaccine_log").select("id, vaccine_name, barn_no").in_("id", ids).execute().data or []):
+            names[l["id"]] = l
+    for r in rows:
+        r["_log"] = names.get(r["vaccine_log_id"], {})
+    return rows
+
+
+def _fmt_followups(rows: list[dict], due: list[dict]) -> str:
+    parts = []
+    if rows:
+        lines = []
+        for r in rows:
+            l = r.get("_log") or {}
+            where = l.get("barn_no") or "ไม่ระบุโรงเรือน"
+            lines.append(
+                f"  {r['check_date']} ({l.get('vaccine_name') or 'วัคซีน'} · {where} · "
+                f"วันที่ {r.get('days_after')} หลังฉีด): {_fmt_followup(r)} [{r.get('severity') or '-'}]"
+            )
+        parts.append("ผลตรวจอาการหลังฉีดวัคซีน (ล่าสุดก่อน):\n" + "\n".join(lines))
+    if due:
+        lines = [
+            f"  {d['due_date']}: {d.get('vaccine_name') or 'วัคซีน'} · {d.get('barn_no') or 'ไม่ระบุโรงเรือน'} "
+            f"· วันที่ {d['days_after']} หลังฉีด" + (f" (เลยกำหนด {d['overdue_days']} วัน)" if d["overdue_days"] else "")
+            for d in due[:8]
+        ]
+        parts.append(f"ยังต้องไปตรวจอาการอีก {len(due)} รายการ:\n" + "\n".join(lines))
+    return "\n\n".join(parts) if parts else "ผลตรวจอาการหลังฉีดวัคซีน: ยังไม่มีข้อมูล"
 
 
 def _fmt_stats(s: dict) -> str:
@@ -2770,6 +3088,10 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
             parts.append(_fmt_vaccine_log(_recent_vaccine_log()))
         except Exception:
             pass
+        try:
+            parts.append(_fmt_followups(_recent_followups(), _followup_due_rows()))
+        except Exception:
+            pass
 
     # เซนเซอร์ภายนอก — แนบเฉพาะชุดที่คำถามพูดถึง ดึงสดตอนถาม
     for src in (lab or []):
@@ -3026,6 +3348,14 @@ def ask(q: Question):
             return Answer(answer="ขออภัยครับ ส่งสรุปเข้า LINE ไม่สำเร็จ ลองใหม่อีกครั้งนะครับ")
 
     # คำสั่งบันทึกการฉีดวัคซีนด้วยเสียง -> บันทึกลง DB ตรง ๆ ไม่ผ่าน AI เลย (ต้องแม่นยำ ห้ามมั่ว)
+    # อาการหลังฉีด -> ต้องเช็คก่อนคำสั่งบันทึกการฉีด เพราะประโยคมีคำว่า "วัคซีน" เหมือนกัน
+    if _is_followup_record_command(text):
+        try:
+            return Answer(answer=_record_followup_from_voice(text))
+        except Exception as e:
+            print(f"[warn] บันทึกอาการหลังฉีดไม่สำเร็จ: {e}")
+            return Answer(answer="ขออภัยครับ บันทึกอาการไม่สำเร็จ ลองพูดใหม่อีกครั้งนะครับ")
+
     if _is_vaccine_record_command(text):
         try:
             return Answer(answer=_record_vaccine_from_voice(text))

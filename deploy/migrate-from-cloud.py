@@ -17,6 +17,7 @@ TABLES = [
     ("vaccine_log", "id"),
     ("vaccine_schedule", "vaccine_name"),
     ("admin_users", "id"),
+    ("vaccine_followup", "id"),
     ("knowledge_docs", "id"),
     ("knowledge_chunks", "id"),
 ]

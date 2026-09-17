@@ -73,6 +73,12 @@ export const saveVaccineLog = (entry) => post('/vaccine-log', entry)
 
 export const sendVaccineReportToLine = () => post('/line/send-vaccine-report', {})
 export const getVaccineSchedule = () => get('/vaccine-schedule')
+
+// ติดตามอาการหลังฉีดวัคซีน
+export const getFollowupDue = (daysAhead = 0) => get(`/vaccine-followup-due?days_ahead=${daysAhead}`)
+export const getFollowups = (logId) => get(logId ? `/vaccine-followup?log_id=${logId}` : '/vaccine-followup')
+export const saveFollowup = (entry) => post('/vaccine-followup', entry)
+export const deleteFollowup = (id) => del(`/vaccine-followup/${id}`)
 export const getVaccineDue = (days = 7) => get(`/vaccine-due?days=${days}`)
 
 // เซนเซอร์ภายนอก (ดินแสลงพัน · เล้าหมูกำแพงเพชร · เสาอากาศแสลงพัน) ผ่านเซิร์ฟเวอร์เรา

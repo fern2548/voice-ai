@@ -142,3 +142,24 @@ create table if not exists knowledge_chunks (
 );
 
 create index if not exists knowledge_chunks_doc_idx on knowledge_chunks (doc_id);
+
+-- ติดตามอาการหลังฉีดวัคซีน — 1 แถว = ตรวจ 1 ครั้งของการฉีด 1 รายการ
+-- ตรวจหลายรอบต่อการฉีดหนึ่งครั้งได้ (ปกติวันที่ 1, 3, 7 ตั้งได้ที่ FOLLOWUP_DAYS)
+create table if not exists vaccine_followup (
+  id bigint generated always as identity primary key,
+  vaccine_log_id bigint not null references vaccine_log(id) on delete cascade,
+  check_date date not null,
+  days_after integer,        -- ตรวจวันที่เท่าไหร่หลังฉีด (คำนวณให้ตอนบันทึก)
+  swelling text,             -- none | mild | moderate | severe
+  fever boolean,
+  appetite text,             -- normal | reduced | none
+  lethargy boolean,          -- ซึม ไม่ค่อยเคลื่อนไหว
+  affected_count integer,    -- จำนวนตัวที่มีอาการ
+  severity text,             -- ปกติ | เฝ้าระวัง | ต้องดูแล (คำนวณจากอาการด้วยกฎตายตัว)
+  note text,
+  checked_by text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists vaccine_followup_log_idx on vaccine_followup (vaccine_log_id);
+create index if not exists vaccine_followup_date_idx on vaccine_followup (check_date desc);

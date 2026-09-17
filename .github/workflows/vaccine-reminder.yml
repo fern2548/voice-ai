@@ -26,3 +26,10 @@ jobs:
           curl -sS --fail-with-body --max-time 60 \
             -X POST "${{ secrets.API_BASE }}/cron/vaccine-due-notify?days=3" \
             -H "X-Cron-Key: ${{ secrets.CRON_KEY }}"
+
+      - name: ส่งรายการที่ต้องตรวจอาการหลังฉีดเข้า LINE
+        # แยกข้อความกัน คนอ่านจะได้รู้ว่าอันไหน "ต้องไปฉีด" อันไหน "ต้องไปดูอาการ"
+        run: |
+          curl -sS --fail-with-body --max-time 60 \
+            -X POST "${{ secrets.API_BASE }}/cron/vaccine-followup-notify" \
+            -H "X-Cron-Key: ${{ secrets.CRON_KEY }}"
