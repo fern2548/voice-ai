@@ -114,21 +114,21 @@ export const createAdminUser = (username, password) => post('/admin/users', { us
 export const deleteAdminUser = (username) => del(`/admin/users/${encodeURIComponent(username)}`)
 
 // คลังความรู้ (RAG) — เอกสารของฟาร์มที่ AI ค้นมาใช้ตอบ
-export const getKnowledge = () => get('/knowledge')
-export const addKnowledgeText = (title, text) => post('/knowledge', { title, text })
-export const deleteKnowledge = (id) => del(`/knowledge/${id}`)
-export const searchKnowledge = (q) => get(`/knowledge/search?q=${encodeURIComponent(q)}`)
+export const getKnowledge = () => get('/kb')
+export const addKnowledgeText = (title, text) => post('/kb', { title, text })
+export const deleteKnowledge = (id) => del(`/kb/${id}`)
+export const searchKnowledge = (q) => get(`/kb/search?q=${encodeURIComponent(q)}`)
 // อัปโหลดไฟล์ต้องส่งเป็น multipart — ห้ามใส่ Content-Type เอง เบราว์เซอร์จะใส่ boundary ให้
 export const uploadKnowledge = async (file, title = '') => {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('title', title)
-  const res = await fetch(apiUrl('/knowledge/upload'), { method: 'POST', headers: adminHeaders(), body: fd })
+  const res = await fetch(apiUrl('/kb/upload'), { method: 'POST', headers: adminHeaders(), body: fd })
   checkAuth(res)
   if (!res.ok) {
     let detail = ''
     try { detail = (await res.json()).detail || '' } catch { /* ไม่ใช่ JSON */ }
-    const err = httpError('/knowledge/upload', res)
+    const err = httpError('/kb/upload', res)
     err.detail = detail
     throw err
   }

@@ -23,7 +23,7 @@ export default function KnowledgePage() {
   const [searching, setSearching] = useState(false)
   const fileRef = useRef(null)
 
-  const reload = () => getKnowledge().then(setData).catch(() => setData({ enabled: false, docs: [] }))
+  const reload = () => getKnowledge().then(setData).catch(() => setData({ enabled: true, ready: false, can_edit: false, docs: [] }))
   useEffect(() => { reload() }, [])
 
   const submitText = async (e) => {
@@ -83,6 +83,8 @@ export default function KnowledgePage() {
   }
 
   const docs = data?.docs || []
+  // เพิ่ม/ลบได้เฉพาะผู้ดูแลระบบ (backend ตัดสิน) — ผู้ใช้ทั่วไปเห็นรายการและทดลองค้นได้อย่างเดียว
+  const canEdit = !!data?.can_edit
 
   return (
     <>
@@ -94,13 +96,23 @@ export default function KnowledgePage() {
         <p className="kb-intro">
           ใส่คู่มือวัคซีน อาการโรคหมู ขั้นตอนงานในฟาร์ม หรือบันทึกสำคัญ — เวลาถาม AI จะค้นเอกสารพวกนี้มาใช้ตอบก่อนความรู้ทั่วไป
         </p>
-        {data && !data.enabled && (
+        {data && data.ready === false && (
+          <div className="kb-warn">
+            <i className="ti ti-alert-triangle" aria-hidden="true" /> ฐานข้อมูลยังไม่มีตารางคลังความรู้ — ผู้ดูแลต้องรันสคริปต์ตาราง (deploy/db/02-schema.sql) ก่อน
+          </div>
+        )}
+        {data && data.ready !== false && !data.enabled && (
           <div className="kb-warn">
             <i className="ti ti-alert-triangle" aria-hidden="true" /> ยังไม่ได้ตั้งค่า GEMINI_API_KEY ที่เซิร์ฟเวอร์ — เพิ่มเอกสารได้หลังตั้งค่าแล้ว
           </div>
         )}
+        {data && !canEdit && (
+          <div className="kb-note">
+            <i className="ti ti-lock" aria-hidden="true" /> เอกสารในคลังนี้ดูแลโดยผู้ดูแลระบบ — ถ้ามีเอกสารที่อยากให้ AI รู้ ส่งให้ผู้ดูแลเพิ่มได้
+          </div>
+        )}
 
-        <form className="pig-form" onSubmit={submitText}>
+        {canEdit && <form className="pig-form" onSubmit={submitText}>
           <div className="pig-form-row">
             <label className="pig-form-field kb-grow">
               <span>ชื่อเอกสาร</span>
@@ -133,7 +145,7 @@ export default function KnowledgePage() {
             </label>
             {msg && <span className="pig-form-msg">{msg}</span>}
           </div>
-        </form>
+        </form>}
       </div>
 
       <div className="panel">
@@ -141,24 +153,26 @@ export default function KnowledgePage() {
         <div className="table-wrap">
           <table className="data-table">
             <thead>
-              <tr><th>ชื่อ</th><th>ที่มา</th><th>ขนาด</th><th>เพิ่มเมื่อ</th><th /></tr>
+              <tr><th>ชื่อ</th><th>ที่มา</th><th>ขนาด</th><th>เพิ่มเมื่อ</th>{canEdit && <th />}</tr>
             </thead>
             <tbody>
               {!data ? (
-                <tr><td colSpan="5" className="td-empty">กำลังโหลด…</td></tr>
+                <tr><td colSpan={canEdit ? 5 : 4} className="td-empty">กำลังโหลด…</td></tr>
               ) : docs.length === 0 ? (
-                <tr><td colSpan="5" className="td-empty">ยังไม่มีเอกสาร — เพิ่มจากด้านบนได้เลย</td></tr>
+                <tr><td colSpan={canEdit ? 5 : 4} className="td-empty">ยังไม่มีเอกสาร — เพิ่มจากด้านบนได้เลย</td></tr>
               ) : docs.map((d) => (
                 <tr key={d.id}>
                   <td>{d.title}</td>
                   <td className="kb-dim">{d.source?.startsWith('file:') ? d.source.slice(5) : 'ข้อความ'}</td>
                   <td className="kb-dim">{d.chunk_count} ท่อน · {(d.chars || 0).toLocaleString('th-TH')} ตัวอักษร</td>
                   <td className="kb-dim">{fmtDate(d.created_at)}</td>
-                  <td>
-                    <button className="pager-btn" onClick={() => remove(d)}>
-                      <i className="ti ti-trash" aria-hidden="true" /> ลบ
-                    </button>
-                  </td>
+                  {canEdit && (
+                    <td>
+                      <button className="pager-btn" onClick={() => remove(d)}>
+                        <i className="ti ti-trash" aria-hidden="true" /> ลบ
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

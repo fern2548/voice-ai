@@ -2860,6 +2860,7 @@ def _fmt_stats(s: dict) -> str:
 
 
 # ---------- คลังความรู้ (RAG) ----------
+# API ใช้ /kb ไม่ใช่ /knowledge เพราะ /knowledge เป็น "หน้าเว็บ" — ถ้าชื่อชนกัน เปิด URL ตรง ๆ จะได้ JSON แทนหน้า
 # เก็บเอกสารของฟาร์ม (คู่มือวัคซีน โรคหมู SOP ฯลฯ) ให้ AI ค้นมาใช้ตอบ
 #   ตอนเก็บ: หั่นเอกสารเป็นท่อน → แปลงแต่ละท่อนเป็น vector ด้วย Gemini → เก็บลงฐานข้อมูล
 #   ตอนถาม: แปลงคำถามเป็น vector แบบเดียวกัน → หาท่อนที่ความหมายใกล้ที่สุด → แนบให้ AI
@@ -2870,6 +2871,9 @@ EMBED_DIM = 768
 RAG_TOP_K = 4           # แนบให้ AI กี่ท่อน
 RAG_MIN_SCORE = 0.70    # ความใกล้ต่ำกว่านี้ถือว่าไม่เกี่ยว ไม่แนบ (วัดจริง: ตรงเรื่อง 0.70-0.81, คนละเรื่อง ≤0.60)
 RAG_CHUNK_CHARS = 900   # ขนาดท่อนโดยประมาณ — เล็กพอให้ค้นแม่น ใหญ่พอให้ความหมายครบ
+# ใครเพิ่ม/ลบเอกสารได้ — เอกสารในนี้กำหนดว่า AI จะตอบอะไร จึงให้เฉพาะผู้ดูแลระบบ
+# ผู้ใช้ทั่วไปเห็นรายการ ค้นได้ แต่แก้ไม่ได้ (ค่าเริ่มต้น = บัญชี admin; ใส่หลายคนคั่นด้วย ,)
+KNOWLEDGE_ADMINS = {u.strip() for u in os.environ.get("KNOWLEDGE_ADMINS", "admin").split(",") if u.strip()}
 _rag_cache: Optional[list[dict]] = None   # โหลดทุกท่อนไว้ในหน่วยความจำ ค้นเร็วกว่าถามฐานข้อมูลทุกครั้ง
 _rag_fail_until = 0.0                     # โหลดไม่ได้ (เช่นยังไม่ได้สร้างตาราง) พักไว้ก่อน ไม่ยิงซ้ำทุกคำถาม
 _rag_lock = threading.Lock()
@@ -3041,22 +3045,37 @@ def _extract_text(filename: str, data: bytes) -> str:
     raise HTTPException(status_code=400, detail="รองรับเฉพาะ .txt .md .pdf .docx")
 
 
-@app.get("/knowledge")
-def knowledge_list():
-    """รายการเอกสารในคลังความรู้"""
-    r = supabase.table("knowledge_docs").select("*").order("created_at", desc=True).execute()
-    return {"enabled": _llm is not None, "docs": r.data or []}
+def _can_edit_knowledge(token: str) -> bool:
+    return (_session_username(token) or "") in KNOWLEDGE_ADMINS
 
 
-@app.post("/knowledge")
+def require_knowledge_admin(x_admin_token: str = Header(...)) -> None:
+    if not _can_edit_knowledge(x_admin_token):
+        raise HTTPException(status_code=403, detail="เฉพาะผู้ดูแลระบบเท่านั้นที่เพิ่ม/ลบเอกสารได้")
+
+
+@app.get("/kb")
+def knowledge_list(x_admin_token: str = Header(default="")):
+    """รายการเอกสารในคลังความรู้ + บอกว่าคนนี้แก้ได้ไหม"""
+    try:
+        r = supabase.table("knowledge_docs").select("*").order("created_at", desc=True).execute()
+        docs, ready = r.data or [], True
+    except Exception as e:
+        # ยังไม่ได้สร้างตารางที่ฐานข้อมูล — บอกให้ชัด ไม่ใช่โทษว่าไม่มีคีย์ AI
+        print(f"[warn] อ่านตาราง knowledge_docs ไม่ได้: {e}")
+        docs, ready = [], False
+    return {"enabled": _llm is not None, "ready": ready, "can_edit": _can_edit_knowledge(x_admin_token), "docs": docs}
+
+
+@app.post("/kb", dependencies=[Depends(require_knowledge_admin)])
 def knowledge_add_text(body: KnowledgeText):
-    """เพิ่มเอกสารจากข้อความที่วางมา"""
+    """เพิ่มเอกสารจากข้อความที่วางมา (ผู้ดูแลระบบเท่านั้น)"""
     return _knowledge_add(body.title, body.text, "text")
 
 
-@app.post("/knowledge/upload")
+@app.post("/kb/upload", dependencies=[Depends(require_knowledge_admin)])
 async def knowledge_upload(file: UploadFile = File(...), title: str = Form("")):
-    """เพิ่มเอกสารจากไฟล์ (.txt .md .pdf .docx) ไม่เกิน 10MB"""
+    """เพิ่มเอกสารจากไฟล์ (.txt .md .pdf .docx) ไม่เกิน 10MB (ผู้ดูแลระบบเท่านั้น)"""
     data = await file.read()
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="ไฟล์ใหญ่เกิน 10MB")
@@ -3064,7 +3083,7 @@ async def knowledge_upload(file: UploadFile = File(...), title: str = Form("")):
     return _knowledge_add(title or (file.filename or "").rsplit(".", 1)[0], text, f"file:{file.filename}")
 
 
-@app.delete("/knowledge/{doc_id}")
+@app.delete("/kb/{doc_id}", dependencies=[Depends(require_knowledge_admin)])
 def knowledge_delete(doc_id: int):
     supabase.table("knowledge_chunks").delete().eq("doc_id", doc_id).execute()
     supabase.table("knowledge_docs").delete().eq("id", doc_id).execute()
@@ -3072,7 +3091,7 @@ def knowledge_delete(doc_id: int):
     return {"ok": True}
 
 
-@app.get("/knowledge/search")
+@app.get("/kb/search")
 def knowledge_search(q: str):
     """ทดสอบว่าคำถามนี้จะค้นเจอท่อนไหน — ไว้เช็คว่าเอกสารที่ใส่ใช้งานได้"""
     return {"hits": _rag_search(q, k=5)}

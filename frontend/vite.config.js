@@ -26,7 +26,7 @@ export default defineConfig({
       '/vaccine-schedule': target,
       '/vaccine-due': target,
       '/vaccine-followup': target,
-      '/knowledge': target,
+      '/kb': target,
       '/lab': target,
       '/admin': target,
       '/export': target,
