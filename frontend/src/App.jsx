@@ -17,12 +17,14 @@ import VaccinePage from './pages/VaccinePage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import SensorsPage from './pages/SensorsPage.jsx'
 import KnowledgePage from './pages/KnowledgePage.jsx'
+import VaccineGuidePage from './pages/VaccineGuidePage.jsx'
 
 const NAV = [
   { to: '/overview', label: 'หน้าแรก' },
   { to: '/features', label: 'ทำอะไรได้บ้าง' },
   { to: '/pig-log', label: 'โรงเรือน' },
   { to: '/vaccine', label: 'วัคซีน' },
+  { to: '/vaccine-guide', label: 'วิธีฉีดวัคซีน' },
   { to: '/history', label: 'รายงาน' },
   { to: '/forecast', label: 'พยากรณ์อากาศ' },
   { to: '/sensors', label: 'กราฟข้อมูล' },
@@ -54,6 +56,7 @@ function AppShell() {
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/pig-log" element={<PigHealthPage />} />
             <Route path="/vaccine" element={<VaccinePage />} />
+            <Route path="/vaccine-guide" element={<VaccineGuidePage />} />
             <Route path="/sensors" element={<SensorsPage />} />
             <Route path="/knowledge" element={<KnowledgePage />} />
             <Route path="/settings" element={<SettingsPage />} />
