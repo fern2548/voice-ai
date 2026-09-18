@@ -61,7 +61,8 @@ function AppShell() {
           </Routes>
         </main>
 
-        {location.pathname !== '/overview' && <ChatWidget />}
+        {/* กล่องเสียงลอยมุมขวาล่าง — มีทุกหน้ารวมหน้าแรก จะได้กดถามได้จากทุกที่โดยไม่ต้องเลื่อนหาไมค์ */}
+        <ChatWidget />
       </div>
     </VoiceAIProvider>
   )

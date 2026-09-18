@@ -371,7 +371,7 @@ app.add_middleware(
 # ---------- ล็อกทั้งเว็บด้วยรหัสผ่าน admin ----------
 # ไม่ใช่แค่ปุ่มแก้ไขข้อมูล — ทุก endpoint ต้องมี X-Admin-Token ที่ถูกต้องก่อน ยกเว้นที่อยู่ใน allowlist
 # (เผื่อ deploy ขึ้นเซิร์ฟเวอร์จริงแล้วมี URL สาธารณะ กันคนนอกเข้ามาดูข้อมูลฟาร์มได้เลยโดยไม่ต้องรู้รหัส)
-_PUBLIC_PATHS = {"/admin/login", "/admin/signup", "/admin/signup-enabled", "/health", "/line/webhook"}  # webhook: LINE เรียกเข้ามาเอง ตรวจด้วยลายเซ็นแทน
+_PUBLIC_PATHS = {"/admin/login", "/admin/signup", "/admin/signup-enabled", "/health", "/line/webhook", "/farm-context"}  # webhook: LINE เรียกเข้ามาเอง ตรวจด้วยลายเซ็นแทน
 # /ingest = อุปกรณ์เซนเซอร์/Node-RED ใช้ INGEST_TOKEN ของตัวเองแยกต่างหากอยู่แล้ว
 # /r      = ลิงก์รายงานสำหรับปุ่มริชเมนู LINE (ดูหมายเหตุที่ PUBLIC_REPORT_KEY ด้านล่าง)
 _PUBLIC_PREFIXES = ("/ingest", "/r/", "/cron/")
@@ -390,6 +390,9 @@ PUBLIC_REPORT_KEY = os.environ.get("PUBLIC_REPORT_KEY", "")
 # แยกจาก PUBLIC_REPORT_KEY เพราะคีย์นั้นถูกแนบไปกับลิงก์ที่ส่งเข้ากลุ่ม LINE แล้ว
 # ใครเห็นลิงก์ก็จะสั่งให้ระบบยิงข้อความเข้ากลุ่มรัว ๆ ได้ ถ้าใช้คีย์เดียวกัน
 CRON_KEY = os.environ.get("CRON_KEY", "")
+# คีย์ให้ระบบภายนอก (เช่น Farmy Voice AI ตัวแยก) มาขอข้อมูลปัจจุบันของฟาร์มผ่าน /farm-context
+# ว่าง = ปิด endpoint นี้
+CONTEXT_KEY = os.environ.get("CONTEXT_KEY", "")
 
 # ---------- แหล่งข้อมูลเซนเซอร์ภายนอก (lab.plotnexuslab.com) ----------
 # API รวมเซนเซอร์หลายที่: ดินแสลงพัน · เล้าหมูกำแพงเพชร · เสาอากาศแสลงพัน
@@ -1612,6 +1615,29 @@ def line_send_vaccine_report():
     msg = _send_line_vaccine_report()
     ok = "แล้วครับ" in msg
     return {"ok": ok, "message": msg}
+
+
+@app.get("/farm-context")
+def farm_context(q: str = "", x_context_key: str = Header(default="")):
+    """ข้อมูลปัจจุบันของฟาร์มเป็นข้อความ สำหรับ AI ตัวแยก (farmy-voice-ai) มาแนบตอนตอบ
+
+    ใช้ตัวตรวจคำถามชุดเดียวกับ /ask จึงได้ข้อมูลเฉพาะที่เกี่ยวกับคำถาม ไม่ส่งทุกอย่างทุกครั้ง
+    ป้องกันด้วย CONTEXT_KEY ไม่ใช่ token ผู้ใช้ เพราะคนเรียกคือเซิร์ฟเวอร์ ไม่ใช่คน
+    """
+    if not CONTEXT_KEY or not hmac.compare_digest(x_context_key, CONTEXT_KEY):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    q = (q or "").strip()
+    ctx = _build_context(
+        detailed=_needs_forecast(q),
+        stats_days=_needs_stats(q),
+        pig=_needs_pig(q),
+        lab=_needs_lab(q),
+        lab_series=_needs_lab_series(q),
+        lab_summary=_needs_lab_summary(q),
+        text=q,
+        docs=_rag_search(q) if q else [],
+    )
+    return {"context": ctx}
 
 
 @app.post("/cron/vaccine-due-notify")
