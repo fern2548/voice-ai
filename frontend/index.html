@@ -18,5 +18,20 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
+
+  <!-- AI ตัวแยก (farmy-voice-ai) — โชว์กล่องเสียงลอยอีกอันฝั่งซ้าย เฉพาะเมื่อตั้ง VITE_VOICE_AI_URL
+       ไว้ให้เทียบกับ AI ในตัวของ Farmy (ปุ่มขวา) ไม่ตั้งค่า = ไม่มีอะไรเปลี่ยน -->
+  <script>
+    (function () {
+      var url = '%VITE_VOICE_AI_URL%'
+      if (!url || url.charAt(0) === '%') return
+      var s = document.createElement('script')
+      s.src = url + '/farmy-voice-widget.js'
+      s.dataset.server = url
+      s.dataset.position = 'left'
+      s.dataset.title = 'AI ตัวแยก (' + url.replace(/^https?:\/\//, '') + ')'
+      document.body.appendChild(s)
+    })()
+  </script>
 </body>
 </html>

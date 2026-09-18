@@ -33,3 +33,6 @@ farmy-docker.zip
 farmy-voice-dashboard/
 farmy-voice-dashboard.zip
 farmy-voice-full.zip
+farmy-voice-ai.zip
+farmy-dashboard.zip
+*.env.development.local
