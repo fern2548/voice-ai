@@ -12,6 +12,13 @@ export default function ChatWidget() {
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
 
+  // หน้าอื่นสั่งเปิดกล่องได้ (เช่นปุ่ม "ถาม AI เพิ่มเติม" ในหน้าคู่มือ) ผ่าน event นี้
+  useEffect(() => {
+    const onOpen = () => setOpen(true)
+    window.addEventListener('farmy:chat-open', onOpen)
+    return () => window.removeEventListener('farmy:chat-open', onOpen)
+  }, [])
+
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, open])
