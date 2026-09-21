@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import usePolling from '../hooks/usePolling.js'
 import { getVaccineHistory, saveVaccineLog, sendVaccineReportToLine } from '../api.js'
 import AdminGate from './AdminGate.jsx'
@@ -31,6 +32,12 @@ export default function VaccineLog() {
   const [page, setPage] = useState(0)
   const [refreshTick, setRefreshTick] = useState(0)
   const [form, setForm] = useState(EMPTY_FORM)
+  // มาจากหน้า "ข้อมูลวัคซีน" (ปุ่มบันทึกการฉีด) → เติมชื่อวัคซีนให้เลย ไม่ต้องพิมพ์ซ้ำ
+  const [searchParams] = useSearchParams()
+  useEffect(() => {
+    const name = searchParams.get('vaccine')
+    if (name) setForm((f) => ({ ...f, vaccineName: name }))
+  }, [searchParams])
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
   const [lineBusy, setLineBusy] = useState(false)
