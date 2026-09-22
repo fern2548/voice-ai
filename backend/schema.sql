@@ -163,3 +163,30 @@ create table if not exists vaccine_followup (
 
 create index if not exists vaccine_followup_log_idx on vaccine_followup (vaccine_log_id);
 create index if not exists vaccine_followup_date_idx on vaccine_followup (check_date desc);
+
+-- ทะเบียนวัคซีน (หมวด 1) — 1 แถว = วัคซีน 1 ล็อต ไว้ตรวจย้อนหลังและทำเอกสาร GAP
+create table if not exists vaccine_products (
+  id bigint generated always as identity primary key,
+  name text not null,
+  disease text,
+  lot_no text,
+  mfg_date date,
+  exp_date date,
+  manufacturer text,
+  distributor text,
+  route text,
+  dose text,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+-- บันทึกการฉีด: เพิ่มช่องให้ครบ 4 หมวด (ของเดิมไม่หาย)
+alter table vaccine_log add column if not exists product_id bigint references vaccine_products(id) on delete set null;
+alter table vaccine_log add column if not exists route text;
+alter table vaccine_log add column if not exists reaction text;
+alter table vaccine_log add column if not exists pig_ids text;
+alter table vaccine_log add column if not exists male_count integer;
+alter table vaccine_log add column if not exists female_count integer;
+alter table vaccine_log add column if not exists age_stage text;
+alter table vaccine_log add column if not exists pig_status text;
+alter table vaccine_log add column if not exists antibody_result text;

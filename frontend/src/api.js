@@ -68,7 +68,17 @@ export const getPredictionsLog = (opts) => logQuery('/predictions-log', opts)
 export const getPigHealthLog = (opts) => logQuery('/pig-health-log', opts)
 export const savePigHealth = (entry) => post('/pig-health', entry)
 
-export const getVaccineHistory = (opts) => logQuery('/vaccine-history', opts)
+// ประวัติการฉีด + ตัวกรอง (ช่วงวัน โรงเรือน วัคซีน สถานะสุกร) — ค่าว่างไม่ส่ง
+export const getVaccineHistory = ({ page = 0, pageSize = 100, filters = {} } = {}) => {
+  const params = new URLSearchParams({ page, page_size: pageSize })
+  Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v) })
+  return get(`/vaccine-history?${params.toString()}`)
+}
+// ทะเบียนวัคซีน (หมวด 1) + ตัวเลขหัวหน้า
+export const getVaccineProducts = () => get('/vaccine-products')
+export const saveVaccineProduct = (p) => post('/vaccine-products', p)
+export const deleteVaccineProduct = (id) => del(`/vaccine-products/${id}`)
+export const getVaccineStats = () => get('/vaccine-stats')
 export const saveVaccineLog = (entry) => post('/vaccine-log', entry)
 
 export const sendVaccineReportToLine = () => post('/line/send-vaccine-report', {})

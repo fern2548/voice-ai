@@ -531,16 +531,42 @@ class PigHealth(BaseModel):
 
 
 class VaccineLog(BaseModel):
+    # หมวด 2 การให้วัคซีน
     log_date: date
+    log_time: Optional[str] = None
     vaccine_name: Optional[str] = None
+    product_id: Optional[int] = None       # อ้างทะเบียนวัคซีน (ล็อต/วันหมดอายุ/ผู้ผลิต ดึงจากนั้น)
+    lot_no: Optional[str] = None
+    route: Optional[str] = None            # IM | SQ | spray | oral | water
+    dose: Optional[str] = None
+    reaction: Optional[str] = None         # อาการทันทีหลังฉีด: normal | fever | lethargy | swelling | other
+    next_due_date: Optional[date] = None
+    # หมวด 3 สุกรที่ได้รับ
+    pig_ids: Optional[str] = None          # หมายเลขหู คั่นด้วย , (ว่างได้ถ้าฉีดทั้งคอก)
     barn_no: Optional[str] = None
     pen_no: Optional[str] = None
     pig_count: Optional[int] = None
+    male_count: Optional[int] = None
+    female_count: Optional[int] = None
+    age_stage: Optional[str] = None        # ลูกสุกร | สุกรรุ่น | สุกรขุน | แม่พันธุ์ก่อนคลอด | แม่พันธุ์หลังคลอด | พ่อพันธุ์
+    pig_status: Optional[str] = None       # normal | sick | treating
+    # หมวด 4 ผู้ฉีดและการติดตาม
     injector: Optional[str] = None
+    antibody_result: Optional[str] = None  # positive | negative | pending | none
+    note: Optional[str] = None
+
+
+class VaccineProduct(BaseModel):
+    """ทะเบียนวัคซีน 1 ล็อต — ใช้ตรวจย้อนหลังตอนเกิดโรคระบาด และประกอบเอกสาร GAP"""
+    name: str                              # ชื่อวัคซีน เช่น FMD
+    disease: Optional[str] = None          # โรค เช่น ปากและเท้าเปื่อย
     lot_no: Optional[str] = None
-    dose: Optional[str] = None
-    log_time: Optional[str] = None
-    next_due_date: Optional[date] = None
+    mfg_date: Optional[date] = None
+    exp_date: Optional[date] = None
+    manufacturer: Optional[str] = None
+    distributor: Optional[str] = None
+    route: Optional[str] = None            # วิธีให้ตามฉลาก
+    dose: Optional[str] = None             # โดสตามฉลาก
     note: Optional[str] = None
 
 
@@ -1067,6 +1093,15 @@ def save_vaccine_log(v: VaccineLog):
     ถ้าไม่ได้ระบุ next_due_date เอง และวัคซีนนี้มีกำหนดรอบฉีดซ้ำตั้งไว้ -> คำนวณให้อัตโนมัติ
     """
     data = v.model_dump(mode="json")
+    if data.get("product_id"):
+        # เลือกจากทะเบียน → ยืมล็อต/วิธีให้/โดส/ชื่อ มาเติมช่องที่เว้นว่าง
+        prod = supabase.table("vaccine_products").select("*").eq("id", data["product_id"]).limit(1).execute().data
+        if prod:
+            pr = prod[0]
+            data["vaccine_name"] = data.get("vaccine_name") or pr.get("name")
+            data["lot_no"] = data.get("lot_no") or pr.get("lot_no")
+            data["route"] = data.get("route") or pr.get("route")
+            data["dose"] = data.get("dose") or pr.get("dose")
     if not data.get("next_due_date"):
         interval_days = _lookup_interval_days(data.get("vaccine_name"))
         if interval_days:
@@ -1076,21 +1111,82 @@ def save_vaccine_log(v: VaccineLog):
     return data
 
 
+# ---------- ทะเบียนวัคซีน (หมวด 1) ----------
+@app.get("/vaccine-products")
+def list_vaccine_products():
+    rows = supabase.table("vaccine_products").select("*").order("name").execute().data or []
+    today = datetime.now(BANGKOK).date()
+    for r in rows:
+        # แจ้งสถานะหมดอายุให้หน้าเว็บโชว์สีได้เลย
+        try:
+            exp = date.fromisoformat(str(r.get("exp_date"))) if r.get("exp_date") else None
+            r["days_to_expire"] = (exp - today).days if exp else None
+        except ValueError:
+            r["days_to_expire"] = None
+    return {"rows": rows}
+
+
+@app.post("/vaccine-products", dependencies=[Depends(verify_admin_token)])
+def save_vaccine_product(p: VaccineProduct):
+    row = supabase.table("vaccine_products").insert(p.model_dump(mode="json")).execute().data[0]
+    return row
+
+
+@app.delete("/vaccine-products/{product_id}", dependencies=[Depends(verify_admin_token)])
+def delete_vaccine_product(product_id: int):
+    supabase.table("vaccine_products").delete().eq("id", product_id).execute()
+    return {"ok": True}
+
+
+@app.get("/vaccine-stats")
+def vaccine_stats():
+    """ตัวเลขบนหัวหน้าวัคซีน: ทะเบียน · ฉีดวันนี้ · นัดซ้ำใน 7 วัน · อาการผิดปกติที่ยังต้องดู"""
+    today = datetime.now(BANGKOK).date()
+    month_ago = (today - timedelta(days=30)).isoformat()
+    products = supabase.table("vaccine_products").select("id, created_at", count="exact").execute()
+    new_products = sum(1 for r in (products.data or []) if str(r.get("created_at", ""))[:10] >= month_ago)
+    today_rows = supabase.table("vaccine_log").select("pig_count").eq("log_date", today.isoformat()).execute().data or []
+    yday_rows = supabase.table("vaccine_log").select("pig_count").eq("log_date", (today - timedelta(days=1)).isoformat()).execute().data or []
+    pigs_today = sum(int(r.get("pig_count") or 0) for r in today_rows)
+    pigs_yday = sum(int(r.get("pig_count") or 0) for r in yday_rows)
+    due = _vaccine_due_rows(7)
+    due_pigs = sum(int(r.get("pig_count") or 0) for r in due)
+    # อาการผิดปกติ = ผลตรวจหลังฉีดที่ยังอยู่ในช่วงเฝ้าระวัง (ไม่ใช่ปกติ) ใน 10 วันล่าสุด
+    since = (today - timedelta(days=10)).isoformat()
+    fu = supabase.table("vaccine_followup").select("severity, affected_count").gte("check_date", since).execute().data or []
+    abnormal = [f for f in fu if f.get("severity") in ("เฝ้าระวัง", "ต้องดูแล")]
+    abnormal_pigs = sum(int(f.get("affected_count") or 1) for f in abnormal)
+    return {
+        "products": products.count or 0, "products_new_month": new_products,
+        "pigs_today": pigs_today, "pigs_today_delta": pigs_today - pigs_yday,
+        "due_pigs": due_pigs, "due_items": len(due),
+        "abnormal_pigs": abnormal_pigs, "abnormal_items": len(abnormal),
+        "pending_followups": len(_followup_due_rows()),
+    }
+
+
 @app.get("/vaccine-history")
-def vaccine_log_log(page: int = 0, page_size: int = 100):
-    """ประวัติการฉีดวัคซีน/ยาทั้งหมด แบ่งหน้าฝั่ง server"""
+def vaccine_log_log(page: int = 0, page_size: int = 100, date_from: Optional[str] = None,
+                    date_to: Optional[str] = None, barn: Optional[str] = None,
+                    vaccine: Optional[str] = None, status: Optional[str] = None):
+    """ประวัติการฉีดวัคซีน/ยาทั้งหมด แบ่งหน้าฝั่ง server + กรองตามช่วงวัน/โรงเรือน/วัคซีน/สถานะสุกร"""
     page = max(0, page)
     page_size = max(1, min(100, page_size))
     start = page * page_size
     end = start + page_size - 1
 
-    result = (
-        supabase.table("vaccine_log")
-        .select("*", count="exact")
-        .order("log_date", desc=True)
-        .range(start, end)
-        .execute()
-    )
+    q = supabase.table("vaccine_log").select("*", count="exact")
+    if date_from:
+        q = q.gte("log_date", date_from)
+    if date_to:
+        q = q.lte("log_date", date_to)
+    if barn:
+        q = q.eq("barn_no", barn)
+    if vaccine:
+        q = q.ilike("vaccine_name", f"%{vaccine}%")
+    if status:
+        q = q.eq("pig_status", status)
+    result = q.order("log_date", desc=True).range(start, end).execute()
     return {
         "rows": result.data or [],
         "total": result.count or 0,
