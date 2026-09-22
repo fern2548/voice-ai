@@ -1524,21 +1524,47 @@ def batch_plan_done(d: PlanDone, x_admin_token: str = Header(default="")):
     return save_vaccine_log(log)
 
 
+# เตือนล่วงหน้ากี่วันก่อนฉีด (ค่าตั้งต้น 7, 3, 1) — วันฉีดและที่เลยกำหนดเตือนทุกเช้าจนกว่าจะกด "ฉีดแล้ว"
+PLAN_REMIND_DAYS = sorted({int(x) for x in (os.environ.get("PLAN_REMIND_DAYS") or "7,3,1").split(",") if x.strip().isdigit()}, reverse=True)
+
+
+def _plan_remind_rows() -> list[dict]:
+    """เข็มที่ต้องส่งเตือน 'วันนี้': อีก 7/3/1 วัน, วันนี้, หรือเลยกำหนดแล้ว"""
+    return [r for r in _batch_plan_rows(max(PLAN_REMIND_DAYS or [7]))
+            if r["status"] == "overdue" or r["days_left"] == 0 or r["days_left"] in PLAN_REMIND_DAYS]
+
+
+@app.get("/batch-plan/remind-days")
+def batch_plan_remind_days():
+    return {"days": PLAN_REMIND_DAYS}
+
+
 @app.post("/cron/batch-plan-notify")
 def cron_batch_plan_notify(x_cron_key: str = Header(default="")):
-    """LINE ทุกเช้า: เข็มที่ถึงกำหนดใน 7 วัน + ที่เลยกำหนดแล้วยังไม่ฉีด"""
+    """LINE ทุกเช้า: เข็มที่อีก 7 / 3 / 1 วันจะถึง + วันนี้ + ที่เลยกำหนดแล้วยังไม่ฉีด"""
     if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
         raise HTTPException(status_code=401, detail="unauthorized")
-    rows = [r for r in _batch_plan_rows() if r["status"] in ("due", "overdue")]
+    rows = _plan_remind_rows()
     if not rows:
         return {"ok": True, "sent": False, "count": 0}
-    lines = ["💉 แผนวัคซีนตามอายุ — ถึงกำหนด"]
-    for r in rows[:10]:
-        when = "วันนี้" if r["days_left"] == 0 else (f"อีก {r['days_left']} วัน" if r["days_left"] > 0 else f"เลยมา {-r['days_left']} วัน")
+    # จัดกลุ่มตามความเร่งด่วน อ่านปุ๊บรู้เลยว่าอะไรต้องทำก่อน
+    groups: dict[str, list[str]] = {}
+    for r in rows:
+        d = r["days_left"]
+        head = "🔴 เลยกำหนด" if d < 0 else "🟠 ฉีดวันนี้" if d == 0 else f"🟡 อีก {d} วัน"
         where = " ".join(x for x in [r.get("barn_no"), r.get("pen_no")] if x)
-        lines.append(f"• {r['batch_name']} · {r['vaccine_name']} {r['label']} · {when} ({r['due_date']}){' · ' + where if where else ''}")
-    if len(rows) > 10:
-        lines.append(f"…และอีก {len(rows) - 10} รายการ")
+        late = f" (เลยมา {-d} วัน)" if d < 0 else ""
+        groups.setdefault(head, []).append(f"• {r['batch_name']} · {r['vaccine_name']} {r['label']}{late}{' · ' + where if where else ''}")
+    lines = ["💉 แผนวัคซีนตามอายุ"]
+    n = 0
+    for head, items in groups.items():
+        lines.append(head)
+        for it in items:
+            if n >= 12:
+                break
+            lines.append(it); n += 1
+    if len(rows) > 12:
+        lines.append(f"…และอีก {len(rows) - 12} รายการ")
     if PUBLIC_SITE_URL:
         lines.append(f"ดูแผน: {PUBLIC_SITE_URL}/vaccine-plan")
     _send_line_broadcast("\n".join(lines))
