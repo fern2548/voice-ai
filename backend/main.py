@@ -569,6 +569,7 @@ class PigBatch(BaseModel):
     pen_no: Optional[str] = None
     pig_count: Optional[int] = None
     note: Optional[str] = None
+    sow_vaccinated: bool = True   # แม่เคยได้รับวัคซีนอหิวาต์ → ลูกใช้โปรแกรม 6/12 สัปดาห์; ไม่เคย → เข็มเดียวอายุ 1 วัน
 
 
 class VaccineProgram(BaseModel):
@@ -1449,6 +1450,30 @@ def delete_vaccine_program(program_id: int):
     return {"ok": True}
 
 
+def _is_csf(name: str) -> bool:
+    n = (name or "").lower()
+    return "อหิวา" in n or "csf" in n or "swine fever" in n
+
+
+def _programs_for_batch(programs: list[dict], b: dict) -> list[dict]:
+    """โปรแกรมที่ใช้กับชุดนี้ — ตามฉลากวัคซีนอหิวาต์: ลูกจากแม่ที่ไม่เคยได้รับวัคซีน ฉีดเข็มเดียวอายุ 1 วัน แล้วซ้ำทุกปี"""
+    if b.get("sow_vaccinated", True) is not False:
+        return programs
+    csf = [p for p in programs if _is_csf(p["vaccine_name"])]
+    if not csf:
+        return programs
+    first = min(csf, key=lambda p: p["dose_no"])
+    rep = max((p.get("repeat_days") or 0) for p in csf) or 365
+    single = {**first, "dose_no": 1, "age_days": 1, "repeat_days": rep, "_single": True}
+    out, placed = [], False
+    for p in programs:
+        if not _is_csf(p["vaccine_name"]):
+            out.append(p)
+        elif not placed:
+            out.append(single); placed = True
+    return sorted(out, key=lambda p: p["age_days"])
+
+
 def _batch_plan_rows(window_days: int = PLAN_WINDOW_DAYS) -> list[dict]:
     """คำนวณทุกเข็มของทุกชุด: วันที่ครบกำหนด + สถานะ — ไม่เก็บลงฐานข้อมูล คำนวณสดจากวันเกิด+โปรแกรม"""
     today = datetime.now(BANGKOK).date()
@@ -1469,7 +1494,7 @@ def _batch_plan_rows(window_days: int = PLAN_WINDOW_DAYS) -> list[dict]:
         except (TypeError, ValueError):
             continue
         age = (today - birth).days
-        for pg in programs:
+        for pg in _programs_for_batch(programs, b):
             # เข็มตามโปรแกรม + เข็มกระตุ้น (ถ้ามี repeat_days) จนถึงอายุสูงสุด
             shots = [(0, pg["age_days"])]
             if pg.get("repeat_days"):
@@ -1491,7 +1516,9 @@ def _batch_plan_rows(window_days: int = PLAN_WINDOW_DAYS) -> list[dict]:
                     "batch_id": b["id"], "batch_name": b["name"], "barn_no": b.get("barn_no"), "pen_no": b.get("pen_no"),
                     "pig_count": b.get("pig_count"), "batch_age_days": age,
                     "program_id": pg["id"], "vaccine_name": pg["vaccine_name"], "dose_no": pg["dose_no"],
-                    "booster_no": booster_no, "label": (f"เข็มที่ {pg['dose_no']}" if booster_no == 0 else f"กระตุ้นรอบ {booster_no}"),
+                    "booster_no": booster_no,
+                    "label": ("เข็มเดียว" if pg.get("_single") and booster_no == 0 else f"เข็มที่ {pg['dose_no']}" if booster_no == 0 else f"กระตุ้นรอบ {booster_no}"),
+                    "sow_vaccinated": b.get("sow_vaccinated", True),
                     "route": pg.get("route"), "dose": pg.get("dose"),
                     "age_at_days": age_at, "due_date": due.isoformat(), "days_left": (due - today).days,
                     "status": status, "done_date": done.get(key),
@@ -2892,6 +2919,7 @@ def _add_batch_from_voice(text: str) -> str:
         "pen_no": f"คอก {pm.group(1)}" if pm else None,
         "pig_count": int(cm.group(1)) if cm else None,
         "note": "เพิ่มด้วยเสียง",
+        "sow_vaccinated": not any(w in text.replace(" ", "") for w in ("แม่ไม่เคย", "ไม่เคยฉีด", "ไม่เคยได้รับ", "แม่ยังไม่ฉีด")),
     }
     supabase.table("pig_batches").insert(row).execute()
     # บอกเข็มแรกที่จะถึงเลย ผู้ใช้จะได้รู้ว่าระบบทำอะไรให้

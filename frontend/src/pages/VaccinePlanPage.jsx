@@ -129,7 +129,7 @@ export default function VaccinePlanPage() {
             <button type="button" key={b.id} className={`vq-batch ${String(b.id) === sel ? 'on' : ''}`} onClick={() => setSel(String(b.id))}>
               <i className="ti ti-pig" aria-hidden="true" />
               <span className="vq-batch-name">{b.name}</span>
-              <span className="vq-batch-sub">{fmtAge(b.age_days)} · {b.pig_count ?? '?'} ตัว</span>
+              <span className="vq-batch-sub">{fmtAge(b.age_days)} · {b.pig_count ?? '?'} ตัว{b.sow_vaccinated === false ? ' · แม่ไม่เคยฉีด' : ''}</span>
               {n && n.status !== 'upcoming' && <span className={`vq-dot ${tone}`} />}
             </button>
           )
@@ -241,7 +241,7 @@ export default function VaccinePlanPage() {
 // ---------- จุดเริ่มต้นเดียว: ใส่วันเกิด → สร้างแผน ----------
 // ค่าตั้งต้น = วันนี้ กดปุ่มเดียวก็สร้างได้ · รายละเอียดอื่น (โรงเรือน/คอก/จำนวน) ซ่อนไว้ ไม่บังคับ
 function StartPanel({ onAdded, chains }) {
-  const EMPTY = { name: '', birth_date: todayStr(), age_weeks: '', age_days: '', barn_no: '', pen_no: '', pig_count: '' }
+  const EMPTY = { name: '', birth_date: todayStr(), age_weeks: '', age_days: '', barn_no: '', pen_no: '', pig_count: '', sow_vaccinated: true }
   const [f, setF] = useState(EMPTY)
   const [mode, setMode] = useState('birth')   // 'birth' = รู้วันเกิด | 'age' = รู้แค่อายุ
   const [more, setMore] = useState(false)
@@ -259,7 +259,7 @@ function StartPanel({ onAdded, chains }) {
     if (!ready || busy) return
     setBusy(true); setErr('')
     try {
-      const row = await savePigBatch({ name: f.name.trim() || autoName, birth_date: birth, barn_no: f.barn_no || null, pen_no: f.pen_no || null, pig_count: f.pig_count === '' ? null : Number(f.pig_count) })
+      const row = await savePigBatch({ name: f.name.trim() || autoName, birth_date: birth, barn_no: f.barn_no || null, pen_no: f.pen_no || null, pig_count: f.pig_count === '' ? null : Number(f.pig_count), sow_vaccinated: f.sow_vaccinated })
       setF(EMPTY); setMore(false); onAdded(row)
     } catch (x) { setErr(x?.detail || 'สร้างไม่สำเร็จ') } finally { setBusy(false) }
   }
@@ -284,6 +284,13 @@ function StartPanel({ onAdded, chains }) {
               </div>
             )}
             <button type="button" className="vq-link vq-start-switch" onClick={() => setMode(mode === 'age' ? 'birth' : 'age')}>{mode === 'age' ? 'รู้วันเกิด? ใส่วันเกิดแทน' : 'ไม่รู้วันเกิด? ใส่อายุแทน'}</button>
+            {/* ตามฉลากวัคซีนอหิวาต์: แม่ไม่เคยฉีด → ลูกฉีดเข็มเดียวอายุ 1 วัน */}
+            <div className="vq-sow">
+              <span>แม่หมูเคยฉีดอหิวาต์?</span>
+              <button type="button" className={`chip ${f.sow_vaccinated ? 'chip-on' : ''}`} onClick={() => setF((x) => ({ ...x, sow_vaccinated: true }))}>เคย</button>
+              <button type="button" className={`chip ${!f.sow_vaccinated ? 'chip-on' : ''}`} onClick={() => setF((x) => ({ ...x, sow_vaccinated: false }))}>ไม่เคย</button>
+              <small>{f.sow_vaccinated ? 'อหิวาต์ 6 + 12 สัปดาห์' : 'อหิวาต์เข็มเดียว อายุ 1 วัน'}</small>
+            </div>
           </div>
         </div>
         <i className="ti ti-arrow-right vq-start-arrow" aria-hidden="true" />

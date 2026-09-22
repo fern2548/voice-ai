@@ -217,6 +217,8 @@ create table if not exists vaccine_programs (
 );
 
 -- บันทึกการฉีดผูกกับแผน (ฉีดแล้วเข็มนั้นของชุดนั้นเป็น ✓)
+-- แม่หมูเคยได้รับวัคซีนอหิวาต์ไหม (false = ลูกฉีดเข็มเดียวอายุ 1 วัน แล้วซ้ำทุกปี)
+alter table pig_batches add column if not exists sow_vaccinated boolean not null default true;
 alter table vaccine_log add column if not exists batch_id bigint references pig_batches(id) on delete set null;
 alter table vaccine_log add column if not exists program_id bigint references vaccine_programs(id) on delete set null;
 alter table vaccine_log add column if not exists booster_no integer;
