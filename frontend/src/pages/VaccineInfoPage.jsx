@@ -109,6 +109,7 @@ export default function VaccineInfoPage() {
               <div className="vi-bottle-fallback"><i className="ti ti-flask-2" aria-hidden="true" /><span>ยังไม่มีรูป — วางไฟล์ที่ public{v.image}</span></div>
             )}
           </div>
+          {v.kind && <div className="vi-kind">{v.kind}</div>}
           {v.packs.length > 0 && (
             <div className="vi-packs">{v.packs.map((p) => <span key={p} className="vi-pack">ขนาด {p}</span>)}</div>
           )}
@@ -118,9 +119,16 @@ export default function VaccineInfoPage() {
           <div className="vi-card-head"><i className="ti ti-calendar-event" aria-hidden="true" /> กำหนดการฉีด</div>
           {v.schedule.length > 0 ? (
             <div className="vi-rows">
+              {v.scheduleTitle && <div className="vi-case">{v.scheduleTitle}</div>}
               {v.schedule.map((s) => (
                 <div className="vi-row" key={s.label}><span className="vi-pill">{s.label}</span><span>{s.when}</span></div>
               ))}
+              {v.scheduleAlt && <>
+                <div className="vi-case">{v.scheduleAlt.title}</div>
+                {v.scheduleAlt.rows.map((s) => (
+                  <div className="vi-row" key={`alt-${s.label}`}><span className="vi-pill">{s.label}</span><span>{s.when}</span></div>
+                ))}
+              </>}
             </div>
           ) : (
             <div className="vi-empty">ยังไม่มีกำหนดการในแคตตาล็อก — ยึดตามฉลาก</div>
