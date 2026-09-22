@@ -14,7 +14,7 @@
 //   schedule  [{label, when}] เข็มแรก/เข็มกระตุ้น
 //   packs     ขนาดบรรจุที่มี
 //   notes     สิ่งที่ควรรู้ 2-4 ข้อ
-//   image     รูปขวดวัคซีน วางไว้ที่ public/vaccines/<id>.webp (ไม่มีไฟล์ = โชว์ไอคอนแทน)
+//   image     รูปขวดวัคซีน public/vaccines/<id>.svg (ภาพวาด) — มีรูปถ่ายจริงค่อยเปลี่ยนเป็น .webp
 
 export const VACCINES = [
   {
@@ -32,7 +32,7 @@ export const VACCINES = [
     ],
     packs: ['10 โดส', '75 โดส'],
     notes: ['เก็บที่ 2–8°C', 'ใช้ตามฉลากหรือคำแนะนำสัตวแพทย์', 'บันทึกทุกครั้งหลังฉีด'],
-    image: '/vaccines/fmd.webp',
+    image: '/vaccines/fmd.svg',
   },
   {
     id: 'prrs',
@@ -46,7 +46,7 @@ export const VACCINES = [
     schedule: [],
     packs: [],
     notes: ['เก็บที่ 2–8°C', 'โดสและรอบฉีดยึดตามฉลาก', 'บันทึกทุกครั้งหลังฉีด'],
-    image: '/vaccines/prrs.webp',
+    image: '/vaccines/prrs.svg',
   },
   {
     // ตามเอกสารวัคซีนสุกร (Swine Fever Vaccine): เชื้อเป็นชนิดดูดแห้ง 10/30 โดส พร้อมน้ำยาละลาย
@@ -74,7 +74,7 @@ export const VACCINES = [
     },
     packs: ['10 โดส', '30 โดส'],
     notes: ['ผสมน้ำยาละลายก่อนใช้ ใช้ให้หมดหลังผสม', 'เก็บที่ 2–8°C', 'บันทึกทุกครั้งหลังฉีด'],
-    image: '/vaccines/csf.webp',
+    image: '/vaccines/csf.svg',
   },
 ]
 

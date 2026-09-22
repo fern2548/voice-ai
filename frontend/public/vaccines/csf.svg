@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 300" width="360" height="300">
+  <ellipse cx="180.0" cy="286" rx="144.0" ry="10" fill="#0f172a" opacity="0.10"/>
+  <g>
+    <rect x="88.0" y="30" width="64.0" height="22" rx="5" fill="#2f3a4a"/>
+    <rect x="88.0" y="48" width="64.0" height="6" fill="#9aa5b5"/>
+    <rect x="94.0" y="52" width="52.0" height="16" fill="#e8f4ff" stroke="#b7c6d6" stroke-width="1.5"/>
+    <rect x="70" y="68" width="100" height="217" rx="10" fill="#e8f4ff" stroke="#b7c6d6" stroke-width="2"/>
+    <rect x="73" y="122.25" width="94" height="159.75" rx="7" fill="#bfe3ff" opacity="0.85"/>
+    <rect x="86.0" y="76" width="10.0" height="199" rx="3" fill="#fff" opacity="0.55"/>
+    <rect x="68" y="133.1" width="104" height="91.14" fill="#fff" stroke="#cfd8e3" stroke-width="1.5"/>
+    <rect x="68" y="133.1" width="104" height="25.5192" fill="#1a8f5c"/>
+    <text x="120.0" y="151.328" text-anchor="middle" font-family="Segoe UI, Tahoma, sans-serif" font-size="13" font-weight="700" fill="#fff">น้ำยาละลาย</text>
+    <text x="120.0" y="189.6068" text-anchor="middle" font-family="Segoe UI, Tahoma, sans-serif" font-size="13" font-weight="700" fill="#1f2937">10 โดส</text>
+    <line x1="95.0" y1="204.1892" x2="145.0" y2="204.1892" stroke="#94a3b8" stroke-width="2"/>
+    <line x1="102.0" y1="215.12599999999998" x2="138.0" y2="215.12599999999998" stroke="#cbd5e1" stroke-width="2"/>
+  </g>
+  <g>
+    <rect x="216.2" y="95" width="57.6" height="20" rx="5" fill="#2f3a4a"/>
+    <rect x="216.2" y="111" width="57.6" height="6" fill="#9aa5b5"/>
+    <rect x="221.6" y="115" width="46.800000000000004" height="16" fill="#f4f7fb" stroke="#b7c6d6" stroke-width="1.5"/>
+    <rect x="200" y="131" width="90" height="154" rx="10" fill="#f4f7fb" stroke="#b7c6d6" stroke-width="2"/>
+    <rect x="203" y="231.1" width="84" height="50.9" rx="7" fill="#fde68a" opacity="0.85"/>
+    <rect x="214.4" y="139" width="9.0" height="136" rx="3" fill="#fff" opacity="0.55"/>
+    <rect x="198" y="177.2" width="94" height="64.67999999999999" fill="#fff" stroke="#cfd8e3" stroke-width="1.5"/>
+    <rect x="198" y="177.2" width="94" height="18.1104" fill="#1a8f5c"/>
+    <text x="245.0" y="190.136" text-anchor="middle" font-family="Segoe UI, Tahoma, sans-serif" font-size="12" font-weight="700" fill="#fff">Swine Fever</text>
+    <text x="245.0" y="217.30159999999998" text-anchor="middle" font-family="Segoe UI, Tahoma, sans-serif" font-size="12" font-weight="700" fill="#1f2937">อหิวาต์สุกร</text>
+    <line x1="222.5" y1="227.6504" x2="267.5" y2="227.6504" stroke="#94a3b8" stroke-width="2"/>
+    <line x1="228.8" y1="235.41199999999998" x2="261.2" y2="235.41199999999998" stroke="#cbd5e1" stroke-width="2"/>
+  </g>
+</svg>
