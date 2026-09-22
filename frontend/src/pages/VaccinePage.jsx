@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   deleteVaccineProduct, getVaccineHistory, getVaccineProducts, getVaccineStats,
@@ -9,6 +9,7 @@ import VaccineDuePanel from '../components/VaccineDuePanel.jsx'
 import VaccineFollowup from '../components/VaccineFollowup.jsx'
 import usePolling from '../hooks/usePolling.js'
 import { apiUrl } from '../config.js'
+import { createRecognizer, pickBestTranscript } from '../utils/speech.js'
 
 // หน้า "บันทึกข้อมูลวัคซีนในฟาร์มสุกร" — ครบ 4 หมวดตามมาตรฐานการบันทึกวัคซีน
 //   ① ทะเบียนวัคซีน (ล็อต วันหมดอายุ ผู้ผลิต)   → ตรวจย้อนหลังตอนเกิดโรค / เอกสาร GAP
@@ -56,6 +57,36 @@ function Chips({ options, value, onChange, allowClear = true }) {
             onClick={() => onChange(on && allowClear ? '' : id)}>{text}</button>
         )
       })}
+    </div>
+  )
+}
+
+// ---------- ช่องข้อความที่พูดใส่ได้ (ใช้กับ "ระบุอาการ") ----------
+// กดไมค์ครั้งแรกเริ่มฟัง ข้อความไหลเข้าช่องสด ๆ กดอีกครั้งหยุด — พิมพ์แก้ต่อได้เลย
+function DictateInput({ value, onChange, placeholder }) {
+  const [listening, setListening] = useState(false)
+  const recRef = useRef(null)
+  const baseRef = useRef('')
+  const toggle = () => {
+    if (recRef.current) { recRef.current.stop(); return }
+    const r = createRecognizer()
+    if (!r) { alert('เบราว์เซอร์นี้ไม่รองรับการฟังเสียง ใช้ Chrome / Edge'); return }
+    recRef.current = r
+    baseRef.current = value ? value.trim() + ' ' : ''
+    r.onresult = (e) => onChange(baseRef.current + pickBestTranscript(e.results))
+    r.onerror = () => { recRef.current = null; setListening(false) }
+    r.onend = () => { recRef.current = null; setListening(false) }
+    try { r.start(); setListening(true) } catch { recRef.current = null }
+  }
+  useEffect(() => () => recRef.current?.stop(), [])
+  return (
+    <div className={`vx-dictate ${listening ? 'on' : ''}`}>
+      <input className="chat-input" value={value} onChange={(e) => onChange(e.target.value)}
+        placeholder={listening ? 'กำลังฟัง... พูดได้เลย' : placeholder} />
+      <button type="button" className={`vx-mic ${listening ? 'on' : ''}`} onClick={toggle}
+        title={listening ? 'หยุดฟัง' : 'พูดใส่'} aria-label={listening ? 'หยุดฟัง' : 'พูดใส่'}>
+        <i className={`ti ${listening ? 'ti-player-stop-filled' : 'ti-microphone'}`} aria-hidden="true" />
+      </button>
     </div>
   )
 }
@@ -200,7 +231,7 @@ function ProductsPanel({ products, onChanged, isAdmin }) {
 // ---------- ② ③ ④ ฟอร์มบันทึกการฉีด 1 ครั้ง ----------
 function RecordForm({ products, onSaved, presetVaccine }) {
   const EMPTY = {
-    log_date: todayStr(), log_time: '', product_id: '', vaccine_name: '', lot_no: '', route: '', dose: '', reaction: 'normal', next_due_date: '',
+    log_date: todayStr(), log_time: '', product_id: '', vaccine_name: '', lot_no: '', route: '', dose: '', reaction: 'normal', reaction_note: '', next_due_date: '',
     pig_ids: '', barn_no: '', pen_no: '', pig_count: '', male_count: '', female_count: '', age_stage: '', pig_status: 'normal',
     injector: '', antibody_result: 'none', note: '',
   }
@@ -229,6 +260,7 @@ function RecordForm({ products, onSaved, presetVaccine }) {
         product_id: f.product_id ? Number(f.product_id) : null,
         vaccine_name: f.vaccine_name.trim() || null, lot_no: f.lot_no.trim() || null,
         route: f.route || null, dose: f.dose.trim() || null, reaction: f.reaction || null,
+        reaction_note: f.reaction !== 'normal' && f.reaction_note.trim() ? f.reaction_note.trim() : null,
         next_due_date: f.next_due_date || null,
         pig_ids: f.pig_ids.trim() || null, barn_no: f.barn_no || null, pen_no: f.pen_no || null,
         pig_count: f.pig_count !== '' ? Number(f.pig_count) : (total || null),
@@ -278,7 +310,14 @@ function RecordForm({ products, onSaved, presetVaccine }) {
               <input className="chat-input" value={f.dose} onChange={set('dose')} placeholder="เช่น 2 มล." /></label>
           </div>
           <div className="pig-form-field"><span>อาการทันทีหลังฉีด</span><Chips options={REACTIONS} value={f.reaction} onChange={setV('reaction')} allowClear={false} />
-            {f.reaction !== 'normal' && <small className="vx-hint warn"><i className="ti ti-alert-triangle" aria-hidden="true" /> พบอาการ — ระบบจะขึ้นในช่อง "อาการหลังฉีดผิดปกติ" และเตือนตรวจซ้ำ</small>}
+            {f.reaction !== 'normal' && (
+              <>
+                {/* เลือก "อื่น ๆ" ต้องบอกว่าคืออะไร · เลือกอาการอื่นก็ขยายความได้ — พิมพ์หรือกดไมค์พูดใส่ */}
+                <DictateInput value={f.reaction_note} onChange={setV('reaction_note')}
+                  placeholder={f.reaction === 'other' ? 'ระบุอาการ เช่น ตัวสั่น หายใจถี่ ตกใจง่าย (พิมพ์หรือกดไมค์พูด)' : 'รายละเอียดเพิ่มเติม เช่น บวมเท่าเหรียญบาท 3 ตัว (ไม่บังคับ)'} />
+                <small className="vx-hint warn"><i className="ti ti-alert-triangle" aria-hidden="true" /> พบอาการ — ระบบจะขึ้นในช่อง "อาการหลังฉีดผิดปกติ" และเตือนตรวจซ้ำ</small>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -400,7 +439,7 @@ function HistoryPanel({ tick, onLineSent }) {
                 <td>{r.pig_count ?? '—'}{(r.male_count != null || r.female_count != null) && <div className="vx-dim">♂ {r.male_count ?? 0} / ♀ {r.female_count ?? 0}</div>}</td>
                 <td>{r.age_stage || '—'}</td>
                 <td>{r.pig_status ? <span className={`vx-pill ${statusTone(r.pig_status)}`}>{label(PIG_STATUS, r.pig_status)}</span> : '—'}</td>
-                <td>{r.reaction ? <span className={`vx-pill ${r.reaction === 'normal' ? 'ok' : 'watch'}`}>{label(REACTIONS, r.reaction)}</span> : '—'}</td>
+                <td>{r.reaction ? <span className={`vx-pill ${r.reaction === 'normal' ? 'ok' : 'watch'}`}>{label(REACTIONS, r.reaction)}</span> : '—'}{r.reaction_note && <div className="vx-dim vx-note">{r.reaction_note}</div>}</td>
                 <td>{r.injector || '—'}{r.antibody_result && r.antibody_result !== 'none' && <div className="vx-dim">{label(ANTIBODY, r.antibody_result)}</div>}</td>
                 <td>{fmtDate(r.next_due_date)}</td>
                 <td className="vx-note">{r.note || '—'}</td>

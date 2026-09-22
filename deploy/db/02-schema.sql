@@ -184,6 +184,7 @@ create table if not exists vaccine_products (
 alter table vaccine_log add column if not exists product_id bigint references vaccine_products(id) on delete set null;
 alter table vaccine_log add column if not exists route text;
 alter table vaccine_log add column if not exists reaction text;
+alter table vaccine_log add column if not exists reaction_note text;
 alter table vaccine_log add column if not exists pig_ids text;
 alter table vaccine_log add column if not exists male_count integer;
 alter table vaccine_log add column if not exists female_count integer;

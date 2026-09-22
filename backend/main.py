@@ -540,6 +540,7 @@ class VaccineLog(BaseModel):
     route: Optional[str] = None            # IM | SQ | spray | oral | water
     dose: Optional[str] = None
     reaction: Optional[str] = None         # อาการทันทีหลังฉีด: normal | fever | lethargy | swelling | other
+    reaction_note: Optional[str] = None    # รายละเอียดอาการ (พิมพ์หรือพูดใส่) ใช้เมื่อเลือก "อื่น ๆ" หรืออยากขยายความ
     next_due_date: Optional[date] = None
     # หมวด 3 สุกรที่ได้รับ
     pig_ids: Optional[str] = None          # หมายเลขหู คั่นด้วย , (ว่างได้ถ้าฉีดทั้งคอก)
