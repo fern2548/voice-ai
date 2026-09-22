@@ -1379,11 +1379,14 @@ def delete_vaccine_followup(followup_id: int):
 PLAN_WINDOW_DAYS = int(os.environ.get("PLAN_WINDOW_DAYS", "7"))
 PLAN_MAX_AGE_DAYS = 400   # ไม่สร้างเข็มกระตุ้นเกินอายุนี้ (หมูขุนขายก่อน)
 
-# โปรแกรมตั้งต้น — ตัวเลขจากข้อมูลวัคซีน FMD ของฟาร์ม (เข็ม 1 อายุ 2 เดือน, เข็ม 2 อายุ 3 เดือน, กระตุ้นทุก 6 เดือน)
-# ตัวอื่นให้สัตวแพทย์กำหนดแล้วเพิ่มเอง ไม่ใส่ตัวเลขเดา
+# โปรแกรมมาตรฐานของฟาร์ม (ตามที่ฟาร์มกำหนด) — ใส่ให้อัตโนมัติตอนยังไม่มีโปรแกรม แก้/เพิ่มในหน้าเว็บได้
+#   ปากเท้าเปื่อย: เข็ม 1 อายุ 2 เดือน · เข็ม 2 อายุ 3 เดือน · กระตุ้นทุก 6 เดือน
+#   อหิวาต์สุกร:   เข็ม 1 อายุ 6 สัปดาห์ · เข็ม 2 อายุ 12 สัปดาห์ · กระตุ้นทุก 1 ปี
 _DEFAULT_PROGRAM = [
-    {"vaccine_name": "FMD", "dose_no": 1, "age_days": 60, "route": "IM", "dose": "2 มล./ตัว", "repeat_days": None, "note": "ปากและเท้าเปื่อย เข็มแรก"},
-    {"vaccine_name": "FMD", "dose_no": 2, "age_days": 90, "route": "IM", "dose": "2 มล./ตัว", "repeat_days": 180, "note": "เข็มสอง แล้วกระตุ้นทุก 6 เดือน"},
+    {"vaccine_name": "ปากเท้าเปื่อย (FMD)", "dose_no": 1, "age_days": 60, "route": "IM", "dose": "2 มล./ตัว", "repeat_days": None, "note": "อายุ 2 เดือน"},
+    {"vaccine_name": "ปากเท้าเปื่อย (FMD)", "dose_no": 2, "age_days": 90, "route": "IM", "dose": "2 มล./ตัว", "repeat_days": 180, "note": "อายุ 3 เดือน แล้วซ้ำทุก 6 เดือน"},
+    {"vaccine_name": "อหิวาต์สุกร (CSF)", "dose_no": 1, "age_days": 42, "route": "IM", "dose": None, "repeat_days": None, "note": "อายุ 6 สัปดาห์"},
+    {"vaccine_name": "อหิวาต์สุกร (CSF)", "dose_no": 2, "age_days": 84, "route": "IM", "dose": None, "repeat_days": 365, "note": "อายุ 12 สัปดาห์ แล้วซ้ำทุก 1 ปี"},
 ]
 
 
@@ -1413,7 +1416,16 @@ def delete_pig_batch(batch_id: int):
 @app.get("/vaccine-programs")
 def list_vaccine_programs():
     rows = supabase.table("vaccine_programs").select("*").order("age_days").order("dose_no").execute().data or []
-    return {"rows": rows, "default": _DEFAULT_PROGRAM}
+    seeded = False
+    if not rows:
+        # ครั้งแรกใส่โปรแกรมมาตรฐานของฟาร์มให้เลย จะได้เพิ่มชุดหมูแล้วเห็นแผนทันที
+        try:
+            supabase.table("vaccine_programs").insert(_DEFAULT_PROGRAM).execute()
+            rows = supabase.table("vaccine_programs").select("*").order("age_days").order("dose_no").execute().data or []
+            seeded = True
+        except Exception as e:
+            print(f"[warn] ใส่โปรแกรมมาตรฐานไม่สำเร็จ: {e}")
+    return {"rows": rows, "default": _DEFAULT_PROGRAM, "seeded": seeded}
 
 
 @app.post("/vaccine-programs", dependencies=[Depends(verify_admin_token)])
@@ -2819,6 +2831,49 @@ def _needs_pig_breed_info(text: str) -> bool:
 # แยกกลไกจาก Q&A ปกติ: ตรวจจับ "คำสั่ง" (record intent) แล้วบันทึกลง DB ตรง ๆ
 # ทำแบบ deterministic (regex/keyword) ไม่ใช้ LLM ช่วยดึงข้อมูล เพราะการบันทึกข้อมูลต้องแม่นยำ
 # 100% (จากที่เจอมาก่อนหน้า โมเดลเล็กอย่าง Ollama ไม่น่าเชื่อถือพอสำหรับงานที่ต้องแม่นยำ)
+# "เพิ่มชุดหมู รุ่นกันยา อายุ 3 สัปดาห์ 40 ตัว โรงเรือน 2" → สร้างชุดหมู + แผนวัคซีนทั้งรุ่นให้ทันที
+_BATCH_ADD_WORDS = ("เพิ่มชุดหมู", "เพิ่มรุ่นหมู", "เพิ่มชุด", "ลงชุดหมู", "บันทึกชุดหมู", "สร้างชุดหมู", "เพิ่มรุ่น")
+_AGE_RE = re.compile(r"อายุ\s*(\d+)\s*(วัน|สัปดาห์|อาทิตย์|เดือน)")
+_COUNT_RE = re.compile(r"(\d+)\s*ตัว")
+_BARN_RE = re.compile(r"(?:โรงเรือน|เล้า)\s*(\d+)")
+_PEN_RE = re.compile(r"คอก\s*(\d+)")
+
+
+def _is_batch_add_command(text: str) -> bool:
+    return any(w in text.replace(" ", "") for w in _BATCH_ADD_WORDS)
+
+
+def _add_batch_from_voice(text: str) -> str:
+    today = datetime.now(BANGKOK).date()
+    m = _AGE_RE.search(text)
+    if not m:
+        return "บอกอายุด้วยครับ เช่น เพิ่มชุดหมู อายุ 3 สัปดาห์ 40 ตัว โรงเรือน 2"
+    n, unit = int(m.group(1)), m.group(2)
+    days = n * (30 if unit == "เดือน" else 7 if unit in ("สัปดาห์", "อาทิตย์") else 1)
+    birth = today - timedelta(days=days)
+    cm, bm, pm = _COUNT_RE.search(text), _BARN_RE.search(text), _PEN_RE.search(text)
+    # ชื่อชุด: ถ้าพูด "รุ่น…"/"ชื่อ…" ใช้คำนั้น ไม่งั้นตั้งจากเดือนเกิด
+    nm = re.search(r"(?:ชื่อ|รุ่น)\s*([^\s,]+)", text)
+    name = nm.group(1) if nm and nm.group(1) not in ("หมู",) else f"ชุดเกิด {birth.strftime('%d/%m')}"
+    row = {
+        "name": name, "birth_date": birth.isoformat(),
+        "barn_no": f"โรงเรือน {bm.group(1)}" if bm else None,
+        "pen_no": f"คอก {pm.group(1)}" if pm else None,
+        "pig_count": int(cm.group(1)) if cm else None,
+        "note": "เพิ่มด้วยเสียง",
+    }
+    supabase.table("pig_batches").insert(row).execute()
+    # บอกเข็มแรกที่จะถึงเลย ผู้ใช้จะได้รู้ว่าระบบทำอะไรให้
+    nxt = [r for r in _batch_plan_rows(60) if r["batch_name"] == name and r["status"] != "done"]
+    tail = ""
+    if nxt:
+        r = nxt[0]
+        when = "วันนี้" if r["days_left"] == 0 else (f"อีก {r['days_left']} วัน" if r["days_left"] > 0 else f"เลยมาแล้ว {-r['days_left']} วัน")
+        tail = f" เข็มถัดไป {r['vaccine_name']} {r['label']} {when}"
+    where = " ".join(x for x in [row["barn_no"], row["pen_no"]] if x)
+    return f"เพิ่มชุด {name} อายุ {n} {unit} {row['pig_count'] or ''} ตัว{(' ' + where) if where else ''} แล้วครับ สร้างแผนวัคซีนให้แล้ว{tail}"
+
+
 _VACCINE_RECORD_VERBS = ("บันทึก", "จด")
 _VACCINE_WORDS = ("วัคซีน", "ฉีดยา", "ฉีดวัคซีน")
 
@@ -3767,6 +3822,13 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
 
     # คำสั่งบันทึกการฉีดวัคซีนด้วยเสียง -> บันทึกลง DB ตรง ๆ ไม่ผ่าน AI เลย (ต้องแม่นยำ ห้ามมั่ว)
     # อาการหลังฉีด -> ต้องเช็คก่อนคำสั่งบันทึกการฉีด เพราะประโยคมีคำว่า "วัคซีน" เหมือนกัน
+    if _is_batch_add_command(text):
+        try:
+            return Answer(answer=_add_batch_from_voice(text))
+        except Exception as e:
+            print(f"[warn] เพิ่มชุดหมูไม่สำเร็จ: {e}")
+            return Answer(answer="ขออภัยครับ เพิ่มชุดหมูไม่สำเร็จ ลองพูดใหม่อีกครั้งนะครับ")
+
     if _is_followup_record_command(text):
         try:
             return Answer(answer=_record_followup_from_voice(text))

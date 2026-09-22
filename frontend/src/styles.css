@@ -2846,3 +2846,29 @@ th, td { font-size: 14px; }
 .vp-done { padding: 7px 12px; font-size: 13px; gap: 5px; }
 .vp-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px 14px; font-size: 13px; color: var(--text-dim); }
 .vp-foot i { color: var(--accent); }
+
+/* แผนวัคซีน: ต้องทำต่อไป / โหมดใส่อายุ / สายโซ่โปรแกรม */
+.vp-next { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.vp-next-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.vp-next-card.due { border-color: var(--warn); } .vp-next-card.overdue { border-color: var(--danger); }
+.vp-next-batch { font-weight: 700; font-size: 14.5px; }
+.vp-next-shot { font-size: 15px; display: flex; align-items: center; gap: 6px; }
+.vp-next-card.due .vp-next-shot i { color: var(--warn); } .vp-next-card.overdue .vp-next-shot i { color: var(--danger); } .vp-next-card.upcoming .vp-next-shot i { color: var(--text-dim); }
+.vp-next-when { font-size: 13.5px; font-weight: 600; }
+.vp-next-card.overdue .vp-next-when { color: var(--danger); } .vp-next-card.due .vp-next-when { color: var(--warn); }
+.vp-next-card .vp-done { margin-top: 6px; align-self: flex-start; }
+.vp-mode { display: flex; gap: 6px; }
+.vp-calc { padding: 11px 12px; background: var(--panel-2); border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--accent); }
+.vp-voice-tip { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-dim); }
+.vp-voice-tip i { color: var(--accent); }
+.vp-chains { display: flex; flex-direction: column; gap: 10px; padding: 6px 16px 12px; }
+.vp-chain { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; }
+.vp-chain-name { font-weight: 700; font-size: 14.5px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.vp-chain-name i { color: var(--accent); }
+.vp-chain-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 13.5px; }
+.vp-step-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.vp-step { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 3px 11px; white-space: nowrap; }
+.vp-step.repeat { border-color: var(--accent); color: var(--accent); display: inline-flex; gap: 4px; align-items: center; }
+.vp-arrow { color: var(--text-dim); }
+.vp-chain-note { padding: 0 2px; }
+.vp-edit-bar { padding: 6px 16px 0; }

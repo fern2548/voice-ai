@@ -18,9 +18,13 @@ const fmtDate = (iso) => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })
 }
 // อายุเป็นวันอ่านยาก → แปลงเป็น "9 สัปดาห์ 1 วัน" / "3 เดือน"
+// ใช้หน่วยที่ฟาร์มพูดกันจริง: 42 → "6 สัปดาห์", 60 → "2 เดือน", 365 → "1 ปี"
 const fmtAge = (days) => {
   if (days == null) return '—'
   if (days < 0) return 'ยังไม่เกิด'
+  if (days % 365 === 0) return `${days / 365} ปี`
+  if (days % 30 === 0 && days >= 30) return `${days / 30} เดือน`
+  if (days % 7 === 0 && days >= 14) return `${days / 7} สัปดาห์`
   if (days < 14) return `${days} วัน`
   if (days < 90) { const w = Math.floor(days / 7), d = days % 7; return `${w} สัปดาห์${d ? ` ${d} วัน` : ''}` }
   const m = Math.floor(days / 30), d = days % 30
@@ -62,6 +66,15 @@ export default function VaccinePlanPage() {
   const rows = useMemo(() => (plan?.rows || []).filter((r) => (!filterBatch || String(r.batch_id) === filterBatch) && (!hideDone || r.status !== 'done')), [plan, filterBatch, hideDone])
   const sum = plan?.summary || {}
 
+  // เพิ่มชุดเสร็จ → กรองแผนไปชุดนั้นเลย ผู้ใช้เห็นทันทีว่าระบบสร้างอะไรให้
+  const onBatchAdded = (row) => { if (row?.id) setFilterBatch(String(row.id)); setMsg(`เพิ่มชุด "${row?.name}" แล้ว — นี่คือแผนฉีดทั้งรุ่นของชุดนี้`); refresh() }
+  // เข็มถัดไปของแต่ละชุด (ที่ยังไม่ฉีด) — สิ่งเดียวที่คนงานต้องรู้ในแต่ละวัน
+  const nextPerBatch = useMemo(() => {
+    const m = new Map()
+    for (const r of plan?.rows || []) if (r.status !== 'done' && !m.has(r.batch_id)) m.set(r.batch_id, r)
+    return [...m.values()].sort((a, b) => a.days_left - b.days_left)
+  }, [plan])
+
   const done = async (r) => {
     if (!window.confirm(`บันทึกว่าฉีด ${r.vaccine_name} ${r.label} ให้ ${r.batch_name} (${r.pig_count ?? '?'} ตัว) วันนี้?`)) return
     try { await markPlanDone(r.batch_id, r.program_id, r.booster_no); setMsg(`บันทึก ${r.batch_name} ${r.vaccine_name} ${r.label} แล้ว`); refresh() }
@@ -89,9 +102,26 @@ export default function VaccinePlanPage() {
         ))}
       </div>
 
+      {/* ต้องทำต่อไป — การ์ดละชุด */}
+      {nextPerBatch.length > 0 && (
+        <div className="vp-next">
+          {nextPerBatch.map((r) => {
+            const st = STATUS[r.status]
+            return (
+              <div className={`vp-next-card ${r.status}`} key={r.batch_id}>
+                <div className="vp-next-batch">{r.batch_name} <span className="vp-dim">· อายุ {fmtAge(r.batch_age_days)} · {r.pig_count ?? '?'} ตัว</span></div>
+                <div className="vp-next-shot"><i className={`ti ${st.icon}`} aria-hidden="true" /> {r.vaccine_name} {r.label}</div>
+                <div className="vp-next-when">{r.days_left === 0 ? 'วันนี้' : r.days_left > 0 ? `อีก ${r.days_left} วัน` : `เลยมา ${-r.days_left} วัน`} <span className="vp-dim">({fmtDate(r.due_date)})</span></div>
+                {r.status !== 'upcoming' && <AdminGate><button className="ask-btn vp-done" type="button" onClick={() => done(r)}><i className="ti ti-check" aria-hidden="true" /> ฉีดแล้ว</button></AdminGate>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       <div className="vp-grid">
         <AdminGate>
-          <BatchPanel batches={batches} onChanged={refresh} />
+          <BatchPanel batches={batches} onChanged={refresh} onAdded={onBatchAdded} />
           <ProgramPanel programs={programs} onChanged={refresh} />
         </AdminGate>
       </div>
@@ -149,9 +179,15 @@ export default function VaccinePlanPage() {
 }
 
 // ---------- ชุดหมู ----------
-function BatchPanel({ batches, onChanged }) {
-  const EMPTY = { name: '', birth_date: '', barn_no: '', pen_no: '', pig_count: '', note: '' }
+function BatchPanel({ batches, onChanged, onAdded }) {
+  const EMPTY = { name: '', birth_date: '', age_weeks: '', age_days: '', barn_no: '', pen_no: '', pig_count: '', note: '' }
   const [f, setF] = useState(EMPTY)
+  // คนงานมักรู้ "อายุ" มากกว่า "วันเกิด" → ให้ใส่ได้ทั้งสองแบบ ระบบคำนวณอีกอันให้
+  const [mode, setMode] = useState('age')
+  const birthFromAge = () => {
+    const d = (Number(f.age_weeks) || 0) * 7 + (Number(f.age_days) || 0)
+    return new Date(Date.now() - d * 864e5).toLocaleDateString('sv-SE')
+  }
   const [open, setOpen] = useState(batches.length === 0)
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
@@ -160,10 +196,14 @@ function BatchPanel({ batches, onChanged }) {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!f.name.trim() || !f.birth_date) return
+    const birth = mode === 'age' ? birthFromAge() : f.birth_date
+    if (mode === 'age' && f.age_weeks === '' && f.age_days === '') return
+    if (!birth) return
+    // ไม่ตั้งชื่อก็ได้ — ตั้งให้จากวันเกิด
+    const name = f.name.trim() || `ชุดเกิด ${fmtDate(birth)}`
     try {
-      await savePigBatch({ name: f.name.trim(), birth_date: f.birth_date, barn_no: f.barn_no || null, pen_no: f.pen_no || null, pig_count: f.pig_count === '' ? null : Number(f.pig_count), note: f.note || null })
-      setF(EMPTY); setErr(''); onChanged()
+      const row = await savePigBatch({ name, birth_date: birth, barn_no: f.barn_no || null, pen_no: f.pen_no || null, pig_count: f.pig_count === '' ? null : Number(f.pig_count), note: f.note || null })
+      setF(EMPTY); setErr(''); onAdded ? onAdded(row) : onChanged()
     } catch (x) { setErr(x?.detail || 'บันทึกไม่สำเร็จ') }
   }
   const remove = async (b) => { if (window.confirm(`ลบชุด "${b.name}"? (แผนของชุดนี้จะหายไปด้วย)`)) { await deletePigBatch(b.id).catch(() => {}); onChanged() } }
@@ -177,9 +217,21 @@ function BatchPanel({ batches, onChanged }) {
       </div>
       {open && (
         <form className="pig-form vp-form" onSubmit={submit}>
+          <div className="vp-mode">
+            <button type="button" className={`chip ${mode === 'age' ? 'chip-on' : ''}`} onClick={() => setMode('age')}>ใส่อายุตอนนี้</button>
+            <button type="button" className={`chip ${mode === 'birth' ? 'chip-on' : ''}`} onClick={() => setMode('birth')}>ใส่วันเกิด</button>
+          </div>
           <div className="pig-form-row">
-            <label className="pig-form-field"><span>ชื่อชุด / รุ่น *</span><input className="chat-input" value={f.name} onChange={set('name')} placeholder="เช่น รุ่น ก.ย. 69 หรือ แม่ 12 ครอกที่ 3" required /></label>
-            <label className="pig-form-field"><span>วันเกิด *</span><input type="date" className="chat-input" value={f.birth_date} max={todayStr()} onChange={set('birth_date')} required /></label>
+            {mode === 'age' ? (
+              <>
+                <label className="pig-form-field vp-narrow"><span>อายุ (สัปดาห์) *</span><input type="number" min="0" className="chat-input" value={f.age_weeks} onChange={set('age_weeks')} placeholder="เช่น 3" /></label>
+                <label className="pig-form-field vp-narrow"><span>+ วัน</span><input type="number" min="0" max="6" className="chat-input" value={f.age_days} onChange={set('age_days')} placeholder="0" /></label>
+                <div className="pig-form-field"><span>วันเกิดโดยประมาณ</span><div className="vp-calc">{(f.age_weeks !== '' || f.age_days !== '') ? fmtDate(birthFromAge()) : '—'}</div></div>
+              </>
+            ) : (
+              <label className="pig-form-field"><span>วันเกิด *</span><input type="date" className="chat-input" value={f.birth_date} max={todayStr()} onChange={set('birth_date')} /></label>
+            )}
+            <label className="pig-form-field"><span>ชื่อชุด / รุ่น</span><input className="chat-input" value={f.name} onChange={set('name')} placeholder="ว่างได้ — ตั้งให้จากวันเกิด" /></label>
           </div>
           <div className="pig-form-row">
             <label className="pig-form-field"><span>โรงเรือน</span><select className="chat-input" value={f.barn_no} onChange={set('barn_no')}><option value="">—</option>{BARNS.map((b) => <option key={b}>{b}</option>)}</select></label>
@@ -187,9 +239,10 @@ function BatchPanel({ batches, onChanged }) {
             <label className="pig-form-field"><span>จำนวน (ตัว)</span><input type="number" min="1" className="chat-input" value={f.pig_count} onChange={set('pig_count')} /></label>
           </div>
           <div className="pig-form-actions">
-            <button className="ask-btn" type="submit"><i className="ti ti-device-floppy" aria-hidden="true" /> เพิ่มชุดหมู</button>
+            <button className="ask-btn" type="submit"><i className="ti ti-device-floppy" aria-hidden="true" /> เพิ่มชุดหมู → สร้างแผนให้เลย</button>
             {err && <span className="pig-form-msg">{err}</span>}
           </div>
+          <div className="vp-voice-tip"><i className="ti ti-microphone" aria-hidden="true" /> พูดก็ได้: “เพิ่มชุดหมู อายุ 3 สัปดาห์ 40 ตัว โรงเรือน 2”</div>
         </form>
       )}
       <div className="vp-list">
@@ -212,8 +265,15 @@ function ProgramPanel({ programs, onChanged }) {
   const EMPTY = { vaccine_name: '', dose_no: '1', age_days: '', route: '', dose: '', repeat_days: '', note: '' }
   const [f, setF] = useState(EMPTY)
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [err, setErr] = useState('')
   const rows = programs?.rows || []
+  // รวมเป็นสายโซ่ต่อวัคซีน: "เข็ม 1 อายุ 2 เดือน → เข็ม 2 อายุ 3 เดือน → ซ้ำทุก 6 เดือน"
+  const chains = useMemo(() => {
+    const m = new Map()
+    for (const r of rows) { if (!m.has(r.vaccine_name)) m.set(r.vaccine_name, []); m.get(r.vaccine_name).push(r) }
+    return [...m.entries()].map(([name, list]) => ({ name, list: list.sort((a, b) => a.age_days - b.age_days) }))
+  }, [rows])
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
 
   const submit = async (e) => {
@@ -231,13 +291,35 @@ function ProgramPanel({ programs, onChanged }) {
     <div className="panel vp-sec">
       <div className="vp-sec-head">
         <i className="ti ti-vaccine" aria-hidden="true" />
-        <span className="vp-sec-title">โปรแกรมวัคซีนของฟาร์ม <small>{rows.length} เข็ม</small></span>
-        <button type="button" className="btn-clear vp-add" onClick={() => setOpen((o) => !o)}><i className={`ti ${open ? 'ti-x' : 'ti-plus'}`} aria-hidden="true" /> {open ? 'ปิด' : 'เพิ่มเข็ม'}</button>
+        <span className="vp-sec-title">โปรแกรมวัคซีนของฟาร์ม <small>{chains.length} วัคซีน · {rows.length} เข็ม</small></span>
+        <button type="button" className="btn-clear vp-add" onClick={() => { setEditing((e) => !e); setOpen(false) }}><i className={`ti ${editing ? 'ti-check' : 'ti-pencil'}`} aria-hidden="true" /> {editing ? 'เสร็จ' : 'แก้ไข'}</button>
       </div>
+      {!editing && chains.length > 0 && (
+        <div className="vp-chains">
+          {chains.map((c) => (
+            <div className="vp-chain" key={c.name}>
+              <div className="vp-chain-name"><i className="ti ti-vaccine" aria-hidden="true" /> {c.name}</div>
+              <div className="vp-chain-steps">
+                {c.list.map((r, i) => (
+                  <span key={r.id} className="vp-step-wrap">
+                    {i > 0 && <i className="ti ti-arrow-right vp-arrow" aria-hidden="true" />}
+                    <span className="vp-step"><b>เข็ม {r.dose_no}</b> อายุ {fmtAge(r.age_days)}</span>
+                  </span>
+                ))}
+                {c.list.some((r) => r.repeat_days) && <span className="vp-step-wrap"><i className="ti ti-arrow-right vp-arrow" aria-hidden="true" /><span className="vp-step repeat"><i className="ti ti-repeat" aria-hidden="true" /> ซ้ำทุก {fmtAge(c.list.find((r) => r.repeat_days).repeat_days)}</span></span>}
+              </div>
+            </div>
+          ))}
+          <div className="vp-dim vp-chain-note">โปรแกรมมาตรฐานของฟาร์ม — กด "แก้ไข" เพื่อเพิ่มวัคซีนหรือเปลี่ยนอายุ</div>
+        </div>
+      )}
+      {editing && (
+        <div className="vp-edit-bar"><button type="button" className="btn-clear vp-add" onClick={() => setOpen((o) => !o)}><i className={`ti ${open ? 'ti-x' : 'ti-plus'}`} aria-hidden="true" /> {open ? 'ปิดฟอร์ม' : 'เพิ่มเข็ม'}</button></div>
+      )}
       {programs && rows.length === 0 && (
         <div className="vp-default">
-          <div>ยังไม่มีโปรแกรม — เริ่มจากโปรแกรมตั้งต้น (FMD เข็ม 1 อายุ 2 เดือน → เข็ม 2 อายุ 3 เดือน → กระตุ้นทุก 6 เดือน) แล้วเพิ่มวัคซีนอื่นตามที่สัตวแพทย์กำหนด</div>
-          <button className="ask-btn" type="button" onClick={useDefault}><i className="ti ti-sparkles" aria-hidden="true" /> ใช้โปรแกรมตั้งต้น</button>
+          <div>ยังไม่มีโปรแกรม — ใส่โปรแกรมมาตรฐานของฟาร์ม (ปากเท้าเปื่อย 2 เดือน/3 เดือน ซ้ำทุก 6 เดือน · อหิวาต์ 6/12 สัปดาห์ ซ้ำทุกปี)</div>
+          <button className="ask-btn" type="button" onClick={useDefault}><i className="ti ti-sparkles" aria-hidden="true" /> ใช้โปรแกรมมาตรฐาน</button>
         </div>
       )}
       {open && (
@@ -261,7 +343,7 @@ function ProgramPanel({ programs, onChanged }) {
           </div>
         </form>
       )}
-      <div className="vp-list">
+      {editing && <div className="vp-list">
         {rows.map((p) => (
           <div className="vp-item" key={p.id}>
             <div>
@@ -271,7 +353,7 @@ function ProgramPanel({ programs, onChanged }) {
             <button className="pager-btn" onClick={() => remove(p)} title="ลบ"><i className="ti ti-trash" aria-hidden="true" /></button>
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   )
 }

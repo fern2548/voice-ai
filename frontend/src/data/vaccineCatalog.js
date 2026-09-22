@@ -53,11 +53,14 @@ export const VACCINES = [
     match: ['อหิวา', 'csf', 'swine fever'],
     route: 'IM',
     dose: null,
-    repeat: null,
-    repeatDays: null,
-    schedule: [],
+    repeat: 'ทุก 1 ปี',
+    repeatDays: 365,
+    schedule: [
+      { label: 'เข็มที่ 1', when: 'อายุสุกร 6 สัปดาห์' },
+      { label: 'เข็มที่ 2', when: 'อายุสุกร 12 สัปดาห์' },
+    ],
     packs: [],
-    notes: ['เก็บที่ 2–8°C', 'โดสและรอบฉีดยึดตามฉลาก', 'บันทึกทุกครั้งหลังฉีด'],
+    notes: ['เก็บที่ 2–8°C', 'โดสยึดตามฉลาก', 'บันทึกทุกครั้งหลังฉีด'],
     image: '/vaccines/csf.webp',
   },
 ]
