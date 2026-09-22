@@ -151,7 +151,7 @@ function ProductsPanel({ products, onChanged, isAdmin }) {
   }
 
   return (
-    <div className="panel vx-sec">
+    <div className="panel vx-sec" id="vx-s1">
       <div className="vx-sec-head">
         <span className="vx-num">1</span>
         <i className="ti ti-vaccine" aria-hidden="true" />
@@ -281,7 +281,7 @@ function RecordForm({ products, onSaved, presetVaccine }) {
   return (
     <form className="vx-record" onSubmit={submit}>
       {/* ② */}
-      <div className="panel vx-sec">
+      <div className="panel vx-sec" id="vx-s2">
         <div className="vx-sec-head"><span className="vx-num">2</span><i className="ti ti-syringe" aria-hidden="true" /><span className="vx-sec-title">ข้อมูลการให้วัคซีน</span></div>
         <div className="pig-form vx-form">
           <div className="pig-form-row">
@@ -323,7 +323,7 @@ function RecordForm({ products, onSaved, presetVaccine }) {
       </div>
 
       {/* ③ */}
-      <div className="panel vx-sec">
+      <div className="panel vx-sec" id="vx-s3">
         <div className="vx-sec-head"><span className="vx-num">3</span><i className="ti ti-pig" aria-hidden="true" /><span className="vx-sec-title">ข้อมูลสุกรที่ได้รับวัคซีน</span></div>
         <div className="pig-form vx-form">
           <label className="pig-form-field"><span>หมายเลขหู / เลขประจำตัวสุกร</span>
@@ -350,7 +350,7 @@ function RecordForm({ products, onSaved, presetVaccine }) {
       </div>
 
       {/* ④ */}
-      <div className="panel vx-sec">
+      <div className="panel vx-sec" id="vx-s4">
         <div className="vx-sec-head"><span className="vx-num">4</span><i className="ti ti-user-check" aria-hidden="true" /><span className="vx-sec-title">ข้อมูลผู้ฉีดและการติดตาม</span></div>
         <div className="pig-form vx-form">
           <div className="pig-form-row">
@@ -401,7 +401,7 @@ function HistoryPanel({ tick, onLineSent }) {
   }
 
   return (
-    <div className="panel vx-sec">
+    <div className="panel vx-sec" id="vx-history">
       <div className="vx-sec-head">
         <i className="ti ti-history" aria-hidden="true" />
         <span className="vx-sec-title">ประวัติการฉีด <small>{total} รายการ</small></span>
@@ -459,6 +459,47 @@ function HistoryPanel({ tick, onLineSent }) {
   )
 }
 
+// ---------- เมนูหมวดด้านบน (sticky) — กดแล้วเลื่อนไปหัวข้อนั้น ไฮไลต์หมวดที่กำลังดูอยู่ ----------
+const SECTIONS = [
+  { id: 'vx-s1', n: 1, label: 'ข้อมูลวัคซีน' },
+  { id: 'vx-s2', n: 2, label: 'ข้อมูลการให้วัคซีน' },
+  { id: 'vx-s3', n: 3, label: 'ข้อมูลสุกรที่ได้รับวัคซีน' },
+  { id: 'vx-s4', n: 4, label: 'ข้อมูลผู้ฉีดและการติดตาม' },
+  { id: 'vx-history', n: null, label: 'ประวัติ', icon: 'ti-history' },
+  { id: 'vx-followup', n: null, label: 'ติดตามอาการ', icon: 'ti-stethoscope' },
+]
+
+function SectionNav() {
+  const [active, setActive] = useState('vx-s1')
+  useEffect(() => {
+    // หมวดไหนอยู่ใกล้ขอบบนสุด (ใต้เมนู) ถือว่ากำลังดูหมวดนั้น
+    const els = SECTIONS.map((x) => document.getElementById(x.id)).filter(Boolean)
+    if (!els.length) return
+    const io = new IntersectionObserver((entries) => {
+      const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+      if (vis[0]) setActive(vis[0].target.id)
+    }, { rootMargin: '-140px 0px -60% 0px', threshold: 0 })
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [])
+  const go = (id) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setActive(id)
+  }
+  return (
+    <nav className="vx-nav" aria-label="หมวดในหน้านี้">
+      {SECTIONS.map((x) => (
+        <button type="button" key={x.id} className={`vx-nav-btn ${active === x.id ? 'on' : ''}`} onClick={() => go(x.id)}>
+          {x.n ? <span className="vx-nav-num">{x.n}</span> : <i className={`ti ${x.icon}`} aria-hidden="true" />}
+          {x.label}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
 // ---------- เหตุผลที่ต้องบันทึกละเอียด ----------
 const WHY = [
   { icon: 'ti-calendar-stats', tone: 'green', t: 'วางแผนตารางฉีดวัคซีน', d: 'ให้ตรงรอบการผลิต ไม่พลาดกำหนดการ' },
@@ -494,6 +535,8 @@ export default function VaccinePage() {
 
       <StatTiles stats={stats} />
 
+      <SectionNav />
+
       <AdminGate>
         <ProductsPanel products={products} onChanged={refresh} isAdmin={isAdmin} />
         <RecordForm products={products} onSaved={refresh} presetVaccine={params.get('vaccine')} />
@@ -501,7 +544,7 @@ export default function VaccinePage() {
 
       <HistoryPanel tick={tick} />
 
-      <VaccineFollowup />
+      <div id="vx-followup"><VaccineFollowup /></div>
       <VaccineDuePanel />
 
       <div className="panel vx-why">
