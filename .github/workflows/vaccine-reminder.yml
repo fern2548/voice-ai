@@ -33,3 +33,7 @@ jobs:
           curl -sS --fail-with-body --max-time 60 \
             -X POST "${{ secrets.API_BASE }}/cron/vaccine-followup-notify" \
             -H "X-Cron-Key: ${{ secrets.CRON_KEY }}"
+
+      - name: ส่งแผนวัคซีนตามอายุที่ถึงกำหนดเข้า LINE
+        run: |
+          curl -sS --fail-with-body --max-time 60             -X POST "${{ secrets.API_BASE }}/cron/batch-plan-notify"             -H "X-Cron-Key: ${{ secrets.CRON_KEY }}"

@@ -528,6 +528,7 @@ export default function VaccinePage() {
           <p className="vx-sub">จัดการข้อมูลวัคซีนอย่างเป็นระบบ เพื่อสุขภาพสุกรที่ดี และฟาร์มที่ยั่งยืน</p>
         </div>
         <div className="vx-head-links">
+          <Link to="/vaccine-plan" className="btn-clear"><i className="ti ti-calendar-time" aria-hidden="true" /> แผนตามอายุ</Link>
           <Link to="/vaccine-info" className="btn-clear"><i className="ti ti-info-circle" aria-hidden="true" /> ข้อมูลวัคซีน</Link>
           <Link to="/vaccine-guide" className="btn-clear"><i className="ti ti-player-play" aria-hidden="true" /> วิธีฉีด</Link>
         </div>

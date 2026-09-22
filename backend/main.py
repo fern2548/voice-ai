@@ -555,6 +555,38 @@ class VaccineLog(BaseModel):
     injector: Optional[str] = None
     antibody_result: Optional[str] = None  # positive | negative | pending | none
     note: Optional[str] = None
+    # ผูกกับแผนตามอายุ (ถ้าฉีดตามแผน) — ใช้เช็คว่าเข็มนี้ของชุดนี้ฉีดแล้ว
+    batch_id: Optional[int] = None
+    program_id: Optional[int] = None
+    booster_no: Optional[int] = None
+
+
+class PigBatch(BaseModel):
+    """ชุด/รุ่นหมู — หมูที่เกิดพร้อมกัน เลี้ยงด้วยกัน ใช้แผนวัคซีนชุดเดียวกัน"""
+    name: str
+    birth_date: date
+    barn_no: Optional[str] = None
+    pen_no: Optional[str] = None
+    pig_count: Optional[int] = None
+    note: Optional[str] = None
+
+
+class VaccineProgram(BaseModel):
+    """โปรแกรมวัคซีนตามอายุ 1 แถว = วัคซีน 1 ตัว เข็มที่ N ฉีดตอนอายุกี่วัน"""
+    vaccine_name: str
+    dose_no: int = 1
+    age_days: int                          # อายุที่ฉีด (วัน) — 2 เดือน = 60
+    route: Optional[str] = None
+    dose: Optional[str] = None
+    repeat_days: Optional[int] = None      # หลังเข็มนี้ ฉีดกระตุ้นซ้ำทุกกี่วัน (ใส่ที่เข็มสุดท้าย)
+    note: Optional[str] = None
+
+
+class PlanDone(BaseModel):
+    batch_id: int
+    program_id: int
+    booster_no: int = 0                    # 0 = เข็มตามโปรแกรม, 1,2,… = กระตุ้นรอบที่
+    injector: Optional[str] = None
 
 
 class VaccineProduct(BaseModel):
@@ -1339,6 +1371,166 @@ def list_vaccine_followup(log_id: Optional[int] = None, limit: int = 100):
 def delete_vaccine_followup(followup_id: int):
     supabase.table("vaccine_followup").delete().eq("id", followup_id).execute()
     return {"ok": True}
+
+
+# ---------- แผนวัคซีนตามอายุ ----------
+# ใส่วันเกิดชุดหมู + โปรแกรม (วัคซีนไหน อายุกี่วัน) → ระบบคำนวณวันที่ต้องฉีดทุกเข็มของทุกชุดให้
+# สถานะแต่ละเข็ม: done (มี vaccine_log ที่ผูกไว้) · overdue · due (ใน 7 วัน) · upcoming
+PLAN_WINDOW_DAYS = int(os.environ.get("PLAN_WINDOW_DAYS", "7"))
+PLAN_MAX_AGE_DAYS = 400   # ไม่สร้างเข็มกระตุ้นเกินอายุนี้ (หมูขุนขายก่อน)
+
+# โปรแกรมตั้งต้น — ตัวเลขจากข้อมูลวัคซีน FMD ของฟาร์ม (เข็ม 1 อายุ 2 เดือน, เข็ม 2 อายุ 3 เดือน, กระตุ้นทุก 6 เดือน)
+# ตัวอื่นให้สัตวแพทย์กำหนดแล้วเพิ่มเอง ไม่ใส่ตัวเลขเดา
+_DEFAULT_PROGRAM = [
+    {"vaccine_name": "FMD", "dose_no": 1, "age_days": 60, "route": "IM", "dose": "2 มล./ตัว", "repeat_days": None, "note": "ปากและเท้าเปื่อย เข็มแรก"},
+    {"vaccine_name": "FMD", "dose_no": 2, "age_days": 90, "route": "IM", "dose": "2 มล./ตัว", "repeat_days": 180, "note": "เข็มสอง แล้วกระตุ้นทุก 6 เดือน"},
+]
+
+
+@app.get("/pig-batches")
+def list_pig_batches():
+    rows = supabase.table("pig_batches").select("*").order("birth_date", desc=True).execute().data or []
+    today = datetime.now(BANGKOK).date()
+    for r in rows:
+        try:
+            r["age_days"] = (today - date.fromisoformat(str(r["birth_date"]))).days
+        except (TypeError, ValueError):
+            r["age_days"] = None
+    return {"rows": rows}
+
+
+@app.post("/pig-batches", dependencies=[Depends(verify_admin_token)])
+def save_pig_batch(b: PigBatch):
+    return supabase.table("pig_batches").insert(b.model_dump(mode="json")).execute().data[0]
+
+
+@app.delete("/pig-batches/{batch_id}", dependencies=[Depends(verify_admin_token)])
+def delete_pig_batch(batch_id: int):
+    supabase.table("pig_batches").delete().eq("id", batch_id).execute()
+    return {"ok": True}
+
+
+@app.get("/vaccine-programs")
+def list_vaccine_programs():
+    rows = supabase.table("vaccine_programs").select("*").order("age_days").order("dose_no").execute().data or []
+    return {"rows": rows, "default": _DEFAULT_PROGRAM}
+
+
+@app.post("/vaccine-programs", dependencies=[Depends(verify_admin_token)])
+def save_vaccine_program(pg: VaccineProgram):
+    return supabase.table("vaccine_programs").insert(pg.model_dump(mode="json")).execute().data[0]
+
+
+@app.post("/vaccine-programs/use-default", dependencies=[Depends(verify_admin_token)])
+def use_default_program():
+    """ใส่โปรแกรมตั้งต้นให้ (เฉพาะตอนยังว่าง) แล้วค่อยแก้เพิ่มในหน้าเว็บ"""
+    existing = supabase.table("vaccine_programs").select("id", count="exact").execute().count or 0
+    if existing:
+        raise HTTPException(status_code=400, detail="มีโปรแกรมอยู่แล้ว ลบของเดิมก่อนถ้าจะเริ่มใหม่")
+    supabase.table("vaccine_programs").insert(_DEFAULT_PROGRAM).execute()
+    return {"ok": True, "count": len(_DEFAULT_PROGRAM)}
+
+
+@app.delete("/vaccine-programs/{program_id}", dependencies=[Depends(verify_admin_token)])
+def delete_vaccine_program(program_id: int):
+    supabase.table("vaccine_programs").delete().eq("id", program_id).execute()
+    return {"ok": True}
+
+
+def _batch_plan_rows(window_days: int = PLAN_WINDOW_DAYS) -> list[dict]:
+    """คำนวณทุกเข็มของทุกชุด: วันที่ครบกำหนด + สถานะ — ไม่เก็บลงฐานข้อมูล คำนวณสดจากวันเกิด+โปรแกรม"""
+    today = datetime.now(BANGKOK).date()
+    batches = supabase.table("pig_batches").select("*").execute().data or []
+    programs = supabase.table("vaccine_programs").select("*").order("age_days").execute().data or []
+    if not batches or not programs:
+        return []
+    done_rows = (
+        supabase.table("vaccine_log").select("batch_id, program_id, booster_no, log_date")
+        .not_.is_("batch_id", "null").execute().data or []
+    )
+    done = {(d["batch_id"], d["program_id"], d.get("booster_no") or 0): d["log_date"] for d in done_rows}
+
+    out = []
+    for b in batches:
+        try:
+            birth = date.fromisoformat(str(b["birth_date"]))
+        except (TypeError, ValueError):
+            continue
+        age = (today - birth).days
+        for pg in programs:
+            # เข็มตามโปรแกรม + เข็มกระตุ้น (ถ้ามี repeat_days) จนถึงอายุสูงสุด
+            shots = [(0, pg["age_days"])]
+            if pg.get("repeat_days"):
+                n, d = 1, pg["age_days"] + pg["repeat_days"]
+                while d <= PLAN_MAX_AGE_DAYS:
+                    shots.append((n, d)); n += 1; d += pg["repeat_days"]
+            for booster_no, age_at in shots:
+                due = birth + timedelta(days=age_at)
+                key = (b["id"], pg["id"], booster_no)
+                if key in done:
+                    status = "done"
+                elif due < today:
+                    status = "overdue"
+                elif (due - today).days <= window_days:
+                    status = "due"
+                else:
+                    status = "upcoming"
+                out.append({
+                    "batch_id": b["id"], "batch_name": b["name"], "barn_no": b.get("barn_no"), "pen_no": b.get("pen_no"),
+                    "pig_count": b.get("pig_count"), "batch_age_days": age,
+                    "program_id": pg["id"], "vaccine_name": pg["vaccine_name"], "dose_no": pg["dose_no"],
+                    "booster_no": booster_no, "label": (f"เข็มที่ {pg['dose_no']}" if booster_no == 0 else f"กระตุ้นรอบ {booster_no}"),
+                    "route": pg.get("route"), "dose": pg.get("dose"),
+                    "age_at_days": age_at, "due_date": due.isoformat(), "days_left": (due - today).days,
+                    "status": status, "done_date": done.get(key),
+                })
+    out.sort(key=lambda r: (r["due_date"], r["batch_name"], r["dose_no"]))
+    return out
+
+
+@app.get("/batch-plan")
+def batch_plan(days: int = PLAN_WINDOW_DAYS):
+    rows = _batch_plan_rows(max(0, min(60, days)))
+    summary = {k: sum(1 for r in rows if r["status"] == k) for k in ("done", "overdue", "due", "upcoming")}
+    return {"rows": rows, "summary": summary, "window_days": days}
+
+
+@app.post("/batch-plan/done", dependencies=[Depends(verify_admin_token)])
+def batch_plan_done(d: PlanDone, x_admin_token: str = Header(default="")):
+    """กด "ฉีดแล้ว" ที่แผน → สร้างบันทึกการฉีดให้อัตโนมัติ (ชุด+วัคซีน+เข็ม+จำนวน+โรงเรือน เติมให้หมด)"""
+    b = supabase.table("pig_batches").select("*").eq("id", d.batch_id).limit(1).execute().data
+    pg = supabase.table("vaccine_programs").select("*").eq("id", d.program_id).limit(1).execute().data
+    if not b or not pg:
+        raise HTTPException(status_code=404, detail="ไม่พบชุดหมูหรือโปรแกรม")
+    b, pg = b[0], pg[0]
+    log = VaccineLog(
+        log_date=datetime.now(BANGKOK).date(), vaccine_name=pg["vaccine_name"], route=pg.get("route"), dose=pg.get("dose"),
+        barn_no=b.get("barn_no"), pen_no=b.get("pen_no"), pig_count=b.get("pig_count"),
+        injector=d.injector or _session_username(x_admin_token), batch_id=b["id"], program_id=pg["id"], booster_no=d.booster_no,
+        note=f"ตามแผน: {b['name']} {'เข็มที่ ' + str(pg['dose_no']) if d.booster_no == 0 else 'กระตุ้นรอบ ' + str(d.booster_no)}",
+    )
+    return save_vaccine_log(log)
+
+
+@app.post("/cron/batch-plan-notify")
+def cron_batch_plan_notify(x_cron_key: str = Header(default="")):
+    """LINE ทุกเช้า: เข็มที่ถึงกำหนดใน 7 วัน + ที่เลยกำหนดแล้วยังไม่ฉีด"""
+    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    rows = [r for r in _batch_plan_rows() if r["status"] in ("due", "overdue")]
+    if not rows:
+        return {"ok": True, "sent": False, "count": 0}
+    lines = ["💉 แผนวัคซีนตามอายุ — ถึงกำหนด"]
+    for r in rows[:10]:
+        when = "วันนี้" if r["days_left"] == 0 else (f"อีก {r['days_left']} วัน" if r["days_left"] > 0 else f"เลยมา {-r['days_left']} วัน")
+        where = " ".join(x for x in [r.get("barn_no"), r.get("pen_no")] if x)
+        lines.append(f"• {r['batch_name']} · {r['vaccine_name']} {r['label']} · {when} ({r['due_date']}){' · ' + where if where else ''}")
+    if len(rows) > 10:
+        lines.append(f"…และอีก {len(rows) - 10} รายการ")
+    if PUBLIC_SITE_URL:
+        lines.append(f"ดูแผน: {PUBLIC_SITE_URL}/vaccine-plan")
+    _send_line_broadcast("\n".join(lines))
+    return {"ok": True, "sent": True, "count": len(rows)}
 
 
 @app.get("/vaccine-followup-due")
@@ -2973,6 +3165,22 @@ def _recent_followups(limit: int = 10) -> list[dict]:
     return rows
 
 
+def _fmt_batch_plan() -> str:
+    """แผนตามอายุที่ถึงกำหนด/เลยกำหนด (ไม่เกิน 8 รายการ) — ให้ AI ตอบ "ชุดไหนต้องฉีดอะไรเมื่อไหร่" ได้"""
+    try:
+        rows = [r for r in _batch_plan_rows(14) if r["status"] in ("due", "overdue")]
+    except Exception:
+        return ""
+    if not rows:
+        return "แผนวัคซีนตามอายุ: ไม่มีเข็มที่ถึงกำหนดใน 14 วันนี้"
+    lines = [
+        f"  {r['due_date']}: {r['batch_name']} (อายุ {r['batch_age_days']} วัน) {r['vaccine_name']} {r['label']}"
+        + (f" เลยกำหนด {-r['days_left']} วัน" if r["days_left"] < 0 else "")
+        for r in rows[:8]
+    ]
+    return "แผนวัคซีนตามอายุที่ถึงกำหนด:\n" + "\n".join(lines)
+
+
 def _fmt_followups(rows: list[dict], due: list[dict]) -> str:
     parts = []
     if rows:
@@ -3288,6 +3496,9 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
             parts.append(_fmt_followups(_recent_followups(), _followup_due_rows()))
         except Exception:
             pass
+        plan = _fmt_batch_plan()
+        if plan:
+            parts.append(plan)
 
     # เซนเซอร์ภายนอก — แนบเฉพาะชุดที่คำถามพูดถึง ดึงสดตอนถาม
     for src in (lab or []):

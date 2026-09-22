@@ -1,0 +1,277 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  deletePigBatch, deleteVaccineProgram, getBatchPlan, getPigBatches, getVaccinePrograms,
+  markPlanDone, savePigBatch, saveVaccineProgram, useDefaultProgram,
+} from '../api.js'
+import AdminGate from '../components/AdminGate.jsx'
+
+// หน้า "แผนวัคซีนตามอายุ"
+// ใส่ 2 อย่าง: (ก) ชุดหมู = วันเกิด + จำนวน + อยู่ไหน  (ข) โปรแกรม = วัคซีนไหน เข็มที่เท่าไหร่ ฉีดตอนอายุกี่วัน
+// ระบบคำนวณ "ตารางฉีดทั้งรุ่น" ให้เอง: ทุกเข็มของทุกชุดมีวันครบกำหนด + สถานะ (ฉีดแล้ว/เลยกำหนด/ใกล้ถึง/ยังไม่ถึง)
+// กด "ฉีดแล้ว" ที่แผน = สร้างบันทึกการฉีดให้ครบ ไม่ต้องกรอกเอง · LINE เตือนทุกเช้าเมื่อใกล้ถึง
+
+const todayStr = () => new Date().toLocaleDateString('sv-SE')
+const fmtDate = (iso) => {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })
+}
+// อายุเป็นวันอ่านยาก → แปลงเป็น "9 สัปดาห์ 1 วัน" / "3 เดือน"
+const fmtAge = (days) => {
+  if (days == null) return '—'
+  if (days < 0) return 'ยังไม่เกิด'
+  if (days < 14) return `${days} วัน`
+  if (days < 90) { const w = Math.floor(days / 7), d = days % 7; return `${w} สัปดาห์${d ? ` ${d} วัน` : ''}` }
+  const m = Math.floor(days / 30), d = days % 30
+  return `${m} เดือน${d ? ` ${d} วัน` : ''}`
+}
+const BARNS = ['โรงเรือน 1', 'โรงเรือน 2', 'โรงเรือน 3', 'โรงเรือน 4', 'โรงเรือน 5']
+const PENS = Array.from({ length: 10 }, (_, i) => `คอก ${i + 1}`)
+const ROUTES = [{ id: 'IM', label: 'IM เข้ากล้าม' }, { id: 'SQ', label: 'SQ ใต้ผิวหนัง' }, { id: 'spray', label: 'พ่นละออง' }, { id: 'oral', label: 'ทางปาก' }, { id: 'water', label: 'ผ่านน้ำดื่ม' }]
+// ตัวช่วยกรอกอายุ: กดเลือกแล้วแปลงเป็นวันให้
+const AGE_PRESETS = [
+  { label: '3 วัน', days: 3 }, { label: '1 สัปดาห์', days: 7 }, { label: '3 สัปดาห์', days: 21 }, { label: '1 เดือน', days: 30 },
+  { label: '2 เดือน', days: 60 }, { label: '3 เดือน', days: 90 }, { label: '4 เดือน', days: 120 }, { label: '6 เดือน', days: 180 },
+]
+const STATUS = {
+  done: { label: 'ฉีดแล้ว', tone: 'ok', icon: 'ti-circle-check' },
+  overdue: { label: 'เลยกำหนด', tone: 'bad', icon: 'ti-alert-triangle' },
+  due: { label: 'ใกล้ถึง', tone: 'watch', icon: 'ti-bell-ringing' },
+  upcoming: { label: 'ยังไม่ถึง', tone: '', icon: 'ti-clock' },
+}
+
+export default function VaccinePlanPage() {
+  const [tick, setTick] = useState(0)
+  const [batches, setBatches] = useState([])
+  const [programs, setPrograms] = useState(null)
+  const [plan, setPlan] = useState(null)
+  const [filterBatch, setFilterBatch] = useState('')
+  const [hideDone, setHideDone] = useState(false)
+  const [msg, setMsg] = useState('')
+  const refresh = () => setTick((t) => t + 1)
+
+  useEffect(() => {
+    let alive = true
+    getPigBatches().then((d) => alive && setBatches(d?.rows || [])).catch(() => {})
+    getVaccinePrograms().then((d) => alive && setPrograms(d)).catch(() => alive && setPrograms({ rows: [], default: [] }))
+    getBatchPlan(7).then((d) => alive && setPlan(d)).catch(() => alive && setPlan({ rows: [], summary: {} }))
+    return () => { alive = false }
+  }, [tick])
+
+  const rows = useMemo(() => (plan?.rows || []).filter((r) => (!filterBatch || String(r.batch_id) === filterBatch) && (!hideDone || r.status !== 'done')), [plan, filterBatch, hideDone])
+  const sum = plan?.summary || {}
+
+  const done = async (r) => {
+    if (!window.confirm(`บันทึกว่าฉีด ${r.vaccine_name} ${r.label} ให้ ${r.batch_name} (${r.pig_count ?? '?'} ตัว) วันนี้?`)) return
+    try { await markPlanDone(r.batch_id, r.program_id, r.booster_no); setMsg(`บันทึก ${r.batch_name} ${r.vaccine_name} ${r.label} แล้ว`); refresh() }
+    catch (e) { setMsg(e?.detail || 'บันทึกไม่สำเร็จ') }
+  }
+
+  return (
+    <div className="vp">
+      <header className="vp-head">
+        <span className="vp-head-icon"><i className="ti ti-calendar-time" aria-hidden="true" /></span>
+        <div>
+          <h1 className="vp-title">แผนวัคซีนตามอายุ</h1>
+          <p className="vp-sub">ใส่วันเกิดชุดหมู + โปรแกรมของฟาร์ม → ระบบสร้างตารางฉีดทั้งรุ่นให้ และเตือนก่อนถึงกำหนด</p>
+        </div>
+        <Link to="/vaccine" className="btn-clear vp-link"><i className="ti ti-clipboard-text" aria-hidden="true" /> หน้าบันทึกวัคซีน</Link>
+      </header>
+
+      {/* สรุป */}
+      <div className="vp-sum">
+        {[['overdue', 'เลยกำหนด'], ['due', 'ใกล้ถึง (7 วัน)'], ['upcoming', 'ยังไม่ถึง'], ['done', 'ฉีดแล้ว']].map(([k, l]) => (
+          <div className={`vp-sum-item ${STATUS[k].tone}`} key={k}>
+            <i className={`ti ${STATUS[k].icon}`} aria-hidden="true" />
+            <b>{sum[k] ?? '—'}</b><span>{l}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="vp-grid">
+        <AdminGate>
+          <BatchPanel batches={batches} onChanged={refresh} />
+          <ProgramPanel programs={programs} onChanged={refresh} />
+        </AdminGate>
+      </div>
+
+      {/* ตารางแผน */}
+      <div className="panel vp-plan">
+        <div className="vp-sec-head">
+          <i className="ti ti-list-check" aria-hidden="true" />
+          <span className="vp-sec-title">ตารางฉีดทั้งรุ่น <small>{rows.length} เข็ม</small></span>
+          <div className="vp-tools">
+            <select className="chat-input" value={filterBatch} onChange={(e) => setFilterBatch(e.target.value)}>
+              <option value="">ทุกชุด</option>
+              {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <label className="vp-check"><input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} /> ซ่อนที่ฉีดแล้ว</label>
+          </div>
+        </div>
+        {msg && <div className="vp-msg">{msg}</div>}
+        {!plan ? <div className="empty-note">กำลังโหลด…</div> : rows.length === 0 ? (
+          <div className="empty-note">
+            {batches.length === 0 ? 'ยังไม่มีชุดหมู — เพิ่มชุดหมูก่อน' : !programs?.rows?.length ? 'ยังไม่มีโปรแกรมวัคซีน — กด "ใช้โปรแกรมตั้งต้น" หรือเพิ่มเอง' : 'ไม่มีรายการ'}
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table vp-table">
+              <thead><tr><th>ครบกำหนด</th><th>ชุดหมู</th><th>วัคซีน</th><th>เข็ม</th><th>อายุตอนฉีด</th><th>วิธี · โดส</th><th>สถานะ</th><th /></tr></thead>
+              <tbody>
+                {rows.map((r) => {
+                  const st = STATUS[r.status]
+                  return (
+                    <tr key={`${r.batch_id}-${r.program_id}-${r.booster_no}`} className={`vp-row ${r.status}`}>
+                      <td><b>{fmtDate(r.due_date)}</b><div className="vp-dim">{r.status === 'done' ? `ฉีด ${fmtDate(r.done_date)}` : r.days_left === 0 ? 'วันนี้' : r.days_left > 0 ? `อีก ${r.days_left} วัน` : `เลยมา ${-r.days_left} วัน`}</div></td>
+                      <td>{r.batch_name}<div className="vp-dim">{[r.barn_no, r.pen_no].filter(Boolean).join(' · ') || '—'} · {r.pig_count ?? '?'} ตัว · อายุ {fmtAge(r.batch_age_days)}</div></td>
+                      <td><b>{r.vaccine_name}</b></td>
+                      <td>{r.label}</td>
+                      <td>{fmtAge(r.age_at_days)}<div className="vp-dim">{r.age_at_days} วัน</div></td>
+                      <td>{r.route || '—'}{r.dose && <div className="vp-dim">{r.dose}</div>}</td>
+                      <td><span className={`vp-pill ${st.tone}`}><i className={`ti ${st.icon}`} aria-hidden="true" /> {st.label}</span></td>
+                      <td>{r.status !== 'done' && (
+                        <AdminGate>
+                          <button className="ask-btn vp-done" type="button" onClick={() => done(r)}><i className="ti ti-check" aria-hidden="true" /> ฉีดแล้ว</button>
+                        </AdminGate>
+                      )}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="vp-foot"><i className="ti ti-bell" aria-hidden="true" /> LINE เตือนทุกเช้า 07:00 เมื่อมีเข็มถึงกำหนดใน 7 วันหรือเลยกำหนด · ถาม AI ได้ว่า "ชุดไหนต้องฉีดอะไรบ้าง"</div>
+      </div>
+    </div>
+  )
+}
+
+// ---------- ชุดหมู ----------
+function BatchPanel({ batches, onChanged }) {
+  const EMPTY = { name: '', birth_date: '', barn_no: '', pen_no: '', pig_count: '', note: '' }
+  const [f, setF] = useState(EMPTY)
+  const [open, setOpen] = useState(batches.length === 0)
+  const [err, setErr] = useState('')
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
+  // ยังไม่มีชุด → เปิดฟอร์มรอไว้เลย · มีแล้วพับเก็บ (กดเพิ่มชุดเมื่ออยากใส่)
+  useEffect(() => { setOpen(batches.length === 0) }, [batches.length])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!f.name.trim() || !f.birth_date) return
+    try {
+      await savePigBatch({ name: f.name.trim(), birth_date: f.birth_date, barn_no: f.barn_no || null, pen_no: f.pen_no || null, pig_count: f.pig_count === '' ? null : Number(f.pig_count), note: f.note || null })
+      setF(EMPTY); setErr(''); onChanged()
+    } catch (x) { setErr(x?.detail || 'บันทึกไม่สำเร็จ') }
+  }
+  const remove = async (b) => { if (window.confirm(`ลบชุด "${b.name}"? (แผนของชุดนี้จะหายไปด้วย)`)) { await deletePigBatch(b.id).catch(() => {}); onChanged() } }
+
+  return (
+    <div className="panel vp-sec">
+      <div className="vp-sec-head">
+        <i className="ti ti-pig" aria-hidden="true" />
+        <span className="vp-sec-title">ชุดหมู <small>{batches.length} ชุด</small></span>
+        <button type="button" className="btn-clear vp-add" onClick={() => setOpen((o) => !o)}><i className={`ti ${open ? 'ti-x' : 'ti-plus'}`} aria-hidden="true" /> {open ? 'ปิด' : 'เพิ่มชุด'}</button>
+      </div>
+      {open && (
+        <form className="pig-form vp-form" onSubmit={submit}>
+          <div className="pig-form-row">
+            <label className="pig-form-field"><span>ชื่อชุด / รุ่น *</span><input className="chat-input" value={f.name} onChange={set('name')} placeholder="เช่น รุ่น ก.ย. 69 หรือ แม่ 12 ครอกที่ 3" required /></label>
+            <label className="pig-form-field"><span>วันเกิด *</span><input type="date" className="chat-input" value={f.birth_date} max={todayStr()} onChange={set('birth_date')} required /></label>
+          </div>
+          <div className="pig-form-row">
+            <label className="pig-form-field"><span>โรงเรือน</span><select className="chat-input" value={f.barn_no} onChange={set('barn_no')}><option value="">—</option>{BARNS.map((b) => <option key={b}>{b}</option>)}</select></label>
+            <label className="pig-form-field"><span>คอก</span><select className="chat-input" value={f.pen_no} onChange={set('pen_no')}><option value="">—</option>{PENS.map((b) => <option key={b}>{b}</option>)}</select></label>
+            <label className="pig-form-field"><span>จำนวน (ตัว)</span><input type="number" min="1" className="chat-input" value={f.pig_count} onChange={set('pig_count')} /></label>
+          </div>
+          <div className="pig-form-actions">
+            <button className="ask-btn" type="submit"><i className="ti ti-device-floppy" aria-hidden="true" /> เพิ่มชุดหมู</button>
+            {err && <span className="pig-form-msg">{err}</span>}
+          </div>
+        </form>
+      )}
+      <div className="vp-list">
+        {batches.length === 0 ? <div className="empty-note">ยังไม่มีชุดหมู</div> : batches.map((b) => (
+          <div className="vp-item" key={b.id}>
+            <div>
+              <b>{b.name}</b> <span className="vp-dim">· {b.pig_count ?? '?'} ตัว · {[b.barn_no, b.pen_no].filter(Boolean).join(' ') || 'ไม่ระบุที่'}</span>
+              <div className="vp-dim">เกิด {fmtDate(b.birth_date)} · อายุตอนนี้ <b>{fmtAge(b.age_days)}</b></div>
+            </div>
+            <button className="pager-btn" onClick={() => remove(b)} title="ลบ"><i className="ti ti-trash" aria-hidden="true" /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------- โปรแกรมวัคซีน ----------
+function ProgramPanel({ programs, onChanged }) {
+  const EMPTY = { vaccine_name: '', dose_no: '1', age_days: '', route: '', dose: '', repeat_days: '', note: '' }
+  const [f, setF] = useState(EMPTY)
+  const [open, setOpen] = useState(false)
+  const [err, setErr] = useState('')
+  const rows = programs?.rows || []
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!f.vaccine_name.trim() || f.age_days === '') return
+    try {
+      await saveVaccineProgram({ vaccine_name: f.vaccine_name.trim(), dose_no: Number(f.dose_no) || 1, age_days: Number(f.age_days), route: f.route || null, dose: f.dose || null, repeat_days: f.repeat_days === '' ? null : Number(f.repeat_days), note: f.note || null })
+      setF({ ...EMPTY, vaccine_name: f.vaccine_name, dose_no: String((Number(f.dose_no) || 1) + 1) }); setErr(''); onChanged()
+    } catch (x) { setErr(x?.detail || 'บันทึกไม่สำเร็จ') }
+  }
+  const useDefault = async () => { try { await useDefaultProgram(); onChanged() } catch (x) { setErr(x?.detail || 'ใส่ไม่สำเร็จ') } }
+  const remove = async (p) => { if (window.confirm(`ลบ ${p.vaccine_name} เข็มที่ ${p.dose_no}?`)) { await deleteVaccineProgram(p.id).catch(() => {}); onChanged() } }
+
+  return (
+    <div className="panel vp-sec">
+      <div className="vp-sec-head">
+        <i className="ti ti-vaccine" aria-hidden="true" />
+        <span className="vp-sec-title">โปรแกรมวัคซีนของฟาร์ม <small>{rows.length} เข็ม</small></span>
+        <button type="button" className="btn-clear vp-add" onClick={() => setOpen((o) => !o)}><i className={`ti ${open ? 'ti-x' : 'ti-plus'}`} aria-hidden="true" /> {open ? 'ปิด' : 'เพิ่มเข็ม'}</button>
+      </div>
+      {programs && rows.length === 0 && (
+        <div className="vp-default">
+          <div>ยังไม่มีโปรแกรม — เริ่มจากโปรแกรมตั้งต้น (FMD เข็ม 1 อายุ 2 เดือน → เข็ม 2 อายุ 3 เดือน → กระตุ้นทุก 6 เดือน) แล้วเพิ่มวัคซีนอื่นตามที่สัตวแพทย์กำหนด</div>
+          <button className="ask-btn" type="button" onClick={useDefault}><i className="ti ti-sparkles" aria-hidden="true" /> ใช้โปรแกรมตั้งต้น</button>
+        </div>
+      )}
+      {open && (
+        <form className="pig-form vp-form" onSubmit={submit}>
+          <div className="pig-form-row">
+            <label className="pig-form-field"><span>วัคซีน *</span><input className="chat-input" value={f.vaccine_name} onChange={set('vaccine_name')} placeholder="เช่น FMD, PRRS" required /></label>
+            <label className="pig-form-field vp-narrow"><span>เข็มที่</span><input type="number" min="1" className="chat-input" value={f.dose_no} onChange={set('dose_no')} /></label>
+            <label className="pig-form-field vp-narrow"><span>อายุที่ฉีด (วัน) *</span><input type="number" min="0" className="chat-input" value={f.age_days} onChange={set('age_days')} required /></label>
+          </div>
+          <div className="chip-row">
+            {AGE_PRESETS.map((a) => <button type="button" key={a.days} className={`chip ${String(f.age_days) === String(a.days) ? 'chip-on' : ''}`} onClick={() => setF((x) => ({ ...x, age_days: String(a.days) }))}>{a.label}</button>)}
+          </div>
+          <div className="pig-form-row">
+            <label className="pig-form-field"><span>วิธีให้</span><select className="chat-input" value={f.route} onChange={set('route')}><option value="">—</option>{ROUTES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select></label>
+            <label className="pig-form-field"><span>โดส</span><input className="chat-input" value={f.dose} onChange={set('dose')} placeholder="เช่น 2 มล./ตัว" /></label>
+            <label className="pig-form-field"><span>กระตุ้นซ้ำทุก (วัน)</span><input type="number" min="0" className="chat-input" value={f.repeat_days} onChange={set('repeat_days')} placeholder="ว่าง = ไม่กระตุ้น" /></label>
+          </div>
+          <div className="pig-form-actions">
+            <button className="ask-btn" type="submit"><i className="ti ti-device-floppy" aria-hidden="true" /> เพิ่มเข้าโปรแกรม</button>
+            {err && <span className="pig-form-msg">{err}</span>}
+          </div>
+        </form>
+      )}
+      <div className="vp-list">
+        {rows.map((p) => (
+          <div className="vp-item" key={p.id}>
+            <div>
+              <b>{p.vaccine_name}</b> <span className="vp-pill">เข็มที่ {p.dose_no}</span>
+              <div className="vp-dim">ฉีดตอนอายุ <b>{fmtAge(p.age_days)}</b> ({p.age_days} วัน){p.route ? ` · ${p.route}` : ''}{p.dose ? ` · ${p.dose}` : ''}{p.repeat_days ? ` · กระตุ้นทุก ${p.repeat_days} วัน` : ''}</div>
+            </div>
+            <button className="pager-btn" onClick={() => remove(p)} title="ลบ"><i className="ti ti-trash" aria-hidden="true" /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

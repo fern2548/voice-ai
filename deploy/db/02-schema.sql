@@ -191,3 +191,32 @@ alter table vaccine_log add column if not exists female_count integer;
 alter table vaccine_log add column if not exists age_stage text;
 alter table vaccine_log add column if not exists pig_status text;
 alter table vaccine_log add column if not exists antibody_result text;
+
+-- แผนวัคซีนตามอายุ: ชุดหมู (วันเกิด) × โปรแกรม (วัคซีน/เข็ม/อายุ) → ระบบคำนวณวันฉีดให้ ไม่เก็บแผนลงตาราง
+create table if not exists pig_batches (
+  id bigint generated always as identity primary key,
+  name text not null,
+  birth_date date not null,
+  barn_no text,
+  pen_no text,
+  pig_count integer,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists vaccine_programs (
+  id bigint generated always as identity primary key,
+  vaccine_name text not null,
+  dose_no integer not null default 1,
+  age_days integer not null,     -- ฉีดตอนอายุกี่วัน
+  route text,
+  dose text,
+  repeat_days integer,           -- กระตุ้นซ้ำทุกกี่วันหลังเข็มนี้ (ว่าง = ไม่กระตุ้น)
+  note text,
+  created_at timestamptz not null default now()
+);
+
+-- บันทึกการฉีดผูกกับแผน (ฉีดแล้วเข็มนั้นของชุดนั้นเป็น ✓)
+alter table vaccine_log add column if not exists batch_id bigint references pig_batches(id) on delete set null;
+alter table vaccine_log add column if not exists program_id bigint references vaccine_programs(id) on delete set null;
+alter table vaccine_log add column if not exists booster_no integer;

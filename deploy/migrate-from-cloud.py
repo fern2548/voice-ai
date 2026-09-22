@@ -14,6 +14,8 @@ TABLES = [
     ("weather_readings", "id"),
     ("weather_predictions", "id"),
     ("pig_health_log", "id"),
+    ("pig_batches", "id"),
+    ("vaccine_programs", "id"),
     ("vaccine_products", "id"),
     ("vaccine_log", "id"),
     ("vaccine_schedule", "vaccine_name"),
