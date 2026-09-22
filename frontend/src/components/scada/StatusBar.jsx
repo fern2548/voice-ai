@@ -24,7 +24,7 @@ function useClock() {
 export default function StatusBar({ navItems = [], currentPath = '' }) {
   const { theme, setTheme } = useTheme()
   const now = useClock()
-  const { username, logout } = useAdminAuth()
+  const { username, logout, isAdmin, role } = useAdminAuth()
   // ใช้ /health เป็นตัวชี้สถานะการเชื่อมต่อ backend + DB
   const { health, healthError } = useLiveData()
   const online = !healthError && health?.db === true
@@ -116,13 +116,23 @@ export default function StatusBar({ navItems = [], currentPath = '' }) {
               {now.toLocaleTimeString('th-TH')} ·{' '}
               {now.toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })}
             </div>
-            <div className="menu-user">
-              <i className="ti ti-user-circle" aria-hidden="true" />
-              <span>{username || 'Admin'}</span>
-              <button onClick={logout} title="ออกจากระบบ">
-                <i className="ti ti-logout" aria-hidden="true" /> ออกจากระบบ
-              </button>
-            </div>
+            {isAdmin ? (
+              <div className="menu-user">
+                <i className="ti ti-user-circle" aria-hidden="true" />
+                <span>{username || 'Admin'}{role === 'admin' && <small className="menu-role">ผู้ดูแล</small>}</span>
+                <button onClick={logout} title="ออกจากระบบ">
+                  <i className="ti ti-logout" aria-hidden="true" /> ออกจากระบบ
+                </button>
+              </div>
+            ) : (
+              <div className="menu-user">
+                <i className="ti ti-user" aria-hidden="true" />
+                <span>ผู้เยี่ยมชม</span>
+                <Link to="/vaccine" onClick={() => setOpen(false)} className="menu-login" title="เข้าสู่ระบบสำหรับคนในบริษัท">
+                  <i className="ti ti-login" aria-hidden="true" /> เข้าสู่ระบบ
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </nav>

@@ -3,6 +3,7 @@ import { apiUrl } from '../config.js'
 
 const TOKEN_KEY = 'admin-token'
 const USERNAME_KEY = 'admin-username'
+const ROLE_KEY = 'admin-role'
 const AdminAuthContext = createContext(null)
 
 // backend เก็บ token ไว้ใน memory -> restart ทีไร token ในเบราว์เซอร์ก็ใช้ไม่ได้ทันที
@@ -11,6 +12,7 @@ const AdminAuthContext = createContext(null)
 function clearStoredSession() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USERNAME_KEY)
+  localStorage.removeItem(ROLE_KEY)
 }
 
 async function loginRequest(username, password) {
@@ -50,6 +52,8 @@ async function signupRequest(username, password, code) {
 export function AdminAuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || '')
   const [username, setUsername] = useState(() => localStorage.getItem(USERNAME_KEY) || '')
+  // guest = ไม่ได้ล็อกอิน (คนนอก ดูข้อมูลปกติได้) · staff = คนในบริษัท · admin = ผู้ดูแลระบบ
+  const [role, setRole] = useState(() => localStorage.getItem(ROLE_KEY) || 'guest')
   const [checking, setChecking] = useState(() => !!localStorage.getItem(TOKEN_KEY))
 
   // ตรวจ token ที่ค้างอยู่ตอนเปิดเว็บ ว่า backend ยังรู้จักไหม
@@ -65,6 +69,10 @@ export function AdminAuthProvider({ children }) {
           clearStoredSession()
           setToken('')
           setUsername('')
+          setRole('guest')
+        } else if (d.role) {
+          localStorage.setItem(ROLE_KEY, d.role)
+          setRole(d.role)
         }
       })
       .catch(() => {}) // ต่อ backend ไม่ได้ชั่วคราว -> ไม่เตะออก รอให้ลองใหม่เอง
@@ -78,6 +86,7 @@ export function AdminAuthProvider({ children }) {
       clearStoredSession()
       setToken('')
       setUsername('')
+      setRole('guest')
     }
     window.addEventListener('admin-session-expired', onExpired)
     return () => window.removeEventListener('admin-session-expired', onExpired)
@@ -86,8 +95,10 @@ export function AdminAuthProvider({ children }) {
   const acceptSession = (d) => {
     localStorage.setItem(TOKEN_KEY, d.token)
     localStorage.setItem(USERNAME_KEY, d.username)
+    localStorage.setItem(ROLE_KEY, d.role || 'staff')
     setToken(d.token)
     setUsername(d.username)
+    setRole(d.role || 'staff')
     setChecking(false)
   }
 
@@ -107,9 +118,11 @@ export function AdminAuthProvider({ children }) {
     clearStoredSession()
     setToken('')
     setUsername('')
+    setRole('guest')
   }
 
-  const value = { isAdmin: !!token, token, username, login, signup, logout, checking }
+  // isAdmin = ล็อกอินแล้ว (ชื่อเดิม ใช้ทั่วโค้ด) · isSuperAdmin = ผู้ดูแลระบบจริง ๆ
+  const value = { isAdmin: !!token, isSuperAdmin: role === 'admin', role, token, username, login, signup, logout, checking }
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>
 }
 

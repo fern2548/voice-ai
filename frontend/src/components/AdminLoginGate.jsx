@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAdminAuth } from '../context/AdminAuth.jsx'
 import { useTheme } from '../theme.jsx'
 import { FarmyLogo } from './FarmDecor.jsx'
 import { getSignupEnabled } from '../api.js'
 
-// บล็อกทั้งเว็บไว้จนกว่าจะล็อกอินสำเร็จ — ใช้ตอน deploy ขึ้น URL สาธารณะ
-// กันคนนอกที่ไม่รู้รหัสผ่านเข้ามาดูข้อมูลฟาร์ม
+// บล็อกเฉพาะ "หน้าภายใน" ไว้จนกว่าจะล็อกอิน — หน้าข้อมูลปกติ (อากาศ กราฟ คู่มือ) คนนอกเปิดดูได้เลย
+// backend กันข้อมูลภายในอีกชั้นอยู่แล้ว (401) หน้านี้แค่ทำให้คนนอกไม่เจอหน้าว่าง ๆ แต่เจอฟอร์มล็อกอินแทน
 //
 // มีสองโหมดในหน้าเดียว: เข้าสู่ระบบ กับ สมัครสมาชิก
 // โหมดสมัครจะโผล่ก็ต่อเมื่อผู้ดูแลตั้งรหัสเชิญไว้ในเซิร์ฟเวอร์เท่านั้น
 // (ถ้าเปิดให้ใครสมัครก็ได้ คนนอกที่เจอ URL จะเข้ามาเห็นข้อมูลฟาร์มทั้งหมดทันที)
-export default function AdminLoginGate({ children }) {
+// หน้าที่ต้องเป็นคนในบริษัท — ที่เหลือคนนอกดูได้
+export const INTERNAL_PATHS = ['/pig-log', '/vaccine', '/knowledge', '/settings']
+export const isInternalPath = (p) => INTERNAL_PATHS.some((x) => p === x || p.startsWith(x + '/') || p.startsWith(x + '?'))
+
+export default function AdminLoginGate({ children, force = false }) {
   const { isAdmin, login, signup } = useAdminAuth()
+  const location = useLocation()
   const { theme, setTheme } = useTheme()
   const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('admin')
@@ -32,6 +38,7 @@ export default function AdminLoginGate({ children }) {
   }, [])
 
   if (isAdmin) return children
+  if (!force && !isInternalPath(location.pathname)) return children
 
   const isSignup = mode === 'signup'
   const ready = password.trim() && username.trim() && (!isSignup || code.trim())

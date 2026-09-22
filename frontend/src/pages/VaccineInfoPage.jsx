@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getVaccineHistory, getVaccineSchedule } from '../api.js'
 import { useVoiceAI } from '../context/VoiceAI.jsx'
+import { useAdminAuth } from '../context/AdminAuth.jsx'
 import { ROUTE_LABEL, VACCINES, findVaccine } from '../data/vaccineCatalog.js'
 
 // หน้า "ข้อมูลวัคซีนสุกร" — สรุปวัคซีน 1 ตัวแบบดูปุ๊บรู้: ฉีดยังไง กี่มล. ซ้ำเมื่อไหร่ กำหนดการ สิ่งที่ควรรู้
@@ -29,6 +30,7 @@ export default function VaccineInfoPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const { ask } = useVoiceAI()
+  const { isAdmin } = useAdminAuth()
   const [schedule, setSchedule] = useState([])
   const [history, setHistory] = useState([])
   const [imgOk, setImgOk] = useState(true)
@@ -36,12 +38,14 @@ export default function VaccineInfoPage() {
   const v = VACCINES.find((x) => x.id === params.get('v')) || VACCINES[0]
   const pick = (id) => setParams({ v: id }, { replace: true })
 
+  // บันทึกจริงของฟาร์มเป็นข้อมูลภายใน — ดึงเฉพาะตอนล็อกอิน
   useEffect(() => {
+    if (!isAdmin) return
     let alive = true
     getVaccineSchedule().then((d) => alive && setSchedule(d?.rows || [])).catch(() => {})
     getVaccineHistory({ pageSize: 100 }).then((d) => alive && setHistory(d?.rows || [])).catch(() => {})
     return () => { alive = false }
-  }, [])
+  }, [isAdmin])
   useEffect(() => { setImgOk(true) }, [v.id])
 
   // ของจริงจากฐานข้อมูล: รอบที่ตั้งไว้ในระบบ + ครั้งล่าสุดที่ฉีดวัคซีนตัวนี้
@@ -121,8 +125,8 @@ export default function VaccineInfoPage() {
           ) : (
             <div className="vi-empty">ยังไม่มีกำหนดการในแคตตาล็อก — ยึดตามฉลาก</div>
           )}
-          {/* ของจริงจากฟาร์ม */}
-          <div className="vi-live">
+          {/* ของจริงจากฟาร์ม — คนในเท่านั้น */}
+          {isAdmin && <div className="vi-live">
             <div className="vi-live-row">
               <span className="vi-live-k">ฉีดล่าสุดในฟาร์ม</span>
               <span className="vi-live-v">{live.last ? `${fmtDate(live.last.log_date)}${live.last.barn_no ? ` · ${live.last.barn_no}` : ''}` : 'ยังไม่มีบันทึก'}</span>
@@ -131,7 +135,7 @@ export default function VaccineInfoPage() {
               <span className="vi-live-k">นัดครั้งถัดไป</span>
               <span className={`vi-live-v ${live.last?.next_due_date ? 'due' : ''}`}>{live.last?.next_due_date ? fmtDate(live.last.next_due_date) : '—'}</span>
             </div>
-          </div>
+          </div>}
         </div>
 
         <div className="vi-card">
@@ -153,7 +157,7 @@ export default function VaccineInfoPage() {
           <i className="ti ti-player-play" aria-hidden="true" /> ดูวิธีฉีด <i className="ti ti-chevron-right vi-btn-arrow" aria-hidden="true" />
         </button>
         <button type="button" className="vi-btn primary" onClick={() => navigate(`/vaccine?vaccine=${encodeURIComponent(v.name)}`)}>
-          <i className="ti ti-clipboard-text" aria-hidden="true" /> บันทึกการฉีด <i className="ti ti-chevron-right vi-btn-arrow" aria-hidden="true" />
+          <i className="ti ti-clipboard-text" aria-hidden="true" /> {isAdmin ? 'บันทึกการฉีด' : 'บันทึกการฉีด (คนใน)'} <i className="ti ti-chevron-right vi-btn-arrow" aria-hidden="true" />
         </button>
       </div>
     </div>

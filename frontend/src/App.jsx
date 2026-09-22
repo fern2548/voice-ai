@@ -5,7 +5,7 @@ import ConnectionAlert from './components/ConnectionAlert.jsx'
 import VaccineDueAlert from './components/VaccineDueAlert.jsx'
 import ChatWidget from './components/ChatWidget.jsx'
 import { VoiceAIProvider } from './context/VoiceAI.jsx'
-import { AdminAuthProvider } from './context/AdminAuth.jsx'
+import { AdminAuthProvider, useAdminAuth } from './context/AdminAuth.jsx'
 import AdminLoginGate from './components/AdminLoginGate.jsx'
 import OverviewPage from './pages/OverviewPage.jsx'
 import FeaturesPage from './pages/FeaturesPage.jsx'
@@ -20,32 +20,35 @@ import KnowledgePage from './pages/KnowledgePage.jsx'
 import VaccineGuidePage from './pages/VaccineGuidePage.jsx'
 import VaccineInfoPage from './pages/VaccineInfoPage.jsx'
 
+// internal: true = เฉพาะคนในบริษัท (ต้องล็อกอิน) — คนนอกเห็นแต่เมนูข้อมูลปกติ
 const NAV = [
   { to: '/overview', label: 'หน้าแรก' },
   { to: '/features', label: 'ทำอะไรได้บ้าง' },
-  { to: '/pig-log', label: 'โรงเรือน' },
-  { to: '/vaccine', label: 'วัคซีน' },
+  { to: '/pig-log', label: 'โรงเรือน', internal: true },
+  { to: '/vaccine', label: 'วัคซีน', internal: true },
   { to: '/vaccine-info', label: 'ข้อมูลวัคซีน' },
   { to: '/vaccine-guide', label: 'วิธีฉีดวัคซีน' },
   { to: '/history', label: 'รายงาน' },
   { to: '/forecast', label: 'พยากรณ์อากาศ' },
   { to: '/sensors', label: 'กราฟข้อมูล' },
-  { to: '/knowledge', label: 'คลังความรู้' },
-  { to: '/settings', label: 'ตั้งค่า' },
+  { to: '/knowledge', label: 'คลังความรู้', internal: true },
+  { to: '/settings', label: 'ตั้งค่า', internal: true },
 ]
 
 function AppShell() {
   const location = useLocation()
+  const { isAdmin } = useAdminAuth()
+  const nav = isAdmin ? NAV : NAV.filter((n) => !n.internal)
 
   return (
     <VoiceAIProvider>
       <div className="app-root">
-        <StatusBar navItems={NAV} currentPath={location.pathname} />
+        <StatusBar navItems={nav} currentPath={location.pathname} />
 
         <div className="alert-stack">
           <ConnectionAlert />
           <SensorAlert />
-          <VaccineDueAlert />
+          {isAdmin && <VaccineDueAlert />}
         </div>
 
         <main className="app-main">

@@ -304,6 +304,12 @@ def verify_admin_token(x_admin_token: str = Header(...)) -> None:
         raise HTTPException(status_code=401, detail="กรุณาเข้าสู่ระบบ admin ก่อน")
 
 
+def require_role_admin(x_admin_token: str = Header(default="")) -> None:
+    """เฉพาะผู้ดูแลระบบ (ADMIN_USERS) — คนในทั่วไปทำไม่ได้"""
+    if _role_of(x_admin_token) != "admin":
+        raise HTTPException(status_code=403, detail="เฉพาะผู้ดูแลระบบเท่านั้น")
+
+
 app = FastAPI(title="Weather Station AI")
 
 # ทำเบื้องหลัง ห้ามเรียกตรง ๆ ตรงนี้
@@ -375,6 +381,22 @@ _PUBLIC_PATHS = {"/admin/login", "/admin/signup", "/admin/signup-enabled", "/hea
 # /ingest = อุปกรณ์เซนเซอร์/Node-RED ใช้ INGEST_TOKEN ของตัวเองแยกต่างหากอยู่แล้ว
 # /r      = ลิงก์รายงานสำหรับปุ่มริชเมนู LINE (ดูหมายเหตุที่ PUBLIC_REPORT_KEY ด้านล่าง)
 _PUBLIC_PREFIXES = ("/ingest", "/r/", "/cron/")
+
+# ---------- 3 ระดับ: คนนอก (guest) · คนในบริษัท (staff) · ผู้ดูแลระบบ (admin) ----------
+# ข้อมูล "ปกติ" (อากาศ พยากรณ์ กราฟจาก lab คู่มือ) คนนอกดูได้โดยไม่ต้องล็อกอิน
+# ข้อมูล "ภายใน" (หมูป่วย บันทึกวัคซีน คลังความรู้ ตั้งค่า) ต้องล็อกอิน = คนในบริษัท
+# จัดการผู้ใช้ / แก้คลังความรู้ = admin เท่านั้น (ชื่อบัญชีใน ADMIN_USERS)
+ADMIN_USERS = {u.strip() for u in (os.environ.get("ADMIN_USERS") or os.environ.get("KNOWLEDGE_ADMINS") or "admin").split(",") if u.strip()}
+_GUEST_PATHS = {"/weather", "/history", "/predict", "/stats", "/readings-log", "/predictions-log", "/ask", "/admin/whoami"}
+_GUEST_PREFIXES = ("/lab/",)
+
+
+def _role_of(token: Optional[str]) -> str:
+    """guest = ไม่มีบัตรผ่าน · staff = ล็อกอินแล้ว · admin = ล็อกอินด้วยบัญชีใน ADMIN_USERS"""
+    u = _session_username(token or "")
+    if u is None:
+        return "guest"
+    return "admin" if u in ADMIN_USERS else "staff"
 _SERVE_WEB = False  # เปลี่ยนเป็น True ท้ายไฟล์ถ้ามี frontend/dist ให้เสิร์ฟ  # /cron/: ตัวตั้งเวลาภายนอกเรียก ตรวจด้วย CRON_KEY แทน
 
 # ---------- ลิงก์รายงานถาวรสำหรับปุ่มริชเมนู LINE ----------
@@ -453,6 +475,12 @@ async def _require_admin_login(request, call_next):
         or path in _PUBLIC_PATHS
         or path.startswith(_PUBLIC_PREFIXES)
     ):
+        return await call_next(request)
+
+    # ข้อมูลปกติ — คนนอกดูได้ (endpoint เหล่านี้ตรวจ role เองอีกชั้นถ้าต้องแยกคำตอบ เช่น /ask)
+    if request.method == "GET" and (path in _GUEST_PATHS or path.startswith(_GUEST_PREFIXES)):
+        return await call_next(request)
+    if path == "/ask" and request.method == "POST":
         return await call_next(request)
 
     # ลิงก์ดาวน์โหลดที่แนบ token ชั่วคราวมา (เปิดจาก LINE/มือถือได้โดยไม่ต้องล็อกอิน)
@@ -542,6 +570,7 @@ class AdminLogin(BaseModel):
 class AdminLoginResponse(BaseModel):
     token: str
     username: str
+    role: str = "staff"
 
 
 class ChangePassword(BaseModel):
@@ -656,7 +685,8 @@ def admin_login(body: AdminLogin, request: Request):
         raise HTTPException(status_code=401, detail=detail)
 
     _LOGIN_FAILS.pop(key, None)   # เข้าสำเร็จแล้วล้างตัวนับ
-    return AdminLoginResponse(token=_issue_session_token(body.username), username=body.username)
+    return AdminLoginResponse(token=_issue_session_token(body.username), username=body.username,
+                              role="admin" if body.username in ADMIN_USERS else "staff")
 
 
 @app.post("/admin/logout")
@@ -666,9 +696,9 @@ def admin_logout(x_admin_token: str = Header(...)):
 
 
 @app.get("/admin/whoami")
-def admin_whoami(x_admin_token: str = Header(...)):
+def admin_whoami(x_admin_token: str = Header(default="")):
     username = _session_username(x_admin_token)
-    return {"logged_in": username is not None, "username": username}
+    return {"logged_in": username is not None, "username": username, "role": _role_of(x_admin_token)}
 
 
 @app.post("/admin/change-password")
@@ -741,17 +771,17 @@ def signup(body: SignupRequest, request: Request):
 
     _create_admin_user(username, body.password)
     print(f"[info] สมัครบัญชีใหม่: {username}")
-    return AdminLoginResponse(token=_issue_session_token(username), username=username)
+    return AdminLoginResponse(token=_issue_session_token(username), username=username, role="admin" if username in ADMIN_USERS else "staff")
 
 
-@app.get("/admin/users")
+@app.get("/admin/users", dependencies=[Depends(require_role_admin)])
 def list_admin_users():
     """รายชื่อผู้ใช้ admin ทั้งหมด (ไม่ส่ง password กลับไปเด็ดขาด)"""
     res = supabase.table("admin_users").select("id,username,created_at").order("username").execute()
     return {"rows": res.data or []}
 
 
-@app.post("/admin/users")
+@app.post("/admin/users", dependencies=[Depends(require_role_admin)])
 def create_admin_user(body: NewAdminUser):
     username = body.username.strip()
     if not username or not body.password:
@@ -763,7 +793,7 @@ def create_admin_user(body: NewAdminUser):
     return {"ok": True}
 
 
-@app.delete("/admin/users/{username}")
+@app.delete("/admin/users/{username}", dependencies=[Depends(require_role_admin)])
 def delete_admin_user(username: str, x_admin_token: str = Header(...)):
     me = _session_username(x_admin_token)
     if username == me:
@@ -3068,7 +3098,7 @@ def _extract_text(filename: str, data: bytes) -> str:
 
 
 def _can_edit_knowledge(token: str) -> bool:
-    return (_session_username(token) or "") in KNOWLEDGE_ADMINS
+    return _role_of(token) == "admin"
 
 
 def require_knowledge_admin(x_admin_token: str = Header(...)) -> None:
@@ -3387,7 +3417,7 @@ def _ollama_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -
 
 
 @app.post("/ask", response_model=Answer)
-def ask(q: Question):
+def ask(q: Question, x_admin_token: str = Header(default="")):
     """ถาม-ตอบเรื่องสภาพอากาศ — ลำดับ: Gemini (ถ้ามีคีย์) -> Ollama local (ถ้ารันอยู่) -> rule-based
 
     ประหยัด token/ทรัพยากร:
@@ -3399,6 +3429,17 @@ def ask(q: Question):
     text = q.text.strip()
     if not text:
         return Answer(answer="ถามเรื่องสภาพอากาศได้เลยครับ เช่น อุณหภูมิ ความชื้น หรือพยากรณ์ล่วงหน้า")
+
+    # คนนอก (ไม่ได้ล็อกอิน) ถามได้เฉพาะข้อมูลปกติ: อากาศ พยากรณ์ เซนเซอร์ วิธีฉีดวัคซีน
+    # ข้อมูลภายในฟาร์ม (หมูป่วย บันทึกวัคซีน เอกสารของฟาร์ม) และคำสั่งบันทึก/ส่ง LINE ต้องเป็นคนใน
+    guest = _role_of(x_admin_token) == "guest"
+    if guest and (
+        _is_line_report_command(text) or _is_line_send_command(text)
+        or _is_followup_record_command(text) or _is_vaccine_record_command(text)
+        or (_needs_pig(text) and not _needs_vaccine_method(text) and not _needs_pig_breed_info(text))
+    ):
+        return Answer(answer="ข้อมูลส่วนนี้เป็นข้อมูลภายในฟาร์มครับ ต้องเข้าสู่ระบบก่อนถึงจะดูหรือบันทึกได้ "
+                             "ถามเรื่องสภาพอากาศ พยากรณ์ หรือวิธีฉีดวัคซีนได้เลยครับ")
 
     # คำสั่งส่งรายงาน PDF (ไฟล์) เข้า LINE ด้วยเสียง -> เช็คก่อนคำสั่งส่งสรุปทั่วไป เพราะเจาะจงกว่า
     if _is_line_report_command(text):
@@ -3437,11 +3478,11 @@ def ask(q: Question):
         return Answer(answer=_PIG_BREEDS_INFO.replace("ความรู้อ้างอิง: ", "") + " ครับ")
 
     # ค้นคลังความรู้ (เอกสารของฟาร์ม) ทุกคำถาม — ไม่เจอก็ได้ลิสต์ว่าง ไม่มีผลอะไร
-    docs = _rag_search(text)
+    docs = [] if guest else _rag_search(text)
     context = _build_context(
         detailed=_needs_forecast(text),
         stats_days=_needs_stats(text),
-        pig=_needs_pig(text),
+        pig=(not guest) and _needs_pig(text),
         lab=_needs_lab(text),
         lab_series=_needs_lab_series(text),
         lab_summary=_needs_lab_summary(text),
