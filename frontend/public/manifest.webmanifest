@@ -1,0 +1,23 @@
+{
+  "name": "Farmy Voice — ผู้ช่วยเสียงประจำฟาร์ม",
+  "short_name": "Farmy Voice",
+  "description": "แดชบอร์ดฟาร์มสุกร สั่งงานและถามข้อมูลด้วยเสียง",
+  "id": "/",
+  "start_url": "/overview",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08090e",
+  "theme_color": "#08090e",
+  "lang": "th",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "บันทึกวัคซีน", "url": "/vaccine", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "โรงเรือน / หมูป่วย", "url": "/pig-log", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "วิธีฉีดวัคซีน", "url": "/vaccine-guide", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

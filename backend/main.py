@@ -3681,7 +3681,8 @@ if os.path.isdir(_WEB_DIST):
         return FileResponse(os.path.join(_WEB_DIST, "index.html"))
 
     # หน้าเว็บต้องเปิดได้โดยไม่ต้องล็อกอิน (หน้าล็อกอินก็อยู่ในนั้น) — เพิ่มเข้า allowlist ของด่านตรวจ
-    _PUBLIC_PREFIXES = _PUBLIC_PREFIXES + ("/assets",)
+    # ไฟล์นิ่งของหน้าเว็บ + ของ PWA (manifest, service worker, ไอคอน, ภาพคู่มือ) — เบราว์เซอร์ขอเองโดยไม่มี token
+    _PUBLIC_PREFIXES = _PUBLIC_PREFIXES + ("/assets", "/icons/", "/guide/", "/vaccines/", "/sw.js", "/manifest.webmanifest")
     _SERVE_WEB = True
     print(f"[info] เสิร์ฟหน้าเว็บจาก {_WEB_DIST}")
 
