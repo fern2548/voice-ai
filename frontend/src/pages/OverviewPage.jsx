@@ -1,9 +1,14 @@
+import BarnEnvironment from '../components/BarnEnvironment.jsx'
 import VoiceHero from '../components/VoiceHero.jsx'
 
 /**
- * หน้าแรก — จอเดียวจบ มีแค่ตัวรับคำสั่งด้วยเสียง เหมือนเว็บ Farmy Voice (5174)
- * การ์ดสรุปฟาร์มย้ายไปอยู่หน้าอื่นแล้ว ไม่ให้มาแย่งความสนใจจาก Voice AI
+ * หน้าแรก — สภาพแวดล้อมโรงเรือน (ค่าเซนเซอร์ + สรุป + ต้นทุนที่ลดได้) แล้วต่อด้วยตัวรับคำสั่งด้วยเสียง
  */
 export default function OverviewPage() {
-  return <VoiceHero />
+  return (
+    <>
+      <BarnEnvironment />
+      <VoiceHero />
+    </>
+  )
 }

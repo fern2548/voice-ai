@@ -2950,3 +2950,52 @@ th, td { font-size: 14px; }
   .vq-doses { grid-template-columns: repeat(3, 1fr); }
   .vq-table th:nth-child(3), .vq-table td:nth-child(3) { display: none; }
 }
+
+/* ---------- สภาพแวดล้อมโรงเรือน (หน้าแรก) ---------- */
+.be { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
+.be-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.be-title { margin: 0; font-size: 26px; font-weight: 800; }
+.be-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
+.be-when { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
+.be-when i { color: var(--accent); font-size: 14px; }
+.be-when.stale { color: var(--warn); } .be-when.stale i { color: var(--warn); }
+.be-graph { padding: 9px 14px; font-size: 13.5px; text-decoration: none; gap: 6px; }
+/* การ์ด 5 ค่า */
+.be-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.be-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.be-card.tone-watch { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.be-card.tone-bad { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.be-card-top { display: flex; align-items: center; gap: 10px; }
+.be-card-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); font-size: 22px; flex: none; }
+.be-card-name { font-size: 15px; font-weight: 700; }
+.be-card-unit { font-size: 12px; color: var(--text-dim); }
+.be-card-value { font-size: 40px; font-weight: 800; line-height: 1.05; color: var(--c); font-variant-numeric: tabular-nums; }
+.be-status { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 12.5px; font-weight: 600; padding: 4px 11px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
+.be-status.tone-ok { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.be-status.tone-watch { color: var(--warn); border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.be-status.tone-bad { color: var(--danger); border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.be-card-range { font-size: 12px; color: var(--text-dim); }
+/* สรุปของ Farmy Voice */
+.be-summary { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 16px; background: color-mix(in srgb, var(--accent) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.be-pig { width: 92px; height: auto; flex: none; }
+.be-summary-text { flex: 1; min-width: 0; }
+.be-summary-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.be-summary-text p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--text-dim); }
+.be-ask { flex: none; padding: 12px 20px; font-size: 15px; border-radius: 12px; }
+/* ต้นทุนที่ลดได้ */
+.be-cost-head { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.be-cost-more { margin-left: auto; font-size: 13px; font-weight: 400; color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 2px; }
+.be-cost-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.be-cost-item { display: flex; gap: 10px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.be-cost-icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-size: 18px; flex: none; }
+.be-cost-item b { display: block; font-size: 14px; }
+.be-cost-item small { color: var(--text-dim); font-size: 12px; line-height: 1.45; display: block; margin-top: 2px; }
+.be-foot { font-size: 12px; color: var(--text-faint); text-align: right; }
+@media (max-width: 700px) {
+  .be-title { font-size: 21px; }
+  .be-when { margin-left: 0; }
+  .be-card-value { font-size: 32px; }
+  .be-summary { flex-wrap: wrap; gap: 12px; }
+  .be-pig { width: 64px; }
+  .be-ask { width: 100%; justify-content: center; }
+}
