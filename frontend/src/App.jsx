@@ -32,7 +32,7 @@ const NAV = [
   { to: '/vaccine-info', label: 'ข้อมูลวัคซีน' },
   { to: '/vaccine-guide', label: 'วิธีฉีดวัคซีน' },
   { to: '/history', label: 'รายงาน' },
-  { to: '/forecast', label: 'พยากรณ์อากาศ' },
+  { to: '/forecast', label: 'สภาพอากาศ · พยากรณ์' },
   { to: '/sensors', label: 'กราฟข้อมูล' },
   { to: '/settings', label: 'ตั้งค่า', internal: true },
 ]

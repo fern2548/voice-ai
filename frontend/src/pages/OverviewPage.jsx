@@ -1,14 +1,9 @@
-import BarnEnvironment from '../components/BarnEnvironment.jsx'
 import VoiceHero from '../components/VoiceHero.jsx'
 
 /**
- * หน้าแรก — สภาพแวดล้อมโรงเรือน (ค่าเซนเซอร์ + สรุป + ต้นทุนที่ลดได้) แล้วต่อด้วยตัวรับคำสั่งด้วยเสียง
+ * หน้าแรก — จอเดียวจบ มีแค่ตัวรับคำสั่งด้วยเสียง
+ * สภาพแวดล้อมโรงเรือนอยู่หน้าพยากรณ์อากาศ (ค่าปัจจุบัน + พยากรณ์ ดูที่เดียวจบ)
  */
 export default function OverviewPage() {
-  return (
-    <>
-      <BarnEnvironment />
-      <VoiceHero />
-    </>
-  )
+  return <VoiceHero />
 }
