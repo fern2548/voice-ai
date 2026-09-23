@@ -5,6 +5,8 @@ import {
 } from 'recharts'
 import { getLabSources, getLabLatest, getLabSeries, getLabSummary } from '../api.js'
 import usePolling from '../hooks/usePolling.js'
+import { METRICS } from '../metrics.js'
+import { SENSOR_VALUE } from '../data/sensorValue.js'
 
 // หน้า "กราฟข้อมูล" — ค่าตอนนี้ + กราฟย้อนหลังของชุดข้อมูลจาก lab.plotnexuslab.com
 // เลือกได้ 3 อย่าง: ชุดข้อมูล · ค่าที่ดู · ช่วงเวลา และรับค่าจาก URL ด้วย
@@ -126,6 +128,9 @@ export default function SensorsPage() {
   }
 
   const measureMeta = src?.measures.find((m) => m.id === measure)
+  // ค่าที่เลือกอยู่ช่วยฟาร์มอะไร — ข้อความอยู่ใน data/sensorValue.js (จับคู่ด้วยรหัสสั้น เช่น temperature)
+  const why = SENSOR_VALUE[measureMeta?.short]
+  const whyColor = METRICS.find((m) => m.key === measureMeta?.short)?.color
 
   return (
     <>
@@ -191,7 +196,7 @@ export default function SensorsPage() {
                       type="button"
                       className={`sx-val ${v.id === measure ? 'on' : ''}`}
                       onClick={() => setParam('measure', v.id)}
-                      title="กดเพื่อดูกราฟค่านี้"
+                      title="กดเพื่อดูกราฟและประโยชน์ของค่านี้"
                     >
                       <span className="sx-val-label">{v.label}</span>
                       <span className="sx-val-num">
@@ -206,6 +211,23 @@ export default function SensorsPage() {
           </div>
         )}
       </div>
+
+      {/* ค่านี้ช่วยอะไร — ตามค่าที่เลือกอยู่ */}
+      {why && (
+        <div className="metric-why" style={{ '--metric-color': whyColor || 'var(--accent)' }}>
+          <div>
+            <div className="metric-why-head"><i className="ti ti-bulb" aria-hidden="true" /> {measureMeta.label} ช่วยอะไร</div>
+            <p>{why.how}</p>
+            {why.note && <p className="metric-why-note"><i className="ti ti-info-circle" aria-hidden="true" /> {why.note}</p>}
+          </div>
+          <div>
+            <div className="metric-why-head"><i className="ti ti-coin" aria-hidden="true" /> ลดต้นทุนตรงไหน</div>
+            {why.saves.map((x) => (
+              <div className="metric-save" key={x}><i className="ti ti-arrow-down-right" aria-hidden="true" />{x}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* กราฟย้อนหลัง */}
       <div className="panel">
