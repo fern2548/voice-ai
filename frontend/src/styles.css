@@ -2807,6 +2807,12 @@ th, td { font-size: 14px; }
 #vx-s1, #vx-s2, #vx-s3, #vx-s4, #vx-history, #vx-followup { scroll-margin-top: 140px; }
 @media (max-width: 700px) { .vx-nav { top: 64px; } .vx-nav-btn { padding: 7px 10px; font-size: 12.5px; } }
 
+.vd-done { width: 100%; justify-content: center; margin-top: 10px; padding: 10px; font-size: 14px; gap: 6px; }
+.vd-undo { display: flex; align-items: center; gap: 10px; margin: 0 16px 10px; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); font-size: 13.5px; }
+.vd-undo i { color: var(--accent); font-size: 18px; }
+.vd-undo .vd-clear { margin-left: auto; }
+.vd-undo.error { background: color-mix(in srgb, var(--danger) 14%, var(--panel-2)); }
+.vd-undo.error i { color: var(--danger); }
 /* ---------- ตารางฉีดวัคซีนตามอายุ (ตัวหนังสือน้อย ตัวเลขใหญ่) ---------- */
 .vq { display: flex; flex-direction: column; gap: 14px; }
 .vq-head { display: flex; align-items: center; gap: 14px; position: relative; }

@@ -100,6 +100,8 @@ export const getFollowups = (logId) => get(logId ? `/vaccine-followup?log_id=${l
 export const saveFollowup = (entry) => post('/vaccine-followup', entry)
 export const deleteFollowup = (id) => del(`/vaccine-followup/${id}`)
 export const getVaccineDue = (days = 7) => get(`/vaccine-due?days=${days}`)
+// กด "เสร็จแล้ว" ที่การ์ดแจ้งเตือน (undo = เอากลับมาเตือนใหม่)
+export const markVaccineDueDone = (id, undo = false) => post(`/vaccine-due/${id}/done?undo=${undo ? 'true' : 'false'}`, {})
 
 // เซนเซอร์ภายนอก (ดินแสลงพัน · เล้าหมูกำแพงเพชร · เสาอากาศแสลงพัน) ผ่านเซิร์ฟเวอร์เรา
 export const getLabSources = () => get('/lab/sources')

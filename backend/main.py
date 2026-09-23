@@ -1908,7 +1908,21 @@ def _vaccine_due_rows(days: int = 7) -> list[dict]:
         .order("next_due_date", desc=False)
         .execute()
     )
-    return res.data or []
+    # ที่กด "เสร็จแล้ว" ไปแล้ว ไม่ต้องเตือนซ้ำ (กรองฝั่ง Python เผื่อฐานข้อมูลยังไม่มีคอลัมน์)
+    return [r for r in (res.data or []) if not r.get("due_done")]
+
+
+@app.post("/vaccine-due/{log_id}/done", dependencies=[Depends(verify_admin_token)])
+def vaccine_due_done(log_id: int, undo: bool = False):
+    """กด "เสร็จแล้ว" ที่การ์ดแจ้งเตือน — หยุดเตือนรายการนั้น (ประวัติการฉีดยังอยู่ครบ)"""
+    row = {"due_done": not undo, "due_done_at": None if undo else datetime.now(BANGKOK).isoformat()}
+    try:
+        res = supabase.table("vaccine_log").update(row).eq("id", log_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"บันทึกไม่สำเร็จ (ฐานข้อมูลยังไม่มีคอลัมน์ due_done?) {e}")
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ไม่พบรายการนี้")
+    return {"ok": True, "done": not undo}
 
 
 def _build_vaccine_report_messages() -> list[dict]:

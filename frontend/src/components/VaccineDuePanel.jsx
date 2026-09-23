@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import usePolling from '../hooks/usePolling.js'
-import { getVaccineDue } from '../api.js'
+import { getVaccineDue, markVaccineDueDone } from '../api.js'
+import AdminGate from './AdminGate.jsx'
 
 function daysLeft(dateStr) {
   const today = new Date()
@@ -32,23 +33,50 @@ const FIELDS = [
 ]
 
 // รายการวัคซีนที่ใกล้ครบกำหนด แสดงแยกเป็นการ์ดละรายการ พร้อมรายละเอียดครบ
+// กด "เสร็จแล้ว" = ทำงานนั้นเรียบร้อย ไม่ต้องเตือนอีก (ประวัติการฉีดยังอยู่ครบ กดเลิกทำได้ใน 10 วินาที)
 // กดจากแถบแจ้งเตือนจะพามาที่นี่พร้อม ?focus=<id> แล้วเลื่อนไปไฮไลต์ใบนั้นให้
 export default function VaccineDuePanel() {
-  const { data } = usePolling(() => getVaccineDue(7), 60000)
-  const rows = Array.isArray(data?.rows) ? data.rows : []
+  const [tick, setTick] = useState(0)
+  const { data } = usePolling(() => getVaccineDue(7), 60000, tick)
+  const refresh = () => setTick((t) => t + 1)
+  const all = Array.isArray(data?.rows) ? data.rows : []
   const [params, setParams] = useSearchParams()
   const focusId = params.get('focus')
   const focusRef = useRef(null)
+  // ซ่อนทันทีที่กด ไม่ต้องรอ server ตอบ — ผู้ใช้เห็นผลทันที
+  const [hidden, setHidden] = useState([])
+  const [undoRow, setUndoRow] = useState(null)
+  const [err, setErr] = useState('')
 
   useEffect(() => {
     if (!focusId || !focusRef.current) return
     focusRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [focusId, rows.length])
+  }, [focusId, rowsKey(all)])
 
-  if (rows.length === 0) return null
+  const rows = all.filter((r) => !hidden.includes(r.id))
+  if (rows.length === 0 && !undoRow) return null
 
-  // รายการที่ถูกกดมาจากแถบแจ้งเตือน — ใช้ทำกล่องบอกด้านบนให้รู้ว่ากำลังดูอันไหนอยู่
   const focusRow = focusId ? rows.find((r) => String(r.id) === focusId) : null
+
+  const markDone = async (r) => {
+    setHidden((h) => [...h, r.id]); setErr('')
+    try {
+      await markVaccineDueDone(r.id)
+      window.dispatchEvent(new CustomEvent('farmy:vaccine-due-changed'))   // แถบแจ้งเตือนด้านบนอัปเดตทันที
+      setUndoRow(r)
+      setTimeout(() => setUndoRow((u) => (u && u.id === r.id ? null : u)), 10000)
+      refresh()
+    } catch (e) {
+      setHidden((h) => h.filter((id) => id !== r.id))
+      setErr(e?.detail || 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง')
+    }
+  }
+  const undo = async (r) => {
+    setUndoRow(null)
+    try { await markVaccineDueDone(r.id, true); window.dispatchEvent(new CustomEvent('farmy:vaccine-due-changed')) } catch { /* ไม่เป็นไร รอบหน้าจะโผล่เอง */ }
+    setHidden((h) => h.filter((id) => id !== r.id))
+    refresh()
+  }
 
   return (
     <div className="panel vd-panel">
@@ -57,8 +85,16 @@ export default function VaccineDuePanel() {
         <span className="vd-panel-count">{rows.length} รายการ</span>
       </div>
 
-      {/* มาจากการกดแจ้งเตือน — บอกให้ชัดว่ากำลังดูรายการไหน
-          ไม่งั้นพอมีหลายใบผู้ใช้จะไม่รู้ว่าที่กดมาคืออันไหน */}
+      {undoRow && (
+        <div className="vd-undo" role="status">
+          <i className="ti ti-circle-check" aria-hidden="true" />
+          <span>ทำเครื่องหมายว่าเสร็จแล้ว: <b>{undoRow.vaccine_name || 'วัคซีน'}</b> — จะไม่เตือนอีก</span>
+          <button type="button" className="vd-clear" onClick={() => undo(undoRow)}>เลิกทำ</button>
+        </div>
+      )}
+      {err && <div className="vd-undo error" role="alert"><i className="ti ti-alert-triangle" aria-hidden="true" /> {err}</div>}
+
+      {/* มาจากการกดแจ้งเตือน — บอกให้ชัดว่ากำลังดูรายการไหน */}
       {focusId && (
         <div className="vd-focus-note" role="status">
           <i className="ti ti-arrow-down-circle" aria-hidden="true" />
@@ -78,7 +114,7 @@ export default function VaccineDuePanel() {
             ) : (
               <>
                 <b>ไม่พบรายการที่กดมา</b>
-                <span>อาจถูกบันทึกฉีดไปแล้ว หรือเลยช่วงแจ้งเตือน 7 วัน</span>
+                <span>อาจกดว่าเสร็จแล้ว หรือเลยช่วงแจ้งเตือน 7 วัน</span>
               </>
             )}
           </div>
@@ -129,6 +165,12 @@ export default function VaccineDuePanel() {
                   )
                 })}
               </dl>
+
+              <AdminGate>
+                <button type="button" className="ask-btn vd-done" onClick={() => markDone(r)}>
+                  <i className="ti ti-check" aria-hidden="true" /> เสร็จแล้ว · ไม่ต้องเตือนอีก
+                </button>
+              </AdminGate>
             </article>
           )
         })}
@@ -136,4 +178,9 @@ export default function VaccineDuePanel() {
 
     </div>
   )
+}
+
+// คีย์ไว้เทียบว่ารายการเปลี่ยนไหม (ใช้กับ useEffect ที่เลื่อนหน้าจอ)
+function rowsKey(rows) {
+  return rows.map((r) => r.id).join(',')
 }

@@ -26,7 +26,14 @@ const MAX_SHOWN = 4
 export default function VaccineDueAlert() {
   // 3 วัน = ช่วงเดียวกับที่แจ้งเตือนเข้า LINE ทุกเช้า ทั้งสองทางจะได้เตือนเรื่องเดียวกัน
   // (เดิมตั้งไว้ 0 วัน คือเตือนเฉพาะวันที่ถึงกำหนดพอดี แคบเกินจนแทบไม่เคยขึ้นให้เห็น)
-  const { data } = usePolling(() => getVaccineDue(3), 60000)
+  // กด "เสร็จแล้ว" ที่การ์ดด้านล่าง → ดึงใหม่ทันที ไม่ต้องรอรอบ poll ถัดไป
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const onChanged = () => setTick((t) => t + 1)
+    window.addEventListener('farmy:vaccine-due-changed', onChanged)
+    return () => window.removeEventListener('farmy:vaccine-due-changed', onChanged)
+  }, [])
+  const { data } = usePolling(() => getVaccineDue(3), 60000, tick)
   const rows = Array.isArray(data?.rows) ? data.rows : []
   const [dismissed, setDismissed] = useState(false)
   const navigate = useNavigate()

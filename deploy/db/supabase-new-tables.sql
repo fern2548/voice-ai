@@ -101,3 +101,7 @@ alter table pig_batches add column if not exists sow_vaccinated boolean not null
 alter table vaccine_log add column if not exists batch_id bigint references pig_batches(id) on delete set null;
 alter table vaccine_log add column if not exists program_id bigint references vaccine_programs(id) on delete set null;
 alter table vaccine_log add column if not exists booster_no integer;
+
+-- กด "เสร็จแล้ว" ที่การ์ดแจ้งเตือน → ไม่เตือนรายการนั้นอีก (ไม่ลบประวัติการฉีด)
+alter table vaccine_log add column if not exists due_done boolean not null default false;
+alter table vaccine_log add column if not exists due_done_at timestamptz;
