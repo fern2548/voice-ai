@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage.jsx'
 import SensorsPage from './pages/SensorsPage.jsx'
 import VaccineGuidePage from './pages/VaccineGuidePage.jsx'
 import VaccineInfoPage from './pages/VaccineInfoPage.jsx'
+import VetCommunityPage from './pages/VetCommunityPage.jsx'
 import VaccinePlanPage from './pages/VaccinePlanPage.jsx'
 
 // internal: true = เฉพาะคนในบริษัท (ต้องล็อกอิน) — คนนอกเห็นแต่เมนูข้อมูลปกติ
@@ -26,6 +27,7 @@ const NAV = [
   { to: '/features', label: 'ทำอะไรได้บ้าง' },
   { to: '/pig-log', label: 'โรงเรือน', internal: true },
   { to: '/vaccine', label: 'วัคซีน', internal: true },
+  { to: '/vet', label: 'ปรึกษาสัตวแพทย์', internal: true },
   { to: '/vaccine-plan', label: 'แผนวัคซีนตามอายุ', internal: true },
   { to: '/vaccine-info', label: 'ข้อมูลวัคซีน' },
   { to: '/vaccine-guide', label: 'วิธีฉีดวัคซีน' },
@@ -63,6 +65,7 @@ function AppShell() {
             <Route path="/vaccine" element={<VaccinePage />} />
             <Route path="/vaccine-guide" element={<VaccineGuidePage />} />
             <Route path="/vaccine-info" element={<VaccineInfoPage />} />
+            <Route path="/vet" element={<VetCommunityPage />} />
             <Route path="/vaccine-plan" element={<VaccinePlanPage />} />
             <Route path="/sensors" element={<SensorsPage />} />
             <Route path="/settings" element={<SettingsPage />} />

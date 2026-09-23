@@ -1374,6 +1374,161 @@ def delete_vaccine_followup(followup_id: int):
     return {"ok": True}
 
 
+# ---------- ชุมชนปรึกษาสัตวแพทย์ ----------
+# ฟาร์มโพสต์เคส (อาการ + รูป) → สัตวแพทย์เข้ามาคอมเมนต์ → กด "รับดูแลเคส" → พอจบกด "ปิดเคส"
+# ใครเป็นหมอ: ชื่อผู้ใช้ที่อยู่ใน VET_USERS (คั่นด้วยจุลภาค) — คนอื่นคอมเมนต์ได้แต่รับเคสไม่ได้
+VET_USERS = {u.strip() for u in (os.environ.get("VET_USERS") or "").split(",") if u.strip()}
+VET_STATUS = ("waiting", "claimed", "done")
+
+
+def _is_vet(user: Optional[str]) -> bool:
+    return bool(user) and (user in VET_USERS or user in ADMIN_USERS)
+
+
+class VetPost(BaseModel):
+    """เคสที่ฟาร์มอยากปรึกษา — รูปให้หน้าเว็บย่อก่อนส่ง (เก็บเป็น data URL)"""
+    title: str
+    detail: Optional[str] = None
+    image: Optional[str] = None
+    farm_name: Optional[str] = None
+    barn_no: Optional[str] = None
+    pen_no: Optional[str] = None
+    pig_count: Optional[int] = None
+    age_stage: Optional[str] = None
+
+
+class VetComment(BaseModel):
+    body: str
+
+
+class VetClose(BaseModel):
+    close_note: Optional[str] = None
+
+
+def _vet_counts() -> dict:
+    out = {}
+    for st in VET_STATUS:
+        try:
+            out[st] = supabase.table("vet_posts").select("id", count="exact").eq("status", st).execute().count or 0
+        except Exception:
+            out[st] = 0
+    return out
+
+
+@app.get("/vet-posts")
+def list_vet_posts(status: Optional[str] = None, page: int = 0, page_size: int = 20):
+    """รายการเคส + จำนวนความคิดเห็น (ไม่ส่งตัวความคิดเห็นมาทั้งหมด หน้าเว็บค่อยกางทีละเคส)"""
+    page = max(0, page)
+    page_size = max(1, min(50, page_size))
+    q = supabase.table("vet_posts").select("*", count="exact")
+    if status in VET_STATUS:
+        q = q.eq("status", status)
+    res = q.order("created_at", desc=True).range(page * page_size, page * page_size + page_size - 1).execute()
+    rows = res.data or []
+    ids = [r["id"] for r in rows]
+    counts: dict[int, int] = {}
+    latest: dict[int, list] = {}
+    if ids:
+        cs = supabase.table("vet_comments").select("*").in_("post_id", ids).order("created_at").execute().data or []
+        for c in cs:
+            counts[c["post_id"]] = counts.get(c["post_id"], 0) + 1
+            latest.setdefault(c["post_id"], []).append(c)
+    for r in rows:
+        r["comment_count"] = counts.get(r["id"], 0)
+        r["comments"] = latest.get(r["id"], [])[-2:]   # โชว์ 2 อันล่าสุดในรายการ
+    return {"rows": rows, "total": res.count or 0, "counts": _vet_counts(), "page": page, "page_size": page_size}
+
+
+@app.get("/vet-posts/{post_id}")
+def get_vet_post(post_id: int):
+    rows = supabase.table("vet_posts").select("*").eq("id", post_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="ไม่พบเคสนี้")
+    post = rows[0]
+    try:
+        supabase.table("vet_posts").update({"views": (post.get("views") or 0) + 1}).eq("id", post_id).execute()
+    except Exception as e:
+        print(f"[warn] นับยอดดูไม่สำเร็จ: {e}")
+    post["comments"] = supabase.table("vet_comments").select("*").eq("post_id", post_id).order("created_at").execute().data or []
+    return post
+
+
+@app.post("/vet-posts", dependencies=[Depends(verify_admin_token)])
+def create_vet_post(p: VetPost, x_admin_token: str = Header(default="")):
+    user = _session_username(x_admin_token)
+    row = {**p.model_dump(), "author": user, "status": "waiting"}
+    saved = supabase.table("vet_posts").insert(row).execute().data[0]
+    # บอกหมอใน LINE ว่ามีเคสใหม่ (ถ้าตั้งค่าไว้) — ยิ่งตอบเร็ว หมูยิ่งได้รับการดูแลเร็ว
+    tail = f"\nดูเคส: {PUBLIC_SITE_URL}/vet" if PUBLIC_SITE_URL else ""
+    _send_line_broadcast(f"🩺 เคสใหม่รอสัตวแพทย์\n{p.title}\nโดย {p.farm_name or user}{tail}")
+    return saved
+
+
+@app.delete("/vet-posts/{post_id}", dependencies=[Depends(verify_admin_token)])
+def delete_vet_post(post_id: int, x_admin_token: str = Header(default="")):
+    user = _session_username(x_admin_token)
+    rows = supabase.table("vet_posts").select("author").eq("id", post_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="ไม่พบเคสนี้")
+    if rows[0]["author"] != user and _role_of(x_admin_token) != "admin":
+        raise HTTPException(status_code=403, detail="ลบได้เฉพาะเจ้าของโพสต์")
+    supabase.table("vet_posts").delete().eq("id", post_id).execute()
+    return {"ok": True}
+
+
+@app.post("/vet-posts/{post_id}/comments", dependencies=[Depends(verify_admin_token)])
+def add_vet_comment(post_id: int, c: VetComment, x_admin_token: str = Header(default="")):
+    body = (c.body or "").strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="พิมพ์ความคิดเห็นก่อนส่ง")
+    user = _session_username(x_admin_token)
+    row = {"post_id": post_id, "author": user, "is_vet": _is_vet(user), "body": body}
+    return supabase.table("vet_comments").insert(row).execute().data[0]
+
+
+@app.post("/vet-posts/{post_id}/claim", dependencies=[Depends(verify_admin_token)])
+def claim_vet_post(post_id: int, x_admin_token: str = Header(default="")):
+    """สัตวแพทย์กด "รับดูแลเคส" — ฟาร์มจะได้รู้ว่ามีคนดูแลแล้ว ไม่ต้องรอเก้อ"""
+    user = _session_username(x_admin_token)
+    if not _is_vet(user):
+        raise HTTPException(status_code=403, detail="เฉพาะสัตวแพทย์เท่านั้นที่รับดูแลเคสได้")
+    res = supabase.table("vet_posts").update({
+        "status": "claimed", "claimed_by": user, "claimed_at": datetime.now(BANGKOK).isoformat(),
+    }).eq("id", post_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ไม่พบเคสนี้")
+    return res.data[0]
+
+
+@app.post("/vet-posts/{post_id}/close", dependencies=[Depends(verify_admin_token)])
+def close_vet_post(post_id: int, d: VetClose, x_admin_token: str = Header(default="")):
+    """ปิดเคสเมื่ออาการดีขึ้นหรือจบการรักษา — เจ้าของโพสต์ หมอที่รับเคส หรือผู้ดูแลระบบ"""
+    user = _session_username(x_admin_token)
+    rows = supabase.table("vet_posts").select("author, claimed_by").eq("id", post_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="ไม่พบเคสนี้")
+    r = rows[0]
+    if user not in (r.get("author"), r.get("claimed_by")) and _role_of(x_admin_token) != "admin":
+        raise HTTPException(status_code=403, detail="ปิดเคสได้เฉพาะเจ้าของโพสต์หรือหมอที่รับดูแล")
+    return supabase.table("vet_posts").update({
+        "status": "done", "closed_at": datetime.now(BANGKOK).isoformat(), "close_note": d.close_note,
+    }).eq("id", post_id).execute().data[0]
+
+
+@app.post("/vet-posts/{post_id}/reopen", dependencies=[Depends(verify_admin_token)])
+def reopen_vet_post(post_id: int, x_admin_token: str = Header(default="")):
+    """เปิดเคสใหม่ เผื่อกดปิดผิดหรืออาการกลับมา"""
+    user = _session_username(x_admin_token)
+    rows = supabase.table("vet_posts").select("author, claimed_by").eq("id", post_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="ไม่พบเคสนี้")
+    r = rows[0]
+    if user not in (r.get("author"), r.get("claimed_by")) and _role_of(x_admin_token) != "admin":
+        raise HTTPException(status_code=403, detail="เปิดเคสใหม่ได้เฉพาะเจ้าของโพสต์หรือหมอที่รับดูแล")
+    status = "claimed" if r.get("claimed_by") else "waiting"
+    return supabase.table("vet_posts").update({"status": status, "closed_at": None}).eq("id", post_id).execute().data[0]
+
+
 # ---------- แผนวัคซีนตามอายุ ----------
 # ใส่วันเกิดชุดหมู + โปรแกรม (วัคซีนไหน อายุกี่วัน) → ระบบคำนวณวันที่ต้องฉีดทุกเข็มของทุกชุดให้
 # สถานะแต่ละเข็ม: done (มี vaccine_log ที่ผูกไว้) · overdue · due (ใน 7 วัน) · upcoming

@@ -4,6 +4,7 @@ import { apiUrl } from '../config.js'
 const TOKEN_KEY = 'admin-token'
 const USERNAME_KEY = 'admin-username'
 const ROLE_KEY = 'admin-role'
+const VET_KEY = 'admin-is-vet'
 const AdminAuthContext = createContext(null)
 
 // backend เก็บ token ไว้ใน memory -> restart ทีไร token ในเบราว์เซอร์ก็ใช้ไม่ได้ทันที
@@ -54,6 +55,8 @@ export function AdminAuthProvider({ children }) {
   const [username, setUsername] = useState(() => localStorage.getItem(USERNAME_KEY) || '')
   // guest = ไม่ได้ล็อกอิน (คนนอก ดูข้อมูลปกติได้) · staff = คนในบริษัท · admin = ผู้ดูแลระบบ
   const [role, setRole] = useState(() => localStorage.getItem(ROLE_KEY) || 'guest')
+  // เป็นสัตวแพทย์ไหม (ตั้งที่ VET_USERS ฝั่งเซิร์ฟเวอร์) — ใช้ตัดสินว่าโชว์ปุ่ม "รับดูแลเคส" ไหม
+  const [isVet, setIsVet] = useState(() => localStorage.getItem(VET_KEY) === '1')
   const [checking, setChecking] = useState(() => !!localStorage.getItem(TOKEN_KEY))
 
   // ตรวจ token ที่ค้างอยู่ตอนเปิดเว็บ ว่า backend ยังรู้จักไหม
@@ -70,9 +73,13 @@ export function AdminAuthProvider({ children }) {
           setToken('')
           setUsername('')
           setRole('guest')
-        } else if (d.role) {
-          localStorage.setItem(ROLE_KEY, d.role)
-          setRole(d.role)
+        } else {
+          if (d.role) {
+            localStorage.setItem(ROLE_KEY, d.role)
+            setRole(d.role)
+          }
+          localStorage.setItem(VET_KEY, d.is_vet ? '1' : '0')
+          setIsVet(!!d.is_vet)
         }
       })
       .catch(() => {}) // ต่อ backend ไม่ได้ชั่วคราว -> ไม่เตะออก รอให้ลองใหม่เอง
@@ -122,7 +129,7 @@ export function AdminAuthProvider({ children }) {
   }
 
   // isAdmin = ล็อกอินแล้ว (ชื่อเดิม ใช้ทั่วโค้ด) · isSuperAdmin = ผู้ดูแลระบบจริง ๆ
-  const value = { isAdmin: !!token, isSuperAdmin: role === 'admin', role, token, username, login, signup, logout, checking }
+  const value = { isAdmin: !!token, isSuperAdmin: role === 'admin', isVet, role, token, username, login, signup, logout, checking }
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>
 }
 

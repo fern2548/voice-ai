@@ -2999,3 +2999,103 @@ th, td { font-size: 14px; }
   .be-pig { width: 64px; }
   .be-ask { width: 100%; justify-content: center; }
 }
+
+/* ---------- ชุมชนปรึกษาสัตวแพทย์ ---------- */
+.vc { display: flex; flex-direction: column; gap: 14px; }
+.vc-head { display: flex; align-items: center; gap: 14px; }
+.vc-head-icon { width: 56px; height: 56px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); display: grid; place-items: center; font-size: 28px; flex: none; }
+.vc-title { margin: 0; font-size: 26px; font-weight: 800; }
+.vc-sub { margin: 2px 0 0; font-size: 13.5px; color: var(--text-dim); }
+.vc-pig { margin-left: auto; height: 70px; width: auto; }
+.vc-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vc-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.vc-tab { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text-dim); font: inherit; font-size: 14px; cursor: pointer; }
+.vc-tab i { font-size: 18px; }
+.vc-tab.on { color: var(--text); font-weight: 600; }
+.vc-tab.on.wait { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--panel)); }
+.vc-tab.on.wait i { color: var(--warn); }
+.vc-tab.on.claim { border-color: #6aa9ff; background: color-mix(in srgb, #6aa9ff 12%, var(--panel)); }
+.vc-tab.on.claim i { color: #8dbcff; }
+.vc-tab.on.done { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.vc-tab.on.done i { color: var(--accent); }
+.vc-new { margin-left: auto; padding: 12px 20px; font-size: 15px; border-radius: 12px; }
+.vc-msg { padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--accent-2); font-size: 14px; font-weight: 600; }
+.vc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; align-items: start; }
+.vc-feed { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+/* การ์ดเคส */
+.vc-post { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.vc-post.st-done { opacity: .82; }
+.vc-post-head { display: flex; align-items: center; gap: 10px; }
+.vc-avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); color: var(--text-dim); font-size: 20px; flex: none; }
+.vc-avatar.sm { width: 30px; height: 30px; font-size: 15px; }
+.vc-comment.vet .vc-avatar { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.vc-who b { display: block; font-size: 15px; }
+.vc-who small { color: var(--text-dim); font-size: 12px; }
+.vc-status { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); }
+.vc-status.wait { color: var(--warn); border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.vc-status.claim { color: #8dbcff; border-color: #6aa9ff; background: color-mix(in srgb, #6aa9ff 12%, transparent); }
+.vc-status.done { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.vc-post-body { display: flex; gap: 14px; }
+.vc-photo-main { width: 190px; height: 150px; object-fit: cover; border-radius: 12px; flex: none; background: var(--panel-2); }
+.vc-post-text { min-width: 0; flex: 1; }
+.vc-post-title { margin: 0 0 6px; font-size: 19px; font-weight: 700; }
+.vc-post-text p { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: var(--text-dim); white-space: pre-wrap; }
+.vc-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.vc-tag { font-size: 12px; color: var(--text-dim); background: var(--panel-2); border-radius: 20px; padding: 3px 10px; }
+.vc-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-faint); }
+.vc-meta i { font-size: 15px; vertical-align: -2px; margin-right: 3px; }
+/* ความคิดเห็น */
+.vc-comments { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.vc-more { align-self: flex-start; background: none; border: 0; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; padding: 0; }
+.vc-comment { display: flex; gap: 9px; align-items: flex-start; background: var(--panel-2); border-radius: 12px; padding: 9px 12px; }
+.vc-comment-top { display: flex; align-items: baseline; gap: 8px; }
+.vc-comment-top b { font-size: 13.5px; }
+.vc-comment-top small { color: var(--text-faint); font-size: 11.5px; }
+.vc-comment p { margin: 2px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); }
+.vc-reply { display: flex; gap: 8px; align-items: center; }
+.vc-reply .chat-input { flex: 1; }
+.vc-send { padding: 10px 14px; }
+.vc-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border); padding-top: 12px; }
+.vc-close { color: var(--accent); }
+.vc-del { margin-left: auto; }
+/* ฟอร์มโพสต์ใหม่ */
+.vc-new-form { border: 1px solid var(--accent); }
+.vc-sec-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15.5px; }
+.vc-sec-head i { color: var(--accent); font-size: 20px; }
+.vc-title-in { font-size: 17px; font-weight: 600; }
+.vc-detail-in { resize: vertical; font-family: inherit; }
+.vc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.vc-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-dim); }
+.vc-fields .chat-input { width: 100%; }
+.vc-photo { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.vc-photo-prev { position: relative; }
+.vc-photo-prev img { width: 110px; height: 80px; object-fit: cover; border-radius: 10px; }
+.vc-photo-prev .pager-btn { position: absolute; top: 4px; right: 4px; }
+.vc-submit { justify-content: center; padding: 13px; font-size: 16px; font-weight: 700; border-radius: 12px; }
+/* คอลัมน์ขวา */
+.vc-side { display: flex; flex-direction: column; gap: 12px; }
+.vc-sec { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.vc-counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.vc-count { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 12px 6px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font: inherit; cursor: pointer; }
+.vc-count i { font-size: 20px; color: var(--text-dim); }
+.vc-count b { font-size: 24px; font-weight: 800; }
+.vc-count span { font-size: 11.5px; color: var(--text-dim); }
+.vc-count.wait.on { border-color: var(--warn); } .vc-count.wait i { color: var(--warn); }
+.vc-count.claim.on { border-color: #6aa9ff; } .vc-count.claim i { color: #8dbcff; }
+.vc-count.done.on { border-color: var(--accent); } .vc-count.done i { color: var(--accent); }
+.vc-howto { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vc-howto li { display: flex; align-items: center; gap: 9px; }
+.vc-step { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); color: var(--text-dim); font-size: 12.5px; font-weight: 700; flex: none; }
+.vc-howto li > i { color: var(--accent); font-size: 19px; flex: none; }
+.vc-howto b { display: block; font-size: 13.5px; }
+.vc-howto small { color: var(--text-dim); font-size: 12px; }
+.vc-quote { padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--panel)); font-size: 14px; line-height: 1.6; }
+.vc-quote i { color: var(--accent); font-size: 20px; display: block; margin-bottom: 4px; }
+.vc-quote span { display: block; margin-top: 6px; font-size: 12.5px; color: var(--text-dim); text-align: right; }
+@media (max-width: 900px) {
+  .vc-grid { grid-template-columns: 1fr; }
+  .vc-pig { display: none; }
+  .vc-post-body { flex-direction: column; }
+  .vc-photo-main { width: 100%; height: 200px; }
+  .vc-new { margin-left: 0; width: 100%; justify-content: center; }
+}

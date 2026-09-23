@@ -99,6 +99,17 @@ export const getFollowupDue = (daysAhead = 0) => get(`/vaccine-followup-due?days
 export const getFollowups = (logId) => get(logId ? `/vaccine-followup?log_id=${logId}` : '/vaccine-followup')
 export const saveFollowup = (entry) => post('/vaccine-followup', entry)
 export const deleteFollowup = (id) => del(`/vaccine-followup/${id}`)
+// ชุมชนปรึกษาสัตวแพทย์
+export const getVetPosts = ({ status, page = 0, pageSize = 20 } = {}) =>
+  get(`/vet-posts?${new URLSearchParams({ ...(status ? { status } : {}), page, page_size: pageSize })}`)
+export const getVetPost = (id) => get(`/vet-posts/${id}`)
+export const createVetPost = (p) => post('/vet-posts', p)
+export const deleteVetPost = (id) => del(`/vet-posts/${id}`)
+export const addVetComment = (id, body) => post(`/vet-posts/${id}/comments`, { body })
+export const claimVetPost = (id) => post(`/vet-posts/${id}/claim`, {})
+export const closeVetPost = (id, close_note = null) => post(`/vet-posts/${id}/close`, { close_note })
+export const reopenVetPost = (id) => post(`/vet-posts/${id}/reopen`, {})
+
 export const getVaccineDue = (days = 7) => get(`/vaccine-due?days=${days}`)
 // กด "เสร็จแล้ว" ที่การ์ดแจ้งเตือน (undo = เอากลับมาเตือนใหม่)
 export const markVaccineDueDone = (id, undo = false) => post(`/vaccine-due/${id}/done?undo=${undo ? 'true' : 'false'}`, {})

@@ -23,6 +23,7 @@ backups/
 
 # ค่าลับและข้อมูลที่ดึงออกมา ห้ามขึ้น git
 backend/.env.cloud
+backend/.env.local-supabase
 supabase/local-keys.txt
 supabase/cloud-export/
 supabase/import-data.sql

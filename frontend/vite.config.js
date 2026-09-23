@@ -33,6 +33,7 @@ export default defineConfig({
       '/vaccine-followup': target,
       '/kb': target,
       '/lab': target,
+      '/vet-posts': target,
       '/admin': target,
       '/export': target,
       '/line': target,
