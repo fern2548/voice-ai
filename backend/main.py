@@ -262,14 +262,50 @@ def _hash_password(password: str, salt: str) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000).hex()
 
 
-def _create_admin_user(username: str, password: str) -> None:
+# ใครเข้ามาใช้ในบริบทไหน — ใช้แสดงในชุมชนปรึกษาสัตวแพทย์ และตัดสินว่าใครรับเคสได้
+JOB_ROLES = {
+    "farmer": "เจ้าของฟาร์ม",
+    "manager": "ผู้จัดการฟาร์ม",
+    "worker": "ผู้ดูแลโรงเรือน",
+    "vet": "สัตวแพทย์",
+    "livestock": "สัตวบาล / ผู้ช่วยสัตวแพทย์",
+    "other": "อื่น ๆ",
+}
+_PROFILE_COLUMNS = "id,username,display_name,job_role,org_name,license_no,vet_status,phone,created_at"
+
+
+def _create_admin_user(username: str, password: str, profile: Optional[dict] = None) -> None:
     _REVOKED_USERS.discard(username)  # เผื่อเคยลบชื่อนี้ไปแล้วสร้างใหม่
     salt = secrets.token_hex(16)
-    supabase.table("admin_users").insert({
+    row = {
         "username": username,
         "password_hash": _hash_password(password, salt),
         "password_salt": salt,
-    }).execute()
+    }
+    if profile:
+        row.update({k: v for k, v in profile.items() if v not in (None, "")})
+    try:
+        supabase.table("admin_users").insert(row).execute()
+    except Exception as e:
+        # ฐานข้อมูลเก่ายังไม่มีคอลัมน์โปรไฟล์ — สร้างบัญชีให้ได้ก่อน ค่อยไปรันสคริปต์เพิ่มคอลัมน์
+        print(f"[warn] สร้างผู้ใช้พร้อมโปรไฟล์ไม่สำเร็จ ({e}) ลองใหม่แบบไม่มีโปรไฟล์")
+        supabase.table("admin_users").insert({k: row[k] for k in ("username", "password_hash", "password_salt")}).execute()
+
+
+def _user_profile(username: Optional[str]) -> dict:
+    """โปรไฟล์ของผู้ใช้คนหนึ่ง — คืน {} ถ้าไม่มี/อ่านไม่ได้ (ฐานข้อมูลเก่าที่ยังไม่มีคอลัมน์)"""
+    if not username:
+        return {}
+    try:
+        rows = supabase.table("admin_users").select(_PROFILE_COLUMNS).eq("username", username).limit(1).execute().data
+        return rows[0] if rows else {}
+    except Exception:
+        return {}
+
+
+def _display_name(username: Optional[str], profile: Optional[dict] = None) -> str:
+    p = profile if profile is not None else _user_profile(username)
+    return (p.get("display_name") or username or "") if p else (username or "")
 
 
 def _verify_admin_password(username: str, password: str) -> bool:
@@ -647,6 +683,12 @@ class SignupRequest(BaseModel):
     username: str
     password: str
     code: str = ""
+    # บอกว่าเป็นใคร เข้ามาในบริบทไหน (ไม่บังคับ แต่ช่วยให้ชุมชนรู้ว่าใครตอบ)
+    display_name: Optional[str] = None
+    job_role: Optional[str] = None
+    org_name: Optional[str] = None
+    license_no: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class ChatTurn(BaseModel):
@@ -758,7 +800,13 @@ def admin_logout(x_admin_token: str = Header(...)):
 @app.get("/admin/whoami")
 def admin_whoami(x_admin_token: str = Header(default="")):
     username = _session_username(x_admin_token)
-    return {"logged_in": username is not None, "username": username, "role": _role_of(x_admin_token)}
+    p = _user_profile(username)
+    return {
+        "logged_in": username is not None, "username": username, "role": _role_of(x_admin_token),
+        "is_vet": _is_vet(username), "display_name": _display_name(username, p),
+        "job_role": p.get("job_role"), "job_label": JOB_ROLES.get(p.get("job_role") or "", ""),
+        "org_name": p.get("org_name"), "vet_status": p.get("vet_status") or "none",
+    }
 
 
 @app.post("/admin/change-password")
@@ -829,16 +877,56 @@ def signup(body: SignupRequest, request: Request):
     if existing:
         raise HTTPException(status_code=400, detail="มีชื่อผู้ใช้นี้อยู่แล้ว กรุณาใช้ชื่ออื่น")
 
-    _create_admin_user(username, body.password)
-    print(f"[info] สมัครบัญชีใหม่: {username}")
+    job = (body.job_role or "").strip()
+    if job and job not in JOB_ROLES:
+        raise HTTPException(status_code=400, detail="ตำแหน่งงานไม่ถูกต้อง")
+    # เลือก "สัตวแพทย์" = ขอสถานะไว้ก่อน ต้องให้ผู้ดูแลยืนยันจึงจะรับเคสได้
+    # (ถ้าใครกดเองแล้วเป็นหมอทันที ชุมชนจะเชื่อถือไม่ได้)
+    profile = {
+        "display_name": (body.display_name or "").strip() or username,
+        "job_role": job or None,
+        "org_name": (body.org_name or "").strip() or None,
+        "license_no": (body.license_no or "").strip() or None,
+        "phone": (body.phone or "").strip() or None,
+        "vet_status": "pending" if job == "vet" else "none",
+    }
+    _create_admin_user(username, body.password, profile)
+    print(f"[info] สมัครบัญชีใหม่: {username} ({profile.get('job_role') or '-'})")
+    if job == "vet":
+        _send_line_broadcast(
+            f"🩺 มีสัตวแพทย์สมัครเข้าระบบ: {profile['display_name']} ({username})\n"
+            f"ใบอนุญาต: {profile.get('license_no') or 'ไม่ได้ระบุ'}\nรอผู้ดูแลยืนยันในหน้าตั้งค่า"
+        )
     return AdminLoginResponse(token=_issue_session_token(username), username=username, role="admin" if username in ADMIN_USERS else "staff")
 
 
 @app.get("/admin/users", dependencies=[Depends(require_role_admin)])
 def list_admin_users():
     """รายชื่อผู้ใช้ admin ทั้งหมด (ไม่ส่ง password กลับไปเด็ดขาด)"""
-    res = supabase.table("admin_users").select("id,username,created_at").order("username").execute()
-    return {"rows": res.data or []}
+    try:
+        res = supabase.table("admin_users").select(_PROFILE_COLUMNS).order("username").execute()
+    except Exception:   # ฐานข้อมูลเก่ายังไม่มีคอลัมน์โปรไฟล์
+        res = supabase.table("admin_users").select("id,username,created_at").order("username").execute()
+    rows = res.data or []
+    for r in rows:
+        r["job_label"] = JOB_ROLES.get(r.get("job_role") or "", "")
+        r["is_vet"] = _is_vet(r.get("username"))
+    return {"rows": rows, "job_roles": JOB_ROLES}
+
+
+class VetVerify(BaseModel):
+    status: str    # verified | rejected | pending
+
+
+@app.post("/admin/users/{username}/vet-status", dependencies=[Depends(require_role_admin)])
+def set_vet_status(username: str, body: VetVerify):
+    """ผู้ดูแลยืนยันว่าเป็นสัตวแพทย์จริง — ยืนยันแล้วถึงจะกด "รับดูแลเคส" ได้"""
+    if body.status not in ("verified", "rejected", "pending"):
+        raise HTTPException(status_code=400, detail="สถานะไม่ถูกต้อง")
+    res = supabase.table("admin_users").update({"vet_status": body.status}).eq("username", username).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้นี้")
+    return {"ok": True, "username": username, "vet_status": body.status}
 
 
 @app.post("/admin/users", dependencies=[Depends(require_role_admin)])
@@ -1382,7 +1470,12 @@ VET_STATUS = ("waiting", "claimed", "done")
 
 
 def _is_vet(user: Optional[str]) -> bool:
-    return bool(user) and (user in VET_USERS or user in ADMIN_USERS)
+    """หมอที่ยืนยันแล้วเท่านั้น — ตั้งจาก VET_USERS ในไฟล์ .env หรือผู้ดูแลกดยืนยันในหน้าตั้งค่า"""
+    if not user:
+        return False
+    if user in VET_USERS or user in ADMIN_USERS:
+        return True
+    return _user_profile(user).get("vet_status") == "verified"
 
 
 class VetPost(BaseModel):
@@ -1456,7 +1549,7 @@ def get_vet_post(post_id: int):
 @app.post("/vet-posts", dependencies=[Depends(verify_admin_token)])
 def create_vet_post(p: VetPost, x_admin_token: str = Header(default="")):
     user = _session_username(x_admin_token)
-    row = {**p.model_dump(), "author": user, "status": "waiting"}
+    row = {**p.model_dump(), "author": user, "author_name": _display_name(user), "status": "waiting"}
     saved = supabase.table("vet_posts").insert(row).execute().data[0]
     # บอกหมอใน LINE ว่ามีเคสใหม่ (ถ้าตั้งค่าไว้) — ยิ่งตอบเร็ว หมูยิ่งได้รับการดูแลเร็ว
     tail = f"\nดูเคส: {PUBLIC_SITE_URL}/vet" if PUBLIC_SITE_URL else ""
@@ -1482,7 +1575,7 @@ def add_vet_comment(post_id: int, c: VetComment, x_admin_token: str = Header(def
     if not body:
         raise HTTPException(status_code=400, detail="พิมพ์ความคิดเห็นก่อนส่ง")
     user = _session_username(x_admin_token)
-    row = {"post_id": post_id, "author": user, "is_vet": _is_vet(user), "body": body}
+    row = {"post_id": post_id, "author": user, "author_name": _display_name(user), "is_vet": _is_vet(user), "body": body}
     return supabase.table("vet_comments").insert(row).execute().data[0]
 
 
@@ -1493,7 +1586,8 @@ def claim_vet_post(post_id: int, x_admin_token: str = Header(default="")):
     if not _is_vet(user):
         raise HTTPException(status_code=403, detail="เฉพาะสัตวแพทย์เท่านั้นที่รับดูแลเคสได้")
     res = supabase.table("vet_posts").update({
-        "status": "claimed", "claimed_by": user, "claimed_at": datetime.now(BANGKOK).isoformat(),
+        "status": "claimed", "claimed_by": user, "claimed_name": _display_name(user),
+        "claimed_at": datetime.now(BANGKOK).isoformat(),
     }).eq("id", post_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="ไม่พบเคสนี้")

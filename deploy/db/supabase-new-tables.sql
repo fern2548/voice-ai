@@ -138,3 +138,16 @@ create table if not exists vet_comments (
 
 create index if not exists vet_posts_status_idx on vet_posts (status, created_at desc);
 create index if not exists vet_comments_post_idx on vet_comments (post_id, created_at);
+
+-- โปรไฟล์ผู้ใช้: ใครเป็นใคร เข้ามาในบริบทไหน (ใช้กับชุมชนปรึกษาสัตวแพทย์)
+alter table admin_users add column if not exists display_name text;      -- ชื่อที่แสดงในชุมชน
+alter table admin_users add column if not exists job_role text;          -- farmer | manager | worker | vet | livestock | other
+alter table admin_users add column if not exists org_name text;          -- ชื่อฟาร์ม / คลินิก / หน่วยงาน
+alter table admin_users add column if not exists license_no text;        -- เลขใบอนุญาตสัตวแพทย์ (ถ้ามี)
+alter table admin_users add column if not exists vet_status text not null default 'none';  -- none | pending | verified | rejected
+alter table admin_users add column if not exists phone text;
+
+-- ชื่อที่จะแสดงในโพสต์/ความคิดเห็น เก็บไว้ตอนโพสต์ จะได้ไม่ต้อง join ทุกครั้ง
+alter table vet_posts add column if not exists author_name text;
+alter table vet_comments add column if not exists author_name text;
+alter table vet_posts add column if not exists claimed_name text;      -- ชื่อหมอที่รับเคส (claimed_by เก็บ username ไว้ตรวจสิทธิ์)

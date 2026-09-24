@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useAdminAuth } from '../context/AdminAuth.jsx'
-import { changeAdminPassword, getAdminUsers, createAdminUser, deleteAdminUser } from '../api.js'
+import { changeAdminPassword, getAdminUsers, createAdminUser, deleteAdminUser, setVetStatus } from '../api.js'
+
+// ป้ายสถานะสัตวแพทย์ — ต้องกดยืนยันก่อน คนนั้นถึงจะ "รับดูแลเคส" ในชุมชนได้
+const VET_LABEL = { pending: 'รอยืนยัน', verified: 'ยืนยันแล้ว', rejected: 'ไม่ผ่าน' }
 
 export default function AdminUsersPanel() {
   const { username } = useAdminAuth()
@@ -24,6 +27,11 @@ export default function AdminUsersPanel() {
   }
 
   useEffect(() => { loadUsers() }, [])
+
+  // ยืนยัน/ปฏิเสธสถานะสัตวแพทย์ — ยืนยันแล้วคนนั้นกด "รับดูแลเคส" ได้ทันที
+  const changeVet = async (user, status) => {
+    try { await setVetStatus(user, status); loadUsers() } catch { setUserMsg('อัปเดตสถานะไม่สำเร็จ') }
+  }
 
   const submitChangePassword = async (e) => {
     e.preventDefault()
@@ -145,6 +153,8 @@ export default function AdminUsersPanel() {
             <thead>
               <tr>
                 <th>ชื่อผู้ใช้</th>
+                <th>ตำแหน่ง</th>
+                <th>สัตวแพทย์</th>
                 <th>สร้างเมื่อ</th>
                 <th></th>
               </tr>
@@ -152,14 +162,38 @@ export default function AdminUsersPanel() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan="3" className="td-empty">
+                  <td colSpan="5" className="td-empty">
                     {loadError ? 'โหลดรายชื่อผู้ใช้ไม่สำเร็จ' : 'ไม่มีผู้ใช้'}
                   </td>
                 </tr>
               ) : (
                 users.map((u) => (
                   <tr key={u.id}>
-                    <td>{u.username}{u.username === username ? ' (ฉัน)' : ''}</td>
+                    <td>
+                      <b>{u.display_name || u.username}</b>{u.username === username ? ' (ฉัน)' : ''}
+                      <div className="au-dim">{u.username}{u.org_name ? ` · ${u.org_name}` : ''}</div>
+                    </td>
+                    <td>{u.job_label || '—'}</td>
+                    <td>
+                      {u.vet_status && u.vet_status !== 'none' ? (
+                        <div className="au-vet">
+                          <span className={`au-badge ${u.vet_status}`}>{VET_LABEL[u.vet_status] || u.vet_status}</span>
+                          {u.license_no && <div className="au-dim">ใบอนุญาต {u.license_no}</div>}
+                          <div className="au-vet-btns">
+                            {u.vet_status !== 'verified' && (
+                              <button className="pager-btn" onClick={() => changeVet(u.username, 'verified')}>
+                                <i className="ti ti-check" aria-hidden="true" /> ยืนยัน
+                              </button>
+                            )}
+                            {u.vet_status !== 'rejected' && (
+                              <button className="pager-btn" onClick={() => changeVet(u.username, 'rejected')}>
+                                <i className="ti ti-x" aria-hidden="true" /> ไม่ผ่าน
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ) : '—'}
+                    </td>
                     <td>{u.created_at?.slice(0, 10) ?? '--'}</td>
                     <td>
                       {u.username !== username && (

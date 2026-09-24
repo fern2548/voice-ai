@@ -5,6 +5,16 @@ import { useTheme } from '../theme.jsx'
 import { FarmyLogo } from './FarmDecor.jsx'
 import { getSignupEnabled } from '../api.js'
 
+// ใครเข้ามาใช้บ้าง — ต้องตรงกับ JOB_ROLES ฝั่งเซิร์ฟเวอร์
+const JOBS = [
+  { id: 'farmer', label: 'เจ้าของฟาร์ม', icon: 'ti-home' },
+  { id: 'manager', label: 'ผู้จัดการฟาร์ม', icon: 'ti-clipboard-check' },
+  { id: 'worker', label: 'ผู้ดูแลโรงเรือน', icon: 'ti-pig' },
+  { id: 'vet', label: 'สัตวแพทย์', icon: 'ti-stethoscope' },
+  { id: 'livestock', label: 'สัตวบาล / ผู้ช่วย', icon: 'ti-first-aid-kit' },
+  { id: 'other', label: 'อื่น ๆ', icon: 'ti-user' },
+]
+
 // บล็อกเฉพาะ "หน้าภายใน" ไว้จนกว่าจะล็อกอิน — หน้าข้อมูลปกติ (อากาศ กราฟ คู่มือ) คนนอกเปิดดูได้เลย
 // backend กันข้อมูลภายในอีกชั้นอยู่แล้ว (401) หน้านี้แค่ทำให้คนนอกไม่เจอหน้าว่าง ๆ แต่เจอฟอร์มล็อกอินแทน
 //
@@ -27,6 +37,11 @@ export default function AdminLoginGate({ children, force = false }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [canSignup, setCanSignup] = useState(false)
+  // สมัครแล้วบอกด้วยว่าเป็นใคร — ชุมชนปรึกษาสัตวแพทย์จะได้รู้ว่าใครตอบ
+  const [job, setJob] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [orgName, setOrgName] = useState('')
+  const [licenseNo, setLicenseNo] = useState('')
 
   // ถามเซิร์ฟเวอร์ว่าเปิดให้สมัครเองไหม ถ้าไม่เปิดก็ไม่ต้องโชว์ลิงก์ให้สับสน
   useEffect(() => {
@@ -41,13 +56,17 @@ export default function AdminLoginGate({ children, force = false }) {
   if (!force && !isInternalPath(location.pathname)) return children
 
   const isSignup = mode === 'signup'
-  const ready = password.trim() && username.trim() && (!isSignup || code.trim())
+  const ready = password.trim() && username.trim() && (!isSignup || (code.trim() && job && displayName.trim()))
 
   const switchMode = (next) => {
     setMode(next)
     setError('')
     setPassword('')
     setCode('')
+    setJob('')
+    setDisplayName('')
+    setOrgName('')
+    setLicenseNo('')
     // ชื่อ admin เป็นค่าเริ่มต้นของการล็อกอิน แต่ตอนสมัครต้องให้ผู้ใช้ตั้งเอง
     setUsername(next === 'signup' ? '' : 'admin')
   }
@@ -59,7 +78,12 @@ export default function AdminLoginGate({ children, force = false }) {
     setError('')
     try {
       if (isSignup) {
-        await signup(username.trim(), password, code.trim())
+        await signup(username.trim(), password, code.trim(), {
+          display_name: displayName.trim(),
+          job_role: job,
+          org_name: orgName.trim(),
+          license_no: licenseNo.trim(),
+        })
       } else {
         await login(username.trim(), password)
       }
@@ -101,8 +125,74 @@ export default function AdminLoginGate({ children, force = false }) {
 
         <h1 className="lg-title">{isSignup ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'}</h1>
         <p className="lg-sub">
-          {isSignup ? 'สร้างบัญชีใหม่ด้วยรหัสเชิญจากผู้ดูแล' : 'ระบบจัดการฟาร์มสุกรด้วยเสียง'}
+          {isSignup ? 'บอกหน่อยว่าคุณเป็นใคร ชุมชนจะได้รู้ว่าใครให้คำแนะนำ' : 'ระบบจัดการฟาร์มสุกรด้วยเสียง'}
         </p>
+
+        {isSignup && (
+          <>
+            <div className="lg-field">
+              <span className="lg-label">คุณเข้ามาในฐานะ</span>
+              <div className="lg-jobs">
+                {JOBS.map((j) => (
+                  <button
+                    type="button"
+                    key={j.id}
+                    className={`lg-job ${job === j.id ? 'on' : ''}`}
+                    onClick={() => setJob(j.id)}
+                    disabled={busy}
+                  >
+                    <i className={`ti ${j.icon}`} aria-hidden="true" />
+                    {j.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="lg-field">
+              <span className="lg-label">ชื่อที่แสดงในชุมชน</span>
+              <input
+                type="text"
+                className="lg-input"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder={job === 'vet' ? 'เช่น น.สพ. ธนกร ใจดี' : 'เช่น สมชาย ใจดี'}
+                disabled={busy}
+              />
+            </label>
+
+            <label className="lg-field">
+              <span className="lg-label">{job === 'vet' ? 'คลินิก / หน่วยงาน' : 'ชื่อฟาร์ม'} <small>(ไม่บังคับ)</small></span>
+              <input
+                type="text"
+                className="lg-input"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                placeholder={job === 'vet' ? 'เช่น ปศุสัตว์จังหวัด…' : 'เช่น ฟาร์มสุขสันต์'}
+                disabled={busy}
+              />
+            </label>
+
+            {job === 'vet' && (
+              <>
+                <label className="lg-field">
+                  <span className="lg-label">เลขใบอนุญาตประกอบวิชาชีพ <small>(ไม่บังคับ)</small></span>
+                  <input
+                    type="text"
+                    className="lg-input"
+                    value={licenseNo}
+                    onChange={(e) => setLicenseNo(e.target.value)}
+                    placeholder="ใส่ไว้ช่วยให้ยืนยันเร็วขึ้น"
+                    disabled={busy}
+                  />
+                </label>
+                <div className="lg-note">
+                  <i className="ti ti-shield-check" aria-hidden="true" />
+                  สมัครแล้วเข้าใช้งานได้ทันที แต่ต้องรอผู้ดูแลยืนยันสถานะสัตวแพทย์ก่อน จึงจะกด “รับดูแลเคส” ได้
+                </div>
+              </>
+            )}
+          </>
+        )}
 
         {isSignup && (
           <label className="lg-field">
@@ -195,7 +285,7 @@ export default function AdminLoginGate({ children, force = false }) {
 
         <p className="lg-hint">
           {isSignup
-            ? 'ต้องมีรหัสเชิญจากผู้ดูแลระบบจึงจะสมัครได้'
+            ? 'ต้องมีรหัสเชิญจากผู้ดูแลระบบจึงจะสมัครได้ · ข้อมูลนี้ใช้แสดงในชุมชนเท่านั้น'
             : 'เปิดครั้งแรกอาจใช้เวลาสักครู่ เนื่องจากเซิร์ฟเวอร์กำลังเริ่มทำงาน'}
         </p>
       </form>

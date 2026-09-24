@@ -51,7 +51,7 @@ function shrinkImage(file, max = 1000, quality = 0.72) {
 }
 
 export default function VetCommunityPage() {
-  const { username, isVet, role } = useAdminAuth()
+  const { username, isVet, role, profile } = useAdminAuth()
   const [tab, setTab] = useState('waiting')
   const [data, setData] = useState(null)
   const [tick, setTick] = useState(0)
@@ -98,6 +98,21 @@ export default function VetCommunityPage() {
 
       {msg && <div className="vc-msg">{msg}</div>}
 
+      {/* บอกว่าตอนนี้เราเข้ามาในฐานะอะไร และยืนยันหรือยัง */}
+      {username && (
+        <div className="vc-me">
+          <span className={`vc-avatar ${isVet ? 'vet' : ''}`}><i className={`ti ${isVet ? 'ti-stethoscope' : 'ti-user'}`} aria-hidden="true" /></span>
+          <div>
+            <b>{profile?.display_name || username}</b>
+            <small>
+              {profile?.job_label || 'ผู้ใช้งาน'}{profile?.org_name ? ` · ${profile.org_name}` : ''}
+            </small>
+          </div>
+          {isVet && <span className="vc-badge"><i className="ti ti-rosette-discount-check" aria-hidden="true" /> สัตวแพทย์ยืนยันแล้ว</span>}
+          {!isVet && profile?.vet_status === 'pending' && <span className="vc-badge pending"><i className="ti ti-clock" aria-hidden="true" /> รอผู้ดูแลยืนยันสถานะสัตวแพทย์</span>}
+        </div>
+      )}
+
       <div className="vc-grid">
         <div className="vc-feed">
           {writing && <AdminGate><NewPost onDone={(t) => { setWriting(false); setTab('waiting'); flash(`โพสต์ "${t}" แล้ว — หมอจะเข้ามาตอบเร็ว ๆ นี้`); refresh() }} /></AdminGate>}
@@ -105,7 +120,7 @@ export default function VetCommunityPage() {
           {!data ? <div className="empty-note">กำลังโหลด…</div>
             : rows.length === 0 ? <div className="empty-note">ยังไม่มีเคสในหมวดนี้</div>
               : rows.map((p) => (
-                <PostCard key={p.id} post={p} me={username} isVet={isVet} isAdmin={role === 'admin'} onChanged={refresh} onMsg={flash} />
+                <PostCard key={p.id} post={p} me={username} isVet={isVet} vetStatus={profile?.vet_status} isAdmin={role === 'admin'} onChanged={refresh} onMsg={flash} />
               ))}
         </div>
 
@@ -214,7 +229,7 @@ function NewPost({ onDone }) {
 }
 
 // ---------- การ์ดเคส ----------
-function PostCard({ post, me, isVet, isAdmin, onChanged, onMsg }) {
+function PostCard({ post, me, isVet, vetStatus, isAdmin, onChanged, onMsg }) {
   const [comments, setComments] = useState(post.comments || [])
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
@@ -241,8 +256,8 @@ function PostCard({ post, me, isVet, isAdmin, onChanged, onMsg }) {
       <header className="vc-post-head">
         <span className="vc-avatar"><i className="ti ti-user" aria-hidden="true" /></span>
         <div className="vc-who">
-          <b>{post.farm_name || post.author}</b>
-          <small>{post.farm_name ? `${post.author} · ` : ''}{ago(post.created_at)}</small>
+          <b>{post.author_name || post.author}</b>
+          <small>{post.farm_name ? `${post.farm_name} · ` : ''}{ago(post.created_at)}</small>
         </div>
         <span className={`vc-status ${st.tone}`}><i className={`ti ${st.icon}`} aria-hidden="true" /> {st.label}</span>
       </header>
@@ -259,7 +274,7 @@ function PostCard({ post, me, isVet, isAdmin, onChanged, onMsg }) {
           <div className="vc-meta">
             <span><i className="ti ti-message-circle" aria-hidden="true" /> {comments.length} ความคิดเห็น</span>
             <span><i className="ti ti-eye" aria-hidden="true" /> {post.views ?? 0} คนดู</span>
-            {post.claimed_by && <span><i className="ti ti-user-check" aria-hidden="true" /> ดูแลโดย {post.claimed_by}</span>}
+            {post.claimed_by && <span><i className="ti ti-user-check" aria-hidden="true" /> ดูแลโดย {post.claimed_name || post.claimed_by}</span>}
           </div>
         </div>
       </div>
@@ -272,7 +287,11 @@ function PostCard({ post, me, isVet, isAdmin, onChanged, onMsg }) {
           <div className={`vc-comment ${c.is_vet ? 'vet' : ''}`} key={c.id}>
             <span className="vc-avatar sm"><i className={`ti ${c.is_vet ? 'ti-stethoscope' : 'ti-user'}`} aria-hidden="true" /></span>
             <div>
-              <div className="vc-comment-top"><b>{c.is_vet ? `น.สพ.${c.author}` : c.author}</b><small>{ago(c.created_at)}</small></div>
+              <div className="vc-comment-top">
+                <b>{c.author_name || c.author}</b>
+                {c.is_vet && <span className="vc-badge sm"><i className="ti ti-rosette-discount-check" aria-hidden="true" /> สัตวแพทย์</span>}
+                <small>{ago(c.created_at)}</small>
+              </div>
               <p>{c.body}</p>
             </div>
           </div>
@@ -287,6 +306,9 @@ function PostCard({ post, me, isVet, isAdmin, onChanged, onMsg }) {
 
       <AdminGate>
         <footer className="vc-actions">
+          {post.status === 'waiting' && !isVet && vetStatus === 'pending' && (
+            <span className="vc-hint"><i className="ti ti-clock" aria-hidden="true" /> รอยืนยันสถานะสัตวแพทย์จึงจะรับเคสได้</span>
+          )}
           {post.status === 'waiting' && isVet && (
             <button type="button" className="ask-btn" onClick={() => act(claimVetPost, 'รับดูแลเคสแล้ว')}><i className="ti ti-user-check" aria-hidden="true" /> รับดูแลเคส</button>
           )}

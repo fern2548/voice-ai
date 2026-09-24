@@ -99,6 +99,8 @@ export const getFollowupDue = (daysAhead = 0) => get(`/vaccine-followup-due?days
 export const getFollowups = (logId) => get(logId ? `/vaccine-followup?log_id=${logId}` : '/vaccine-followup')
 export const saveFollowup = (entry) => post('/vaccine-followup', entry)
 export const deleteFollowup = (id) => del(`/vaccine-followup/${id}`)
+export const setVetStatus = (username, status) => post(`/admin/users/${encodeURIComponent(username)}/vet-status`, { status })
+
 // ชุมชนปรึกษาสัตวแพทย์
 export const getVetPosts = ({ status, page = 0, pageSize = 20 } = {}) =>
   get(`/vet-posts?${new URLSearchParams({ ...(status ? { status } : {}), page, page_size: pageSize })}`)

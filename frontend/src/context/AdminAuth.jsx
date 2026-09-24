@@ -5,6 +5,7 @@ const TOKEN_KEY = 'admin-token'
 const USERNAME_KEY = 'admin-username'
 const ROLE_KEY = 'admin-role'
 const VET_KEY = 'admin-is-vet'
+const PROFILE_KEY = 'admin-profile'
 const AdminAuthContext = createContext(null)
 
 // backend เก็บ token ไว้ใน memory -> restart ทีไร token ในเบราว์เซอร์ก็ใช้ไม่ได้ทันที
@@ -34,11 +35,11 @@ async function loginRequest(username, password) {
   return res.json()
 }
 
-async function signupRequest(username, password, code) {
+async function signupRequest(username, password, code, profile = {}) {
   const res = await fetch(apiUrl('/admin/signup'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password, code }),
+    body: JSON.stringify({ username, password, code, ...profile }),
   })
   if (!res.ok) {
     const detail = await res.json().then((d) => d?.detail).catch(() => null)
@@ -57,6 +58,10 @@ export function AdminAuthProvider({ children }) {
   const [role, setRole] = useState(() => localStorage.getItem(ROLE_KEY) || 'guest')
   // เป็นสัตวแพทย์ไหม (ตั้งที่ VET_USERS ฝั่งเซิร์ฟเวอร์) — ใช้ตัดสินว่าโชว์ปุ่ม "รับดูแลเคส" ไหม
   const [isVet, setIsVet] = useState(() => localStorage.getItem(VET_KEY) === '1')
+  // โปรไฟล์: ชื่อที่แสดง · ตำแหน่ง · สถานะยืนยันสัตวแพทย์ (none/pending/verified/rejected)
+  const [profile, setProfile] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}') } catch { return {} }
+  })
   const [checking, setChecking] = useState(() => !!localStorage.getItem(TOKEN_KEY))
 
   // ตรวจ token ที่ค้างอยู่ตอนเปิดเว็บ ว่า backend ยังรู้จักไหม
@@ -80,6 +85,9 @@ export function AdminAuthProvider({ children }) {
           }
           localStorage.setItem(VET_KEY, d.is_vet ? '1' : '0')
           setIsVet(!!d.is_vet)
+          const p = { display_name: d.display_name, job_role: d.job_role, job_label: d.job_label, org_name: d.org_name, vet_status: d.vet_status }
+          localStorage.setItem(PROFILE_KEY, JSON.stringify(p))
+          setProfile(p)
         }
       })
       .catch(() => {}) // ต่อ backend ไม่ได้ชั่วคราว -> ไม่เตะออก รอให้ลองใหม่เอง
@@ -112,8 +120,8 @@ export function AdminAuthProvider({ children }) {
   const login = async (user, password) => acceptSession(await loginRequest(user, password))
 
   // สมัครสำเร็จแล้วเข้าระบบให้เลย ผู้ใช้จะได้ไม่ต้องกรอกชื่อกับรหัสซ้ำอีกรอบ
-  const signup = async (user, password, code) =>
-    acceptSession(await signupRequest(user, password, code))
+  const signup = async (user, password, code, profile) =>
+    acceptSession(await signupRequest(user, password, code, profile))
 
   const logout = () => {
     if (token) {
@@ -123,13 +131,17 @@ export function AdminAuthProvider({ children }) {
       }).catch(() => {})
     }
     clearStoredSession()
+    localStorage.removeItem(PROFILE_KEY)
+    localStorage.removeItem(VET_KEY)
     setToken('')
     setUsername('')
     setRole('guest')
+    setIsVet(false)
+    setProfile({})
   }
 
   // isAdmin = ล็อกอินแล้ว (ชื่อเดิม ใช้ทั่วโค้ด) · isSuperAdmin = ผู้ดูแลระบบจริง ๆ
-  const value = { isAdmin: !!token, isSuperAdmin: role === 'admin', isVet, role, token, username, login, signup, logout, checking }
+  const value = { isAdmin: !!token, isSuperAdmin: role === 'admin', isVet, profile, role, token, username, login, signup, logout, checking }
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>
 }
 
