@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage.jsx'
 import SensorsPage from './pages/SensorsPage.jsx'
 import VaccineGuidePage from './pages/VaccineGuidePage.jsx'
 import VaccineInfoPage from './pages/VaccineInfoPage.jsx'
+import TasksPage from './pages/TasksPage.jsx'
 import VetCommunityPage from './pages/VetCommunityPage.jsx'
 import VaccinePlanPage from './pages/VaccinePlanPage.jsx'
 
@@ -25,6 +26,7 @@ import VaccinePlanPage from './pages/VaccinePlanPage.jsx'
 const NAV = [
   { to: '/overview', label: 'หน้าแรก' },
   { to: '/features', label: 'ทำอะไรได้บ้าง' },
+  { to: '/tasks', label: 'งานวันนี้', internal: true },
   { to: '/pig-log', label: 'โรงเรือน', internal: true },
   { to: '/vaccine', label: 'วัคซีน', internal: true },
   { to: '/vet', label: 'ปรึกษาสัตวแพทย์', internal: true },
@@ -66,6 +68,7 @@ function AppShell() {
             <Route path="/vaccine-guide" element={<VaccineGuidePage />} />
             <Route path="/vaccine-info" element={<VaccineInfoPage />} />
             <Route path="/vet" element={<VetCommunityPage />} />
+            <Route path="/tasks" element={<TasksPage />} />
             <Route path="/vaccine-plan" element={<VaccinePlanPage />} />
             <Route path="/sensors" element={<SensorsPage />} />
             <Route path="/settings" element={<SettingsPage />} />

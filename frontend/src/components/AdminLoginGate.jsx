@@ -22,7 +22,7 @@ const JOBS = [
 // โหมดสมัครจะโผล่ก็ต่อเมื่อผู้ดูแลตั้งรหัสเชิญไว้ในเซิร์ฟเวอร์เท่านั้น
 // (ถ้าเปิดให้ใครสมัครก็ได้ คนนอกที่เจอ URL จะเข้ามาเห็นข้อมูลฟาร์มทั้งหมดทันที)
 // หน้าที่ต้องเป็นคนในบริษัท — ที่เหลือคนนอกดูได้
-export const INTERNAL_PATHS = ['/pig-log', '/vaccine', '/vaccine-plan', '/vet', '/settings']
+export const INTERNAL_PATHS = ['/tasks', '/pig-log', '/vaccine', '/vaccine-plan', '/vet', '/settings']
 export const isInternalPath = (p) => INTERNAL_PATHS.some((x) => p === x || p.startsWith(x + '/') || p.startsWith(x + '?'))
 
 export default function AdminLoginGate({ children, force = false }) {

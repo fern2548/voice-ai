@@ -1462,6 +1462,270 @@ def delete_vaccine_followup(followup_id: int):
     return {"ok": True}
 
 
+# ---------- งานที่ต้องทำวันนี้ ----------
+# รวมงานจากทุกระบบไว้หน้าเดียว: แผนวัคซีน · ตรวจอาการหลังฉีด · เคสที่หมอรับดูแล · ค่าสิ่งแวดล้อมหลุดช่วง
+# งานอัตโนมัติสร้างจาก source_key ที่ไม่ซ้ำ เรียกกี่ครั้งก็ไม่เกิดงานซ้ำ
+TASK_STATUS = ("pending", "doing", "done", "issue")
+TASK_SOURCE_LABEL = {
+    "manual": "สร้างเอง", "vaccine": "แผนวัคซีน", "followup": "ตรวจหลังฉีด",
+    "vet": "สัตวแพทย์มอบหมาย", "sensor": "จากการแจ้งเตือน",
+}
+
+
+class FarmTask(BaseModel):
+    title: str
+    detail: Optional[str] = None
+    barn_no: Optional[str] = None
+    pen_no: Optional[str] = None
+    due_date: Optional[date] = None
+    due_time: Optional[str] = None
+    priority: str = "normal"
+    assignee: Optional[str] = None
+
+
+class TaskResult(BaseModel):
+    outcome: str = "done"              # done = เสร็จเรียบร้อย · issue = พบปัญหา ต้องส่งต่อ
+    note: Optional[str] = None
+    image: Optional[str] = None
+    forward_to: Optional[str] = None   # ส่งต่อให้ใคร (เฉพาะกรณีพบปัญหา)
+
+
+class TaskPostpone(BaseModel):
+    due_date: date
+    reason: Optional[str] = None
+
+
+def _task_insert(rows: list[dict]) -> None:
+    """ใส่งานอัตโนมัติทีละแถว ข้ามอันที่มีอยู่แล้ว (source_key ซ้ำ)"""
+    for r in rows:
+        try:
+            supabase.table("farm_tasks").insert(r).execute()
+        except Exception:
+            pass   # ซ้ำ = มีงานนี้อยู่แล้ว ไม่ต้องทำอะไร
+
+
+def _sync_auto_tasks() -> None:
+    """สร้างงานของวันนี้จากระบบอื่น — เรียกตอนเปิดหน้ารายการงาน"""
+    today = datetime.now(BANGKOK).date()
+    rows: list[dict] = []
+
+    # 1) วัคซีนตามแผนที่ถึงกำหนด/เลยกำหนด
+    try:
+        for r in _batch_plan_rows(3):
+            if r["status"] not in ("due", "overdue"):
+                continue
+            rows.append({
+                "title": f"ฉีด{r['vaccine_name']} {r['label']} · {r['batch_name']}",
+                "detail": f"{r.get('pig_count') or '?'} ตัว" + (f" · {r.get('dose')}" if r.get("dose") else ""),
+                "source": "vaccine", "source_key": f"vaccine:{r['batch_id']}:{r['program_id']}:{r['booster_no']}",
+                "barn_no": r.get("barn_no"), "pen_no": r.get("pen_no"),
+                "due_date": r["due_date"], "priority": "urgent" if r["status"] == "overdue" else "normal",
+                "ref_type": "batch_plan", "ref_id": r["batch_id"],
+            })
+    except Exception as e:
+        print(f"[warn] สร้างงานจากแผนวัคซีนไม่ได้: {e}")
+
+    # 2) ตรวจอาการหลังฉีดที่ถึงรอบแล้ว
+    try:
+        for r in _followup_due_rows():
+            log = r.get("_log") or {}
+            rows.append({
+                "title": f"ตรวจอาการหลังฉีด วันที่ {r.get('days_after')} · {log.get('vaccine_name') or 'วัคซีน'}",
+                "detail": "บันทึกอาการบวม ไข้ การกินอาหาร",
+                "source": "followup", "source_key": f"followup:{r.get('vaccine_log_id')}:{r.get('days_after')}",
+                "barn_no": log.get("barn_no"), "pen_no": log.get("pen_no"),
+                "due_date": r.get("check_date") or today.isoformat(),
+                "priority": "urgent" if r.get("overdue_days") else "normal",
+                "ref_type": "vaccine_log", "ref_id": r.get("vaccine_log_id"),
+            })
+    except Exception as e:
+        print(f"[warn] สร้างงานตรวจอาการไม่ได้: {e}")
+
+    # 3) เคสที่สัตวแพทย์รับดูแลแล้ว — ฟาร์มต้องไปติดตามอาการต่อ
+    try:
+        posts = supabase.table("vet_posts").select("*").eq("status", "claimed").execute().data or []
+        for p in posts:
+            rows.append({
+                "title": f"ติดตามอาการ: {p['title']}",
+                "detail": f"เคสที่ {p.get('claimed_name') or p.get('claimed_by') or 'สัตวแพทย์'} รับดูแล",
+                "source": "vet", "source_key": f"vet:{p['id']}:{today.isoformat()}",
+                "barn_no": p.get("barn_no"), "pen_no": p.get("pen_no"),
+                "due_date": today.isoformat(), "priority": "urgent",
+                "assignee": p.get("author"), "assignee_name": p.get("author_name"),
+                "ref_type": "vet_post", "ref_id": p["id"],
+            })
+    except Exception as e:
+        print(f"[warn] สร้างงานจากเคสสัตวแพทย์ไม่ได้: {e}")
+
+    # 4) ค่าสิ่งแวดล้อมหลุดช่วง (วันละครั้งต่อค่า)
+    try:
+        w = supabase.table("weather_readings").select("*").order("created_at", desc=True).limit(1).execute().data
+        if w:
+            for key, label, lo, hi, fix in (
+                ("temperature", "อุณหภูมิ", 20, 28, "ระบบทำความเย็นและพัดลม"),
+                ("humidity", "ความชื้น", 50, 80, "การระบายอากาศ"),
+                ("windspeed", "ความเร็วลม", 0.5, 3, "รอบพัดลมและช่องระบายอากาศ"),
+                ("light", "ความสว่าง", 50, 200, "ระบบไฟส่องสว่าง"),
+            ):
+                v = w[0].get(key)
+                if v is None or lo <= float(v) <= hi:
+                    continue
+                side = "ต่ำกว่า" if float(v) < lo else "สูงกว่า"
+                rows.append({
+                    "title": f"ตรวจ{fix}",
+                    "detail": f"{label} {v} ({side}ช่วงแนะนำ {lo}–{hi})",
+                    "source": "sensor", "source_key": f"sensor:{key}:{today.isoformat()}",
+                    "due_date": today.isoformat(), "priority": "normal",
+                })
+    except Exception as e:
+        print(f"[warn] สร้างงานจากเซนเซอร์ไม่ได้: {e}")
+
+    if rows:
+        _task_insert(rows)
+
+
+def _decorate_task(t: dict, today: date) -> dict:
+    """เติมสถานะที่คำนวณเอง: เกินกำหนดหรือยัง + ป้ายที่มา"""
+    t["source_label"] = TASK_SOURCE_LABEL.get(t.get("source") or "manual", "งาน")
+    due = t.get("due_date")
+    overdue = False
+    if due and t.get("status") in ("pending", "doing"):
+        try:
+            overdue = date.fromisoformat(str(due)) < today
+        except ValueError:
+            overdue = False
+    t["overdue"] = overdue
+    return t
+
+
+@app.get("/farm-tasks")
+def list_tasks(day: Optional[str] = None, include_done: bool = True, sync: bool = True):
+    """งานของวันนั้น (ไม่ระบุ = วันนี้ + งานค้างจากวันก่อน)"""
+    today = datetime.now(BANGKOK).date()
+    if sync:
+        _sync_auto_tasks()
+    target = today
+    if day:
+        try:
+            target = date.fromisoformat(day)
+        except ValueError:
+            pass
+    rows = (
+        supabase.table("farm_tasks").select("*")
+        .lte("due_date", target.isoformat())
+        .order("due_date").order("priority", desc=True).order("id")
+        .execute().data or []
+    )
+    # งานที่ทำเสร็จไปแล้วเมื่อวานไม่ต้องรก เอาเฉพาะที่เสร็จวันนี้
+    keep = []
+    for t in rows:
+        if t.get("status") in ("done",) and str(t.get("due_date") or "") != target.isoformat():
+            continue
+        keep.append(_decorate_task(t, today))
+    if not include_done:
+        keep = [t for t in keep if t["status"] != "done"]
+    counts = {
+        "total": len(keep),
+        "done": sum(1 for t in keep if t["status"] == "done"),
+        "overdue": sum(1 for t in keep if t["overdue"]),
+        "urgent": sum(1 for t in keep if t["priority"] == "urgent" and t["status"] in ("pending", "doing")),
+        "open": sum(1 for t in keep if t["status"] in ("pending", "doing")),
+        "issue": sum(1 for t in keep if t["status"] == "issue"),
+    }
+    return {"rows": keep, "counts": counts, "date": target.isoformat()}
+
+
+@app.post("/farm-tasks", dependencies=[Depends(verify_admin_token)])
+def create_task(t: FarmTask, x_admin_token: str = Header(default="")):
+    user = _session_username(x_admin_token)
+    row = t.model_dump(mode="json")
+    row["source"] = "manual"
+    if row.get("assignee"):
+        row["assignee_name"] = _display_name(row["assignee"])
+    row.setdefault("due_date", datetime.now(BANGKOK).date().isoformat())
+    row["detail"] = (row.get("detail") or None)
+    print(f"[info] สร้างงานใหม่โดย {user}: {t.title}")
+    return supabase.table("farm_tasks").insert(row).execute().data[0]
+
+
+@app.post("/farm-tasks/{task_id}/claim", dependencies=[Depends(verify_admin_token)])
+def claim_task(task_id: int, x_admin_token: str = Header(default="")):
+    """กด "รับงาน" — งานเปลี่ยนเป็นกำลังดำเนินการ และรู้ว่าใครทำ"""
+    user = _session_username(x_admin_token)
+    res = supabase.table("farm_tasks").update({
+        "assignee": user, "assignee_name": _display_name(user), "status": "doing",
+    }).eq("id", task_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ไม่พบงานนี้")
+    return res.data[0]
+
+
+@app.post("/farm-tasks/{task_id}/result", dependencies=[Depends(verify_admin_token)])
+def record_task_result(task_id: int, r: TaskResult, x_admin_token: str = Header(default="")):
+    """บันทึกผล — "เสร็จเรียบร้อย" ปิดงาน · "พบปัญหา" งานยังไม่ปิด แต่ส่งต่อให้คนที่เกี่ยวข้อง"""
+    if r.outcome not in ("done", "issue"):
+        raise HTTPException(status_code=400, detail="ผลการทำงานไม่ถูกต้อง")
+    user = _session_username(x_admin_token)
+    row = {
+        "status": r.outcome, "result_note": (r.note or "").strip() or None, "result_image": r.image,
+        "forward_to": (r.forward_to or "").strip() or None,
+        "done_by": _display_name(user), "done_at": datetime.now(BANGKOK).isoformat(),
+    }
+    res = supabase.table("farm_tasks").update(row).eq("id", task_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ไม่พบงานนี้")
+    t = res.data[0]
+    if r.outcome == "issue":
+        # พบปัญหา = ต้องมีคนรู้ ไม่ใช่ปิดเงียบ ๆ
+        _send_line_broadcast(
+            f"⚠️ พบปัญหาจากงาน: {t['title']}\n{row['result_note'] or '-'}\n"
+            f"ส่งต่อให้: {row['forward_to'] or 'ยังไม่ระบุ'} · บันทึกโดย {row['done_by']}"
+        )
+    return t
+
+
+@app.post("/farm-tasks/{task_id}/postpone", dependencies=[Depends(verify_admin_token)])
+def postpone_task(task_id: int, p: TaskPostpone, x_admin_token: str = Header(default="")):
+    """เลื่อนนัด — เก็บเหตุผลไว้ในรายละเอียดงาน จะได้รู้ว่าทำไมถึงเลื่อน"""
+    user = _session_username(x_admin_token)
+    cur = supabase.table("farm_tasks").select("detail").eq("id", task_id).limit(1).execute().data
+    if not cur:
+        raise HTTPException(status_code=404, detail="ไม่พบงานนี้")
+    note = f"เลื่อนเป็น {p.due_date.isoformat()} โดย {_display_name(user)}" + (f" ({p.reason})" if p.reason else "")
+    detail = ((cur[0].get("detail") or "") + "\n" + note).strip()
+    return supabase.table("farm_tasks").update({
+        "due_date": p.due_date.isoformat(), "detail": detail, "status": "pending",
+    }).eq("id", task_id).execute().data[0]
+
+
+@app.delete("/farm-tasks/{task_id}", dependencies=[Depends(verify_admin_token)])
+def delete_task(task_id: int):
+    supabase.table("farm_tasks").delete().eq("id", task_id).execute()
+    return {"ok": True}
+
+
+@app.post("/cron/task-notify")
+def cron_task_notify(x_cron_key: str = Header(default="")):
+    """LINE ทุกเช้า: งานของวันนี้ + งานที่ค้างข้ามวัน"""
+    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    data = list_tasks()
+    rows = [t for t in data["rows"] if t["status"] in ("pending", "doing")]
+    if not rows:
+        return {"ok": True, "sent": False, "count": 0}
+    lines = [f"📋 งานวันนี้ {len(rows)} รายการ"]
+    for t in rows[:10]:
+        mark = "🔴" if t["overdue"] else ("🟠" if t["priority"] == "urgent" else "•")
+        where = " ".join(x for x in [t.get("barn_no"), t.get("pen_no")] if x)
+        lines.append(f"{mark} {t['title']}{' · ' + where if where else ''}")
+    if len(rows) > 10:
+        lines.append(f"…และอีก {len(rows) - 10} รายการ")
+    if PUBLIC_SITE_URL:
+        lines.append(f"ดูงานทั้งหมด: {PUBLIC_SITE_URL}/tasks")
+    _send_line_broadcast("\n".join(lines))
+    return {"ok": True, "sent": True, "count": len(rows)}
+
+
 # ---------- ชุมชนปรึกษาสัตวแพทย์ ----------
 # ฟาร์มโพสต์เคส (อาการ + รูป) → สัตวแพทย์เข้ามาคอมเมนต์ → กด "รับดูแลเคส" → พอจบกด "ปิดเคส"
 # ใครเป็นหมอ: ชื่อผู้ใช้ที่อยู่ใน VET_USERS (คั่นด้วยจุลภาค) — คนอื่นคอมเมนต์ได้แต่รับเคสไม่ได้

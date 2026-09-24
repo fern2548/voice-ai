@@ -3124,3 +3124,84 @@ th, td { font-size: 14px; }
 .au-badge.pending { color: var(--warn); border-color: var(--warn); }
 .au-badge.verified { color: var(--accent); border-color: var(--accent); }
 .au-badge.rejected { color: var(--danger); border-color: var(--danger); }
+
+/* ---------- งานที่ต้องทำวันนี้ ---------- */
+.tk { display: flex; flex-direction: column; gap: 14px; }
+.tk-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.tk-head-icon { width: 54px; height: 54px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); display: grid; place-items: center; font-size: 27px; flex: none; }
+.tk-title { margin: 0; font-size: 25px; font-weight: 800; }
+.tk-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
+.tk-me { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 20px; padding: 6px 13px; }
+/* ความคืบหน้า */
+.tk-prog { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.tk-prog-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.tk-prog-big { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tk-prog-label { font-size: 13px; color: var(--text-dim); }
+.tk-new { margin-left: auto; padding: 9px 15px; font-size: 13.5px; }
+.tk-bar { height: 9px; border-radius: 6px; background: var(--panel-2); margin: 10px 0 12px; overflow: hidden; }
+.tk-bar i { display: block; height: 100%; background: var(--accent); border-radius: 6px; transition: width .4s; }
+.tk-counts { display: flex; gap: 8px; flex-wrap: wrap; }
+.tk-c { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; }
+.tk-c b { color: var(--text); font-size: 14px; }
+.tk-c.bad { color: var(--danger); border-color: var(--danger); } .tk-c.bad b { color: var(--danger); }
+.tk-c.warn { color: var(--warn); border-color: var(--warn); } .tk-c.warn b { color: var(--warn); }
+.tk-c.ok { color: var(--accent); border-color: var(--accent); } .tk-c.ok b { color: var(--accent); }
+.tk-msg { padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--accent-2); font-size: 14px; font-weight: 600; }
+/* การ์ดงาน */
+.tk-list { display: flex; flex-direction: column; gap: 10px; }
+.tk-card { --c: var(--accent); background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: 0 14px 14px 0; padding: 14px 16px; }
+.tk-card.amber { --c: var(--warn); } .tk-card.red { --c: var(--danger); } .tk-card.blue { --c: #6aa9ff; }
+.tk-card.overdue { background: color-mix(in srgb, var(--danger) 7%, var(--panel)); }
+.tk-card.done { opacity: .6; }
+.tk-card.issue { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.tk-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.tk-src { font-size: 11.5px; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--c); color: var(--c); }
+.tk-urgent { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.tk-due { margin-left: auto; font-size: 12.5px; color: var(--text-dim); }
+.tk-due.bad { color: var(--danger); font-weight: 600; }
+.tk-card-title { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
+.tk-card.done .tk-card-title { text-decoration: line-through; color: var(--text-dim); }
+.tk-detail { margin: 0 0 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); white-space: pre-wrap; }
+.tk-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tk-tag { font-size: 12px; color: var(--text-dim); background: var(--panel-2); border-radius: 20px; padding: 3px 10px; }
+.tk-tag.who i { font-size: 14px; vertical-align: -2px; margin-right: 2px; }
+.tk-issue { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 12%, transparent); font-size: 13px; }
+.tk-issue i { color: var(--warn); font-size: 18px; flex: none; }
+.tk-issue b { display: block; } .tk-issue span { color: var(--text-dim); font-size: 12.5px; }
+.tk-result { margin-top: 10px; font-size: 13px; color: var(--text-dim); }
+.tk-result i { color: var(--accent); margin-right: 4px; }
+.tk-photo { margin-top: 10px; max-width: 220px; border-radius: 10px; display: block; }
+.tk-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.tk-record { padding: 10px 16px; font-size: 14px; }
+.tk-del { margin-left: auto; }
+/* ฟอร์มบันทึกผล */
+.tk-form { margin-top: 12px; padding: 14px; border-radius: 12px; background: var(--panel-2); display: flex; flex-direction: column; gap: 10px; }
+.tk-form-label { font-size: 12.5px; color: var(--text-dim); }
+.tk-outcomes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tk-outcome { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 11px 13px; border-radius: 11px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+.tk-outcome i { font-size: 19px; color: var(--text-dim); }
+.tk-outcome b { font-size: 14px; } .tk-outcome small { font-size: 11.5px; color: var(--text-dim); }
+.tk-outcome.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.tk-outcome.on i { color: var(--accent); }
+.tk-outcome.bad.on { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--panel)); }
+.tk-outcome.bad.on i { color: var(--warn); }
+.tk-forward { align-items: center; }
+.tk-note-row { display: flex; gap: 8px; align-items: center; }
+.tk-note-row .chat-input { flex: 1; }
+.tk-icon-btn { width: 42px; height: 42px; border-radius: 11px; border: 1px solid var(--border); background: var(--panel); color: var(--accent); font-size: 19px; cursor: pointer; flex: none; }
+.tk-prev { position: relative; width: fit-content; }
+.tk-prev img { width: 130px; height: 95px; object-fit: cover; border-radius: 10px; display: block; }
+.tk-prev .pager-btn { position: absolute; top: 4px; right: 4px; }
+.tk-confirm { justify-content: center; padding: 12px; font-size: 15px; font-weight: 700; border-radius: 11px; }
+/* เพิ่มงานเอง */
+.tk-newform { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--accent); }
+.tk-newtitle { font-size: 16px; font-weight: 600; }
+.tk-newgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.tk-newgrid label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-dim); }
+.tk-newgrid .chat-input { width: 100%; }
+@media (max-width: 700px) {
+  .tk-title { font-size: 21px; }
+  .tk-me { margin-left: 0; }
+  .tk-outcomes { grid-template-columns: 1fr; }
+  .tk-record { width: 100%; justify-content: center; }
+}

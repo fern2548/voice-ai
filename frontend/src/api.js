@@ -101,6 +101,14 @@ export const saveFollowup = (entry) => post('/vaccine-followup', entry)
 export const deleteFollowup = (id) => del(`/vaccine-followup/${id}`)
 export const setVetStatus = (username, status) => post(`/admin/users/${encodeURIComponent(username)}/vet-status`, { status })
 
+// งานที่ต้องทำวันนี้
+export const getTasks = (day) => get(`/farm-tasks${day ? `?day=${day}` : ''}`)
+export const createTask = (t) => post('/farm-tasks', t)
+export const claimTask = (id) => post(`/farm-tasks/${id}/claim`, {})
+export const recordTaskResult = (id, r) => post(`/farm-tasks/${id}/result`, r)
+export const postponeTask = (id, due_date, reason) => post(`/farm-tasks/${id}/postpone`, { due_date, reason })
+export const deleteTask = (id) => del(`/farm-tasks/${id}`)
+
 // ชุมชนปรึกษาสัตวแพทย์
 export const getVetPosts = ({ status, page = 0, pageSize = 20 } = {}) =>
   get(`/vet-posts?${new URLSearchParams({ ...(status ? { status } : {}), page, page_size: pageSize })}`)

@@ -34,6 +34,7 @@ export default defineConfig({
       '/kb': target,
       '/lab': target,
       '/vet-posts': target,
+      '/farm-tasks': target,
       '/admin': target,
       '/export': target,
       '/line': target,

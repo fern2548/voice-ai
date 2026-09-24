@@ -272,3 +272,33 @@ alter table admin_users add column if not exists phone text;
 alter table vet_posts add column if not exists author_name text;
 alter table vet_comments add column if not exists author_name text;
 alter table vet_posts add column if not exists claimed_name text;      -- ชื่อหมอที่รับเคส (claimed_by เก็บ username ไว้ตรวจสิทธิ์)
+
+-- งานที่ต้องทำวันนี้ — รวมงานจากทุกระบบไว้ที่เดียว
+-- source: manual (คนสร้างเอง) · vaccine (แผนวัคซีนถึงกำหนด) · followup (ตรวจอาการหลังฉีด)
+--         vet (เคสที่สัตวแพทย์รับดูแล) · sensor (ค่าสิ่งแวดล้อมหลุดช่วง)
+-- source_key กันสร้างงานซ้ำจากต้นทางเดียวกัน
+create table if not exists farm_tasks (
+  id bigint generated always as identity primary key,
+  title text not null,
+  detail text,
+  source text not null default 'manual',
+  source_key text unique,
+  barn_no text,
+  pen_no text,
+  due_date date,
+  due_time text,
+  priority text not null default 'normal',   -- normal | urgent
+  assignee text,
+  assignee_name text,
+  status text not null default 'pending',    -- pending | doing | done | issue
+  result_note text,
+  result_image text,
+  forward_to text,
+  done_by text,
+  done_at timestamptz,
+  ref_type text,
+  ref_id bigint,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists farm_tasks_due_idx on farm_tasks (due_date, status);
