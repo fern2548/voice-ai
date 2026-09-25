@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 260" width="340" height="260" role="img" aria-labelledby="t d">
+  <title id="t">อาการที่จมูกและรอบปาก</title><desc id="d">ภาพวาดแสดงตุ่มน้ำใสและแผลถลอกบริเวณจมูกและริมฝีปากของสุกร</desc>
+  <rect width="340" height="260" fill="#f7f3ef"/>
+  <ellipse cx="170" cy="150" rx="120" ry="86" fill="#f2c3b4"/>
+  <ellipse cx="170" cy="150" rx="120" ry="86" fill="none" stroke="#8a6a60" stroke-width="2"/>
+  <ellipse cx="170" cy="128" rx="74" ry="52" fill="#d9a294" opacity=".45"/>
+  <ellipse cx="170" cy="128" rx="74" ry="52" fill="none" stroke="#8a6a60" stroke-width="2"/>
+  <ellipse cx="142" cy="128" rx="13" ry="18" fill="#7d5a52"/>
+  <ellipse cx="198" cy="128" rx="13" ry="18" fill="#7d5a52"/>
+  <path d="M96 196 Q170 214 244 196" fill="none" stroke="#8a6a60" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="112" cy="96" r="7" fill="#ffe9b0" stroke="#c0392b" stroke-width="2"/><circle cx="110" cy="94" r="2" fill="#fff" opacity=".7"/><circle cx="150" cy="82" r="7" fill="#ffe9b0" stroke="#c0392b" stroke-width="2"/><circle cx="148" cy="80" r="2" fill="#fff" opacity=".7"/><circle cx="196" cy="84" r="7" fill="#ffe9b0" stroke="#c0392b" stroke-width="2"/><circle cx="194" cy="82" r="2" fill="#fff" opacity=".7"/><circle cx="232" cy="100" r="7" fill="#ffe9b0" stroke="#c0392b" stroke-width="2"/><circle cx="230" cy="98" r="2" fill="#fff" opacity=".7"/>
+  <ellipse cx="124" cy="170" rx="9" ry="6" fill="#c0392b" opacity=".85"/><ellipse cx="124" cy="170" rx="5" ry="3" fill="#8e2a20"/><ellipse cx="168" cy="186" rx="9" ry="6" fill="#c0392b" opacity=".85"/><ellipse cx="168" cy="186" rx="5" ry="3" fill="#8e2a20"/><ellipse cx="214" cy="172" rx="9" ry="6" fill="#c0392b" opacity=".85"/><ellipse cx="214" cy="172" rx="5" ry="3" fill="#8e2a20"/><ellipse cx="96" cy="140" rx="9" ry="6" fill="#c0392b" opacity=".85"/><ellipse cx="96" cy="140" rx="5" ry="3" fill="#8e2a20"/><ellipse cx="246" cy="142" rx="9" ry="6" fill="#c0392b" opacity=".85"/><ellipse cx="246" cy="142" rx="5" ry="3" fill="#8e2a20"/>
+  <text x="170" y="242" text-anchor="middle" font-family="IBM Plex Sans Thai, sans-serif" font-size="15" fill="#5b4a44">จมูกและรอบปาก</text>
+
+</svg>

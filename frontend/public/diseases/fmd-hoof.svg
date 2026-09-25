@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" width="400" height="260" role="img" aria-labelledby="t d">
+  <title id="t">อาการที่กีบเท้า</title><desc id="d">ภาพวาดแสดงตุ่มน้ำที่ขอบกีบและแผลในซอกกีบของสุกร</desc>
+  <rect width="400" height="260" fill="#f7f3ef"/>
+  <g transform="translate(58 0)">
+    <path d="M60 34 L60 150 Q60 178 86 178 L142 178 Q168 178 168 150 L168 34 Z" fill="#f2c3b4" stroke="#8a6a60" stroke-width="2"/>
+    <path d="M60 150 Q114 164 168 150" fill="none" stroke="#8a6a60" stroke-width="2" opacity=".6"/>
+    <path d="M62 178 L106 178 L108 232 Q108 244 90 244 Q70 244 70 232 Z" fill="#4a4038"/>
+    <path d="M122 178 L166 178 L164 232 Q164 244 146 244 Q126 244 126 232 Z" fill="#4a4038"/>
+    <rect x="106" y="178" width="16" height="52" fill="#d9a294"/>
+    <circle cx="78" cy="176" r="10" fill="#ffe9b0" stroke="#c0392b" stroke-width="2"/><circle cx="76" cy="174" r="3" fill="#fff" opacity=".7"/><circle cx="150" cy="176" r="10" fill="#ffe9b0" stroke="#c0392b" stroke-width="2"/><circle cx="148" cy="174" r="3" fill="#fff" opacity=".7"/>
+    <ellipse cx="114" cy="206" rx="8" ry="16" fill="#c0392b" opacity=".85"/><ellipse cx="114" cy="206" rx="4" ry="8" fill="#8e2a20"/>
+    <path d="M40 176 L16 176" stroke="#c0392b" stroke-width="2"/>
+    <text x="14" y="172" text-anchor="end" font-family="IBM Plex Sans Thai, sans-serif" font-size="13" fill="#c0392b">ไรกีบ</text>
+    <path d="M114 214 L196 214" stroke="#c0392b" stroke-width="2"/>
+    <text x="200" y="218" font-family="IBM Plex Sans Thai, sans-serif" font-size="13" fill="#c0392b">ซอกกีบ</text>
+  </g>
+  <text x="170" y="256" text-anchor="middle" font-family="IBM Plex Sans Thai, sans-serif" font-size="15" fill="#5b4a44">ไรกีบและซอกกีบ</text>
+
+</svg>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   addVetComment, claimVetPost, closeVetPost, createVetPost, deleteVetPost, getVetPosts, reopenVetPost,
 } from '../api.js'
@@ -56,6 +57,10 @@ export default function VetCommunityPage() {
   const [data, setData] = useState(null)
   const [tick, setTick] = useState(0)
   const [writing, setWriting] = useState(false)
+  // มาจากหน้าอาการโรค (?ask=…) → เปิดฟอร์มโพสต์พร้อมหัวข้อให้เลย
+  const [params, setParams] = useSearchParams()
+  const askTitle = params.get('ask') || ''
+  useEffect(() => { if (askTitle) setWriting(true) }, [askTitle])
   const [msg, setMsg] = useState('')
   const refresh = () => setTick((t) => t + 1)
   const flash = (t) => { setMsg(t); setTimeout(() => setMsg(''), 4000) }
@@ -115,7 +120,7 @@ export default function VetCommunityPage() {
 
       <div className="vc-grid">
         <div className="vc-feed">
-          {writing && <AdminGate><NewPost onDone={(t) => { setWriting(false); setTab('waiting'); flash(`โพสต์ "${t}" แล้ว — หมอจะเข้ามาตอบเร็ว ๆ นี้`); refresh() }} /></AdminGate>}
+          {writing && <AdminGate><NewPost presetTitle={askTitle} onDone={(t) => { setWriting(false); setTab('waiting'); flash(`โพสต์ "${t}" แล้ว — หมอจะเข้ามาตอบเร็ว ๆ นี้`); refresh() }} /></AdminGate>}
 
           {!data ? <div className="empty-note">กำลังโหลด…</div>
             : rows.length === 0 ? <div className="empty-note">ยังไม่มีเคสในหมวดนี้</div>
@@ -163,9 +168,9 @@ export default function VetCommunityPage() {
 }
 
 // ---------- โพสต์ใหม่ ----------
-function NewPost({ onDone }) {
+function NewPost({ onDone, presetTitle = '' }) {
   const EMPTY = { title: '', detail: '', farm_name: '', barn_no: '', pen_no: '', pig_count: '', age_stage: '' }
-  const [f, setF] = useState(EMPTY)
+  const [f, setF] = useState({ ...EMPTY, title: presetTitle })
   const [image, setImage] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')

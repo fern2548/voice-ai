@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 260" width="340" height="260" role="img" aria-labelledby="t d">
+  <title id="t">อาการในช่องปาก</title><desc id="d">ภาพวาดแสดงตุ่มน้ำและแผลในช่องปากและลิ้น พร้อมน้ำลายไหลของสุกร</desc>
+  <rect width="340" height="260" fill="#f7f3ef"/>
+  <path d="M60 120 Q170 46 280 120 Q170 226 60 120 Z" fill="#b5615f" stroke="#8a6a60" stroke-width="2"/>
+  <path d="M88 118 Q170 74 252 118 Q170 162 88 118 Z" fill="#e79a94"/>
+  <path d="M104 126 Q170 96 236 126 Q170 176 104 126 Z" fill="#d97f7a"/>
+  <circle cx="140" cy="112" r="9" fill="#ffe9b0" stroke="#c0392b" stroke-width="2"/><circle cx="138" cy="110" r="3" fill="#fff" opacity=".7"/><circle cx="196" cy="110" r="9" fill="#ffe9b0" stroke="#c0392b" stroke-width="2"/><circle cx="194" cy="108" r="3" fill="#fff" opacity=".7"/>
+  <ellipse cx="168" cy="138" rx="10" ry="7" fill="#c0392b" opacity=".85"/><ellipse cx="168" cy="138" rx="6" ry="4" fill="#8e2a20"/><ellipse cx="122" cy="132" rx="10" ry="7" fill="#c0392b" opacity=".85"/><ellipse cx="122" cy="132" rx="6" ry="4" fill="#8e2a20"/><ellipse cx="214" cy="134" rx="10" ry="7" fill="#c0392b" opacity=".85"/><ellipse cx="214" cy="134" rx="6" ry="4" fill="#8e2a20"/>
+  <path d="M150 178 q6 22 -4 34" fill="none" stroke="#9fd8ff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M188 180 q8 18 0 30" fill="none" stroke="#9fd8ff" stroke-width="5" stroke-linecap="round"/>
+  <text x="170" y="244" text-anchor="middle" font-family="IBM Plex Sans Thai, sans-serif" font-size="15" fill="#5b4a44">ในปาก ลิ้น และน้ำลายไหล</text>
+
+</svg>

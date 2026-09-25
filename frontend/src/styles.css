@@ -3225,3 +3225,44 @@ th, td { font-size: 14px; }
 .vx-stock.ok { color: var(--accent); }
 .vx-stock-btns { display: flex; gap: 4px; margin-top: 4px; }
 .vq-stock-tag.warn { color: var(--warn); border-color: var(--warn); }
+
+/* ---------- อาการโรคปากและเท้าเปื่อย ---------- */
+.fm { display: flex; flex-direction: column; gap: 14px; }
+.fm-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.fm-head-icon { width: 54px; height: 54px; border-radius: 14px; background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); display: grid; place-items: center; font-size: 27px; flex: none; }
+.fm-title { margin: 0; font-size: 25px; font-weight: 800; }
+.fm-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
+.fm-go { margin-left: auto; padding: 9px 14px; font-size: 13.5px; text-decoration: none; gap: 6px; }
+.fm-warn { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); }
+.fm-warn i { color: var(--danger); font-size: 20px; flex: none; }
+.fm-warn b { display: block; font-size: 14.5px; margin-bottom: 2px; }
+.fm-warn span { font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+.fm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; }
+.fm-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+.fm-card-img { position: relative; background: #f7f3ef; display: grid; place-items: center; padding: 8px; }
+.fm-img { width: 100%; max-width: 340px; height: auto; display: block; border-radius: 8px; }
+.fm-badge { position: absolute; top: 12px; left: 12px; width: 28px; height: 28px; border-radius: 8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.fm-card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.fm-card-title { margin: 0; font-size: 18px; font-weight: 700; }
+.fm-stage, .fm-where { font-size: 12.5px; color: var(--text-dim); }
+.fm-stage i, .fm-where i { color: var(--accent); font-size: 15px; vertical-align: -2px; margin-right: 3px; }
+.fm-signs { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fm-signs li { display: flex; gap: 6px; align-items: flex-start; font-size: 13.5px; line-height: 1.55; }
+.fm-signs i { color: var(--danger); font-size: 15px; flex: none; margin-top: 2px; }
+.fm-ask { margin-top: 10px; justify-content: center; font-size: 13.5px; }
+.fm-sec { padding: 14px 16px; }
+.fm-sec-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; margin-bottom: 10px; }
+.fm-sec-head i { color: var(--danger); font-size: 20px; }
+.fm-actions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.fm-actions li { display: flex; align-items: flex-start; gap: 10px; }
+.fm-step { width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none; }
+.fm-actions li > i { color: var(--text-dim); font-size: 19px; flex: none; margin-top: 2px; }
+.fm-actions b { display: block; font-size: 14.5px; }
+.fm-actions small { color: var(--text-dim); font-size: 12.5px; line-height: 1.5; }
+.fm-look { display: flex; gap: 8px; flex-wrap: wrap; }
+.fm-look-item { font-size: 13px; background: var(--panel-2); border-radius: 20px; padding: 6px 12px; }
+.fm-note { margin: 10px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+.fm-credit { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--panel-2); }
+.fm-credit i { color: var(--accent); flex: none; }
+.fm-credit code { font-size: 12px; background: var(--panel); padding: 1px 5px; border-radius: 4px; }
+@media (max-width: 700px) { .fm-title { font-size: 21px; } .fm-go { margin-left: 0; } }
