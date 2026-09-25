@@ -101,6 +101,12 @@ export const saveFollowup = (entry) => post('/vaccine-followup', entry)
 export const deleteFollowup = (id) => del(`/vaccine-followup/${id}`)
 export const setVetStatus = (username, status) => post(`/admin/users/${encodeURIComponent(username)}/vet-status`, { status })
 
+// คลังยาและวัคซีน
+export const getVaccineStock = () => get('/vaccine-stock')
+export const getStockMoves = (productId) => get(`/vaccine-stock/${productId}/moves`)
+export const addStockMove = (m) => post('/vaccine-stock/move', m)
+export const checkVaccineStock = (days = 30) => get(`/vaccine-stock/check?days=${days}`)
+
 // งานที่ต้องทำวันนี้
 export const getTasks = (day) => get(`/farm-tasks${day ? `?day=${day}` : ''}`)
 export const createTask = (t) => post('/farm-tasks', t)

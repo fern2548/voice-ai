@@ -637,6 +637,8 @@ class VaccineProduct(BaseModel):
     distributor: Optional[str] = None
     route: Optional[str] = None            # วิธีให้ตามฉลาก
     dose: Optional[str] = None             # โดสตามฉลาก
+    doses_per_vial: Optional[int] = None   # ขนาดบรรจุ (โดส/ขวด)
+    min_doses: Optional[int] = None        # เหลือต่ำกว่านี้ = ควรสั่งเพิ่ม
     note: Optional[str] = None
 
 
@@ -1230,6 +1232,7 @@ def save_vaccine_log(v: VaccineLog):
             next_due = date.fromisoformat(data["log_date"]) + timedelta(days=interval_days)
             data["next_due_date"] = next_due.isoformat()
     supabase.table("vaccine_log").insert(data).execute()
+    _auto_deduct_stock(data)
     return data
 
 
@@ -1462,6 +1465,226 @@ def delete_vaccine_followup(followup_id: int):
     return {"ok": True}
 
 
+# ---------- คลังยาและวัคซีน ----------
+# คงเหลือ = ผลรวมรายการเคลื่อนไหวของล็อตนั้น (รับเข้า + / เบิกใช้ -)
+# เก็บแบบนี้เพราะต้องตอบให้ได้ว่า "ของหายไปไหน ใครเบิก เบิกให้ชุดไหน" ไม่ใช่แค่ตัวเลขคงเหลือ
+STOCK_NEAR_EXPIRY_DAYS = int(os.environ.get("STOCK_NEAR_EXPIRY_DAYS", "30"))
+
+
+class StockMove(BaseModel):
+    product_id: int
+    doses: float                       # จำนวนโดส (บวกเสมอ — ทิศทางกำหนดด้วย reason)
+    reason: str = "use"                # receive | use | adjust | expired
+    note: Optional[str] = None
+    ref_type: Optional[str] = None
+    ref_id: Optional[int] = None
+
+
+def _stock_on_hand() -> dict[int, float]:
+    """คงเหลือแยกตามล็อต {product_id: โดสคงเหลือ}"""
+    try:
+        moves = supabase.table("vaccine_stock_moves").select("product_id, doses").execute().data or []
+    except Exception as e:
+        print(f"[warn] อ่านคลังไม่ได้: {e}")
+        return {}
+    out: dict[int, float] = {}
+    for m in moves:
+        out[m["product_id"]] = out.get(m["product_id"], 0) + float(m.get("doses") or 0)
+    return out
+
+
+def _stock_rows() -> list[dict]:
+    """ทะเบียนวัคซีน + คงเหลือ + สถานะวันหมดอายุ (เรียงของที่ต้องรีบใช้ขึ้นก่อน)"""
+    today = datetime.now(BANGKOK).date()
+    products = supabase.table("vaccine_products").select("*").order("name").execute().data or []
+    on_hand = _stock_on_hand()
+    rows = []
+    for p in products:
+        left = round(on_hand.get(p["id"], 0), 2)
+        days = None
+        try:
+            if p.get("exp_date"):
+                days = (date.fromisoformat(str(p["exp_date"])) - today).days
+        except ValueError:
+            days = None
+        if days is not None and days < 0:
+            status = "expired"
+        elif left <= 0:
+            status = "empty"
+        elif days is not None and days <= STOCK_NEAR_EXPIRY_DAYS:
+            status = "near_expiry"
+        elif p.get("min_doses") and left <= p["min_doses"]:
+            status = "low"
+        else:
+            status = "ok"
+        rows.append({**p, "on_hand": left, "days_to_expire": days, "status": status})
+    order = {"expired": 0, "near_expiry": 1, "low": 2, "empty": 3, "ok": 4}
+    rows.sort(key=lambda r: (order[r["status"]], r["days_to_expire"] if r["days_to_expire"] is not None else 9999))
+    return rows
+
+
+def _usable_stock(vaccine_name: str, by_date: Optional[date] = None) -> tuple[float, list[dict]]:
+    """โดสที่ใช้ได้จริงสำหรับวัคซีนชื่อนี้ ณ วันที่กำหนด (ตัดล็อตที่หมดอายุก่อนถึงวันฉีดออก)"""
+    name = (vaccine_name or "").lower()
+    keys = [w for w in re.split(r"[\s()/]+", name) if len(w) >= 3]
+    total, lots = 0.0, []
+    for r in _stock_rows():
+        hay = f"{r.get('name') or ''} {r.get('disease') or ''}".lower()
+        if not (name and (name in hay or any(k in hay for k in keys))):
+            continue
+        if by_date and r.get("exp_date"):
+            try:
+                if date.fromisoformat(str(r["exp_date"])) < by_date:
+                    continue          # หมดอายุก่อนวันฉีด ใช้ไม่ได้
+            except ValueError:
+                pass
+        if r["on_hand"] > 0:
+            total += r["on_hand"]
+            lots.append(r)
+    return total, lots
+
+
+@app.get("/vaccine-stock")
+def vaccine_stock():
+    rows = _stock_rows()
+    return {
+        "rows": rows,
+        "counts": {
+            "lots": len(rows),
+            "doses": round(sum(r["on_hand"] for r in rows), 2),
+            "expired": sum(1 for r in rows if r["status"] == "expired"),
+            "near_expiry": sum(1 for r in rows if r["status"] == "near_expiry"),
+            "low": sum(1 for r in rows if r["status"] in ("low", "empty")),
+        },
+        "near_expiry_days": STOCK_NEAR_EXPIRY_DAYS,
+    }
+
+
+@app.get("/vaccine-stock/{product_id}/moves")
+def vaccine_stock_moves(product_id: int, limit: int = 50):
+    rows = (supabase.table("vaccine_stock_moves").select("*").eq("product_id", product_id)
+            .order("created_at", desc=True).limit(max(1, min(200, limit))).execute().data or [])
+    return {"rows": rows, "on_hand": round(_stock_on_hand().get(product_id, 0), 2)}
+
+
+@app.post("/vaccine-stock/move", dependencies=[Depends(verify_admin_token)])
+def add_stock_move(m: StockMove, x_admin_token: str = Header(default="")):
+    """รับเข้า / เบิกใช้ / ปรับยอด / ตัดของหมดอายุ"""
+    if m.reason not in ("receive", "use", "adjust", "expired"):
+        raise HTTPException(status_code=400, detail="ประเภทรายการไม่ถูกต้อง")
+    qty = abs(float(m.doses))
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="จำนวนต้องมากกว่า 0")
+    signed = qty if m.reason in ("receive", "adjust") else -qty
+    left = _stock_on_hand().get(m.product_id, 0)
+    if signed < 0 and left + signed < 0:
+        raise HTTPException(status_code=400, detail=f"คงเหลือไม่พอ (มี {round(left, 2)} โดส)")
+    row = {
+        "product_id": m.product_id, "doses": signed, "reason": m.reason, "note": m.note,
+        "ref_type": m.ref_type, "ref_id": m.ref_id, "by_user": _display_name(_session_username(x_admin_token)),
+    }
+    saved = supabase.table("vaccine_stock_moves").insert(row).execute().data[0]
+    return {**saved, "on_hand": round(left + signed, 2)}
+
+
+def _auto_deduct_stock(data: dict) -> None:
+    """ฉีดแล้วตัดคลังให้เอง — ตัดตามจำนวนตัวที่ฉีด (1 ตัว = 1 โดส)
+    ตัดไม่ได้ก็ไม่ทำให้การบันทึกการฉีดพัง (ของจริงฉีดไปแล้ว บันทึกต้องไม่หาย)
+    """
+    pid, count = data.get("product_id"), data.get("pig_count")
+    if not pid or not count:
+        return
+    try:
+        supabase.table("vaccine_stock_moves").insert({
+            "product_id": pid, "doses": -abs(float(count)), "reason": "use",
+            "note": f"ฉีด {data.get('vaccine_name') or ''} {count} ตัว".strip(),
+            "ref_type": "vaccine_log", "by_user": data.get("injector"),
+        }).execute()
+    except Exception as e:
+        print(f"[warn] ตัดคลังอัตโนมัติไม่สำเร็จ: {e}")
+
+
+@app.get("/vaccine-stock/check")
+def vaccine_stock_check(days: int = 30):
+    """ก่อนถึงวันฉีด ของพอไหม — เทียบเข็มที่จะถึงกำหนดใน N วัน กับคลังที่ใช้ได้จริง
+
+    รวมความต้องการของวัคซีนชนิดเดียวกันเข้าด้วยกัน เพราะเบิกจากคลังกองเดียวกัน
+    """
+    days = max(1, min(180, days))
+    today = datetime.now(BANGKOK).date()
+    try:
+        plan = [r for r in _batch_plan_rows(days) if r["status"] in ("due", "overdue", "upcoming")]
+    except Exception as e:
+        print(f"[warn] อ่านแผนวัคซีนไม่ได้: {e}")
+        plan = []
+    plan = [r for r in plan if r.get("due_date") and date.fromisoformat(str(r["due_date"])) <= today + timedelta(days=days)]
+
+    need: dict[str, dict] = {}
+    for r in plan:
+        name = r["vaccine_name"]
+        item = need.setdefault(name, {"vaccine_name": name, "doses_needed": 0, "batches": [],
+                                      "first_due": r["due_date"], "unknown_count": 0})
+        # ชุดที่ยังไม่ได้ใส่จำนวนตัว คำนวณไม่ได้ ต้องบอกตรง ๆ ไม่ใช่นับเป็น 0 แล้วสรุปว่าพอ
+        if r.get("pig_count"):
+            item["doses_needed"] += int(r["pig_count"])
+        else:
+            item["unknown_count"] += 1
+        item["batches"].append({
+            "batch_name": r["batch_name"], "label": r["label"], "due_date": r["due_date"],
+            "pig_count": r.get("pig_count"), "days_left": r["days_left"],
+        })
+        if str(r["due_date"]) < str(item["first_due"]):
+            item["first_due"] = r["due_date"]
+
+    rows = []
+    for item in need.values():
+        first_due = date.fromisoformat(str(item["first_due"]))
+        have, lots = _usable_stock(item["vaccine_name"], first_due)
+        # มีของแต่หมดอายุก่อนวันฉีด = ใช้ไม่ได้ ต้องบอกด้วย ไม่งั้นคนดูจะงงว่าทำไมบอกว่าไม่มี
+        all_have, _ = _usable_stock(item["vaccine_name"], None)
+        expiring = round(max(0.0, all_have - have), 2)
+        short = max(0, item["doses_needed"] - have)
+        rows.append({
+            **item,
+            "doses_available": round(have, 2),
+            "shortage": round(short, 2),
+            # ไม่รู้จำนวนตัว = ตอบไม่ได้ว่าพอ (enough=None) หน้าเว็บจะขึ้นว่า "ยังบอกไม่ได้"
+            "enough": None if item["unknown_count"] and short <= 0 else short <= 0,
+            "doses_expiring_before": expiring,
+            "lots": [{"lot_no": l.get("lot_no"), "on_hand": l["on_hand"], "exp_date": l.get("exp_date"),
+                      "days_to_expire": l["days_to_expire"]} for l in lots],
+        })
+    rows.sort(key=lambda r: (r["enough"] is True, str(r["first_due"])))
+    return {"days": days, "rows": rows,
+            "shortages": sum(1 for r in rows if r["enough"] is False),
+            "unknown": sum(1 for r in rows if r["enough"] is None),
+            "checked_at": today.isoformat()}
+
+
+def _fmt_stock_check() -> str:
+    """สรุปคลังให้ AI ตอบคำถาม "วัคซีนพอไหม" ได้ด้วยตัวเลขจริง"""
+    try:
+        data = vaccine_stock_check(30)
+    except Exception:
+        return ""
+    if not data["rows"]:
+        return "คลังวัคซีน: ไม่มีเข็มที่ต้องฉีดใน 30 วันนี้"
+    lines = ["คลังวัคซีนเทียบกับแผนฉีด 30 วันข้างหน้า:"]
+    for r in data["rows"]:
+        who = ", ".join(f"{b['batch_name']} {b['label']} ({b['due_date']})" for b in r["batches"][:3])
+        if r["enough"] is None:
+            lines.append(f"  {r['vaccine_name']}: ยังบอกไม่ได้ว่าพอไหม เพราะชุดหมู {r['unknown_count']} ชุดยังไม่ได้ใส่จำนวนตัว "
+                         f"(มีในคลัง {r['doses_available']} โดส) · {who}")
+        elif r["enough"]:
+            lines.append(f"  {r['vaccine_name']}: ต้องใช้ {r['doses_needed']} โดส · มี {r['doses_available']} โดส · พอ · {who}")
+        else:
+            exp = (f" (มีอีก {r['doses_expiring_before']} โดสแต่หมดอายุก่อนวันฉีด)"
+                   if r.get("doses_expiring_before") else "")
+            lines.append(f"  {r['vaccine_name']}: ต้องใช้ {r['doses_needed']} โดส · ใช้ได้จริง {r['doses_available']} โดส{exp} · "
+                         f"ขาดอีก {r['shortage']} โดส ต้องสั่งเพิ่มก่อน {r['first_due']} · {who}")
+    return "\n".join(lines)
+
+
 # ---------- ค้นประวัติย้อนหลังด้วยภาษาคน ----------
 # "เดือนนี้โรงเรือน 2 มีหมูป่วยกี่ครั้ง" · "ช่วงไหนความชื้นสูงสุด" · "เคยมีอาการคล้ายเคสนี้ไหม"
 #
@@ -1486,6 +1709,15 @@ _METRIC_WORDS = {
 _METRIC_LABEL = {"temperature": ("อุณหภูมิ", "°C"), "humidity": ("ความชื้น", "%"),
                  "windspeed": ("ความเร็วลม", " m/s"), "rainfall": ("ปริมาณฝน", " mm"),
                  "light": ("ความสว่าง", " lux")}
+
+
+_STOCK_WORDS = ("พอไหม", "พอมั้ย", "เพียงพอ", "คลัง", "สต็อก", "สต๊อก", "คงเหลือ", "เหลือกี่",
+                "ต้องสั่ง", "สั่งเพิ่ม", "หมดอายุ", "ล็อต", "ขาดวัคซีน", "วัคซีนพอ", "ยาเหลือ")
+
+
+def _needs_stock(text: str) -> bool:
+    t = text.replace(" ", "")
+    return any(w.replace(" ", "") in t for w in _STOCK_WORDS)
 
 
 def _is_history_question(text: str) -> bool:
@@ -4770,6 +5002,11 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
     )
     if history_facts:
         context += "\n\nผลค้นประวัติจากฐานข้อมูลจริง (ใช้ตัวเลขนี้ตอบ ห้ามคำนวณเอง):\n" + history_facts
+    # ถามว่าวัคซีนพอไหม / เหลือเท่าไหร่ → แนบตัวเลขคลังจริง
+    if not guest and _needs_stock(text):
+        stock = _fmt_stock_check()
+        if stock:
+            context += "\n\n" + stock
 
     # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)
     #    ถ้ายังไม่ได้ตั้ง หรือเรียกไม่สำเร็จ จะคืน None แล้วไหลไป Gemini ต่อเอง

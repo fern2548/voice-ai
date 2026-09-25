@@ -26,6 +26,8 @@ export default defineConfig({
       '/vaccine-schedule': target,
       '/vaccine-due': target,
       '/vaccine-products': target,
+      '/vaccine-stock': target,
+      '/vaccine-stock': target,
       '/vaccine-stats': target,
       '/vaccine-programs': target,
       '/pig-batches': target,

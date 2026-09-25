@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  deletePigBatch, deleteVaccineProgram, getBatchPlan, getPigBatches, getVaccinePrograms,
+  checkVaccineStock, deletePigBatch, deleteVaccineProgram, getBatchPlan, getPigBatches, getVaccinePrograms,
   markPlanDone, savePigBatch, saveVaccineProgram, useDefaultProgram,
 } from '../api.js'
 import AdminGate from '../components/AdminGate.jsx'
@@ -57,6 +57,7 @@ export default function VaccinePlanPage() {
   const [batches, setBatches] = useState([])
   const [programs, setPrograms] = useState(null)
   const [plan, setPlan] = useState(null)
+  const [stock, setStock] = useState(null)      // ของในคลังพอกับแผน 30 วันข้างหน้าไหม
   const [sel, setSel] = useState('')          // ชุดที่กำลังดู
   const [editProgram, setEditProgram] = useState(false)
   const [msg, setMsg] = useState('')
@@ -68,6 +69,7 @@ export default function VaccinePlanPage() {
     getPigBatches().then((d) => alive && setBatches(d?.rows || [])).catch(() => {})
     getVaccinePrograms().then((d) => alive && setPrograms(d)).catch(() => alive && setPrograms({ rows: [] }))
     getBatchPlan(7).then((d) => alive && setPlan(d)).catch(() => alive && setPlan({ rows: [], summary: {} }))
+    checkVaccineStock(30).then((d) => alive && setStock(d)).catch(() => alive && setStock(null))
     return () => { alive = false }
   }, [tick])
   // ยังไม่ได้เลือก → เลือกชุดที่มีเข็มใกล้ถึงที่สุด (แผนเรียงตามวันครบกำหนดอยู่แล้ว)
@@ -117,6 +119,34 @@ export default function VaccinePlanPage() {
       </AdminGate>
 
       {msg && <div className="vq-msg">{msg}</div>}
+
+      {/* ของในคลังพอกับที่ต้องฉีดไหม — รู้ก่อนถึงวันฉีดจะได้สั่งทัน */}
+      {stock?.rows?.length > 0 && (
+        <div className={`vq-stock ${stock.shortages ? 'short' : 'ok'}`}>
+          <div className="vq-stock-head">
+            <i className={`ti ${stock.shortages ? 'ti-alert-triangle' : 'ti-circle-check'}`} aria-hidden="true" />
+            {stock.shortages
+              ? `วัคซีนไม่พอ ${stock.shortages} ชนิด สำหรับแผน 30 วันข้างหน้า`
+              : 'วัคซีนในคลังพอสำหรับแผน 30 วันข้างหน้า'}
+          </div>
+          <div className="vq-stock-rows">
+            {stock.rows.map((r) => (
+              <div className={`vq-stock-row ${r.enough === false ? 'short' : ''}`} key={r.vaccine_name}>
+                <b>{shortName(r.vaccine_name)}</b>
+                <span>
+                  ต้องใช้ {r.doses_needed} โดส · ใช้ได้ {r.doses_available} โดส
+                  {r.doses_expiring_before > 0 && ` (อีก ${r.doses_expiring_before} โดสหมดอายุก่อนวันฉีด)`}
+                </span>
+                {r.enough === null
+                  ? <span className="vq-stock-tag warn">ยังบอกไม่ได้ · ชุดหมูยังไม่ใส่จำนวนตัว</span>
+                  : r.enough
+                    ? <span className="vq-stock-tag ok">พอ</span>
+                    : <span className="vq-stock-tag bad">ขาด {r.shortage} โดส · สั่งก่อน {fmtDateShort(r.first_due)}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {batches.length > 0 && <div className="vq-sec-title"><i className="ti ti-pig" aria-hidden="true" /> ชุดหมูของฟาร์ม <small>{batches.length} ชุด · กดเพื่อดูแผน</small></div>}
 

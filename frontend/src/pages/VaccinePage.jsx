@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  deleteVaccineProduct, getVaccineHistory, getVaccineProducts, getVaccineStats,
+  addStockMove, deleteVaccineProduct, getVaccineHistory, getVaccineStats, getVaccineStock,
   saveVaccineLog, saveVaccineProduct, sendVaccineReportToLine,
 } from '../api.js'
 import AdminGate from '../components/AdminGate.jsx'
@@ -149,6 +149,16 @@ function ProductsPanel({ products, onChanged, isAdmin }) {
     if (!window.confirm(`ลบ ${p.name} ล็อต ${p.lot_no || '-'} ออกจากทะเบียน?`)) return
     try { await deleteVaccineProduct(p.id); onChanged() } catch { setMsg('ลบไม่สำเร็จ') }
   }
+  // รับเข้า/เบิกใช้ — ถามจำนวนโดสแล้วบันทึกเป็นรายการเคลื่อนไหว (ตรวจย้อนได้ว่าใครเบิก)
+  const move = async (p, reason) => {
+    const word = reason === 'receive' ? 'รับเข้า' : 'เบิกใช้'
+    const n = window.prompt(`${word} ${p.name} ล็อต ${p.lot_no || '-'} กี่โดส?`, reason === 'receive' ? '100' : '10')
+    if (!n) return
+    try {
+      await addStockMove({ product_id: p.id, doses: Number(n), reason, note: window.prompt('หมายเหตุ (ไม่บังคับ)') || null })
+      setMsg(''); onChanged()
+    } catch (err) { setMsg(err?.detail || `${word}ไม่สำเร็จ`) }
+  }
 
   return (
     <div className="panel vx-sec" id="vx-s1">
@@ -198,7 +208,7 @@ function ProductsPanel({ products, onChanged, isAdmin }) {
 
       <div className="table-wrap">
         <table className="data-table vx-table">
-          <thead><tr><th>ชื่อวัคซีน / ชนิดโรค</th><th>เลขที่ล็อต</th><th>วันที่ผลิต</th><th>วันหมดอายุ</th><th>ผู้ผลิต / ผู้จำหน่าย</th><th>วิธีให้ · โดส</th>{isAdmin && <th />}</tr></thead>
+          <thead><tr><th>ชื่อวัคซีน / ชนิดโรค</th><th>เลขที่ล็อต</th><th>คงเหลือ</th><th>วันหมดอายุ</th><th>ผู้ผลิต / ผู้จำหน่าย</th><th>วิธีให้ · โดส</th>{isAdmin && <th />}</tr></thead>
           <tbody>
             {products.length === 0 ? (
               <tr><td colSpan={isAdmin ? 7 : 6} className="td-empty">ยังไม่มีทะเบียนวัคซีน — กด "เพิ่มรายการ" ใส่ล็อตที่ใช้อยู่</td></tr>
@@ -209,7 +219,16 @@ function ProductsPanel({ products, onChanged, isAdmin }) {
                 <tr key={p.id}>
                   <td><b>{p.name}</b>{p.disease && <div className="vx-dim">{p.disease}</div>}</td>
                   <td className="vx-mono">{p.lot_no || '—'}</td>
-                  <td>{fmtDate(p.mfg_date)}</td>
+                  <td>
+                    <b className={`vx-stock ${p.status || ''}`}>{p.on_hand ?? 0}</b> โดส
+                    {p.doses_per_vial ? <div className="vx-dim">{Math.floor((p.on_hand ?? 0) / p.doses_per_vial)} ขวด</div> : null}
+                    {isAdmin && (
+                      <div className="vx-stock-btns">
+                        <button type="button" className="pager-btn" title="รับเข้า" onClick={() => move(p, 'receive')}><i className="ti ti-plus" aria-hidden="true" /></button>
+                        <button type="button" className="pager-btn" title="เบิกใช้" onClick={() => move(p, 'use')}><i className="ti ti-minus" aria-hidden="true" /></button>
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <span className={`vx-pill ${expTone}`}>{fmtDate(p.exp_date)}</span>
                     {d != null && d < 0 && <div className="vx-dim bad">หมดอายุแล้ว</div>}
@@ -515,7 +534,8 @@ export default function VaccinePage() {
   const { data: stats } = usePolling(getVaccineStats, 60000, String(tick))
   const isAdmin = true // หน้านี้อยู่หลังล็อกอินอยู่แล้ว (คนใน) — ทะเบียนให้คนในเพิ่มได้ทุกคน
 
-  const loadProducts = () => getVaccineProducts().then((d) => setProducts(d?.rows || [])).catch(() => setProducts([]))
+  // ใช้ /vaccine-stock แทนทะเบียนเปล่า ๆ เพราะได้คงเหลือ + สถานะหมดอายุมาพร้อมกันในครั้งเดียว
+  const loadProducts = () => getVaccineStock().then((d) => setProducts(d?.rows || [])).catch(() => setProducts([]))
   useEffect(() => { loadProducts() }, [tick])
   const refresh = () => setTick((t) => t + 1)
 

@@ -3205,3 +3205,23 @@ th, td { font-size: 14px; }
   .tk-outcomes { grid-template-columns: 1fr; }
   .tk-record { width: 100%; justify-content: center; }
 }
+
+/* คลังวัคซีนพอไหม (หน้าแผนวัคซีน) */
+.vq-stock { border-radius: 12px; padding: 12px 14px; border: 1px solid var(--border); background: var(--panel); }
+.vq-stock.short { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); background: color-mix(in srgb, var(--danger) 7%, var(--panel)); }
+.vq-stock-head { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14.5px; margin-bottom: 8px; }
+.vq-stock.ok .vq-stock-head i { color: var(--accent); }
+.vq-stock.short .vq-stock-head i { color: var(--danger); }
+.vq-stock-rows { display: flex; flex-direction: column; gap: 6px; }
+.vq-stock-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text-dim); }
+.vq-stock-row b { color: var(--text); font-size: 14px; }
+.vq-stock-tag { margin-left: auto; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border); }
+.vq-stock-tag.ok { color: var(--accent); border-color: var(--accent); }
+.vq-stock-tag.bad { color: var(--danger); border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+/* คงเหลือในตารางทะเบียนวัคซีน */
+.vx-stock { font-size: 16px; }
+.vx-stock.expired, .vx-stock.empty { color: var(--danger); }
+.vx-stock.near_expiry, .vx-stock.low { color: var(--warn); }
+.vx-stock.ok { color: var(--accent); }
+.vx-stock-btns { display: flex; gap: 4px; margin-top: 4px; }
+.vq-stock-tag.warn { color: var(--warn); border-color: var(--warn); }

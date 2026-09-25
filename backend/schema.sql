@@ -302,3 +302,23 @@ create table if not exists farm_tasks (
 );
 
 create index if not exists farm_tasks_due_idx on farm_tasks (due_date, status);
+
+-- คลังยาและวัคซีน: นับคงเหลือจาก "รายการเคลื่อนไหว" ไม่ใช่เก็บยอดไว้ตรง ๆ
+-- จะได้ตรวจย้อนได้ว่าของหายไปไหน ใครเบิก เบิกให้ชุดไหน (ใช้ประกอบเอกสาร GAP ได้ด้วย)
+create table if not exists vaccine_stock_moves (
+  id bigint generated always as identity primary key,
+  product_id bigint not null references vaccine_products(id) on delete cascade,
+  doses numeric not null,              -- + รับเข้า · - เบิกใช้/ทิ้ง
+  reason text not null default 'use',  -- receive | use | adjust | expired
+  note text,
+  ref_type text,                       -- vaccine_log | batch_plan
+  ref_id bigint,
+  by_user text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists vaccine_stock_moves_product_idx on vaccine_stock_moves (product_id, created_at desc);
+
+-- จำนวนที่เหลือในขวดที่เปิดแล้ว/ขนาดบรรจุ ใช้คำนวณว่าต้องเบิกกี่ขวด
+alter table vaccine_products add column if not exists doses_per_vial integer;
+alter table vaccine_products add column if not exists min_doses integer;   -- ต่ำกว่านี้ = ควรสั่งเพิ่ม
