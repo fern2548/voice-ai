@@ -1462,6 +1462,321 @@ def delete_vaccine_followup(followup_id: int):
     return {"ok": True}
 
 
+# ---------- ค้นประวัติย้อนหลังด้วยภาษาคน ----------
+# "เดือนนี้โรงเรือน 2 มีหมูป่วยกี่ครั้ง" · "ช่วงไหนความชื้นสูงสุด" · "เคยมีอาการคล้ายเคสนี้ไหม"
+#
+# ตัวเลขทั้งหมดคำนวณจากฐานข้อมูลจริงด้วยกฎตายตัว แล้วค่อยส่งให้ LLM เรียบเรียงเป็นประโยค
+# (ถ้าปล่อยให้ LLM นับเอง มันจะเดา — เรื่องตัวเลขของฟาร์มเดาไม่ได้)
+_HISTORY_WORDS = ("ย้อนหลัง", "ที่ผ่านมา", "เดือนนี้", "เดือนที่แล้ว", "สัปดาห์นี้", "อาทิตย์นี้",
+                  "ปีนี้", "เคย", "กี่ครั้ง", "กี่ตัว", "กี่รอบ", "บ่อยแค่ไหน", "ช่วงไหน", "วันไหน",
+                  "สูงสุด", "ต่ำสุด", "มากสุด", "น้อยสุด", "เฉลี่ย", "ประวัติ", "ทั้งหมดกี่")
+_THAI_MONTHS = {
+    "มกราคม": 1, "กุมภาพันธ์": 2, "มีนาคม": 3, "เมษายน": 4, "พฤษภาคม": 5, "มิถุนายน": 6,
+    "กรกฎาคม": 7, "สิงหาคม": 8, "กันยายน": 9, "ตุลาคม": 10, "พฤศจิกายน": 11, "ธันวาคม": 12,
+    "ม.ค.": 1, "ก.พ.": 2, "มี.ค.": 3, "เม.ย.": 4, "พ.ค.": 5, "มิ.ย.": 6,
+    "ก.ค.": 7, "ส.ค.": 8, "ก.ย.": 9, "ต.ค.": 10, "พ.ย.": 11, "ธ.ค.": 12,
+}
+_METRIC_WORDS = {
+    "temperature": ("อุณหภูมิ", "ร้อน", "หนาว", "เย็น", "องศา"),
+    "humidity": ("ความชื้น", "ชื้น"),
+    "windspeed": ("ลม", "ความเร็วลม"),
+    "rainfall": ("ฝน", "ปริมาณฝน"),
+    "light": ("แสง", "ความสว่าง", "สว่าง", "มืด"),
+}
+_METRIC_LABEL = {"temperature": ("อุณหภูมิ", "°C"), "humidity": ("ความชื้น", "%"),
+                 "windspeed": ("ความเร็วลม", " m/s"), "rainfall": ("ปริมาณฝน", " mm"),
+                 "light": ("ความสว่าง", " lux")}
+
+
+def _is_history_question(text: str) -> bool:
+    t = text.replace(" ", "")
+    return any(w.replace(" ", "") in t for w in _HISTORY_WORDS)
+
+
+def _parse_period(text: str) -> tuple[date, date, str]:
+    """คืน (วันเริ่ม, วันจบ, คำอธิบายช่วง) — ไม่ระบุช่วง = 30 วันล่าสุด"""
+    today = datetime.now(BANGKOK).date()
+    t = text.replace(" ", "")
+
+    if "วันนี้" in t:
+        return today, today, "วันนี้"
+    if "เมื่อวาน" in t:
+        y = today - timedelta(days=1)
+        return y, y, "เมื่อวาน"
+    if "สัปดาห์นี้" in t or "อาทิตย์นี้" in t:
+        start = today - timedelta(days=today.weekday())
+        return start, today, "สัปดาห์นี้"
+    if "สัปดาห์ที่แล้ว" in t or "อาทิตย์ที่แล้ว" in t:
+        start = today - timedelta(days=today.weekday() + 7)
+        return start, start + timedelta(days=6), "สัปดาห์ที่แล้ว"
+    if "เดือนนี้" in t:
+        return today.replace(day=1), today, "เดือนนี้"
+    if "เดือนที่แล้ว" in t or "เดือนก่อน" in t:
+        first = today.replace(day=1)
+        last_prev = first - timedelta(days=1)
+        return last_prev.replace(day=1), last_prev, "เดือนที่แล้ว"
+    if "ปีนี้" in t:
+        return today.replace(month=1, day=1), today, "ปีนี้"
+
+    # ชื่อเดือนไทย เช่น "กรกฎาคม" / "ก.ค. 2569"
+    for name, mm in _THAI_MONTHS.items():
+        if name.replace(" ", "") in t:
+            ym = re.search(r"(25\d{2}|20\d{2})", t)
+            year = today.year
+            if ym:
+                year = int(ym.group(1))
+                if year > 2400:      # พ.ศ. -> ค.ศ.
+                    year -= 543
+            start = date(year, mm, 1)
+            end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+            return start, min(end, today), f"{name} {year + 543}"
+
+    m = re.search(r"(\d+)\s*(วัน|สัปดาห์|อาทิตย์|เดือน)(ที่ผ่านมา|ย้อนหลัง|ล่าสุด)", text)
+    if m:
+        n = int(m.group(1))
+        days = n * (30 if m.group(2) == "เดือน" else 7 if m.group(2) in ("สัปดาห์", "อาทิตย์") else 1)
+        return today - timedelta(days=days), today, f"{n} {m.group(2)}ที่ผ่านมา"
+
+    return today - timedelta(days=30), today, "30 วันล่าสุด"
+
+
+def _parse_barn(text: str) -> Optional[str]:
+    m = re.search(r"(?:โรงเรือน|เล้า)\s*(\d+)", text)
+    return f"โรงเรือน {m.group(1)}" if m else None
+
+
+def _pick_metric(text: str) -> Optional[str]:
+    t = text.replace(" ", "")
+    for key, words in _METRIC_WORDS.items():
+        if any(w in t for w in words):
+            return key
+    return None
+
+
+def _fmt_day(iso: str) -> str:
+    try:
+        d = date.fromisoformat(str(iso)[:10])
+        return f"{d.day}/{d.month}/{d.year + 543}"
+    except Exception:
+        return str(iso)[:10]
+
+
+# คำที่ไม่ช่วยแยกความต่างระหว่างเคส ตัดทิ้งตอนหาเคสคล้ายกัน
+_STOP_WORDS = {"หมู", "สุกร", "ตัว", "ครับ", "ค่ะ", "คะ", "ที่", "ของ", "และ", "มี", "ไม่", "เป็น",
+               "อาการ", "เคส", "คล้าย", "เคย", "ไหม", "มั้ย", "บ้าง", "ช่วย", "ดู", "หน่อย"}
+
+
+# คำอาการที่ใช้แยกเคสจริง ๆ — ถ้าคำถามเอ่ยถึงอาการไหน เคสที่ตอบกลับต้องมีอาการนั้นด้วย
+# (ไม่งั้นจะไปแมตช์กับคำพื้น ๆ อย่าง "ฉีดวัคซีน" ที่มีอยู่ในทุกบันทึก)
+_SYMPTOM_WORDS = (
+    "บวม", "ซึม", "ไข้", "ไอ", "จาม", "ท้องเสีย", "ถ่ายเหลว", "ผื่น", "แดง", "คัน", "แผล",
+    "ไม่กินอาหาร", "กินน้อย", "หายใจ", "น้ำมูก", "ขาเจ็บ", "เดินไม่ไหว", "ตาย", "แท้ง",
+    "ชัก", "อาเจียน", "ผอม", "ขนหยอง", "ตุ่ม", "หนอง",
+)
+
+
+def _symptoms_in(text: str) -> set[str]:
+    t = (text or "").replace(" ", "")
+    return {w for w in _SYMPTOM_WORDS if w.replace(" ", "") in t}
+
+
+def _keywords(text: str) -> set[str]:
+    """ตัดคำแบบหยาบ ๆ: ตัดด้วยช่องว่าง/สัญลักษณ์ แล้วเอาคำยาว 3 ตัวอักษรขึ้นไป
+    ภาษาไทยไม่มีช่องว่างระหว่างคำ จึงเสริมด้วยการตัดเป็นท่อน 3-4 ตัวอักษรซ้อนกัน (n-gram)
+    """
+    words = {w for w in re.split(r"[\s,\.\-/()\"']+", text.lower()) if len(w) >= 3 and w not in _STOP_WORDS}
+    thai = re.sub(r"[^ก-๙]", "", text)
+    grams = {thai[i:i + 3] for i in range(len(thai) - 2)} if len(thai) >= 3 else set()
+    return words | grams
+
+
+def _similar_cases(text: str, limit: int = 3) -> list[dict]:
+    """หาเคสเก่าที่ข้อความคล้ายกัน — ให้คะแนนจากคำที่ใช้ร่วมกัน (ไม่ต้องพึ่ง AI ไม่มีค่าใช้จ่าย)"""
+    q = _keywords(text)
+    q_symptoms = _symptoms_in(text)
+    if not q:
+        return []
+    cands: list[dict] = []
+    try:
+        for p in supabase.table("vet_posts").select("*").order("created_at", desc=True).limit(200).execute().data or []:
+            cands.append({
+                "kind": "เคสปรึกษาสัตวแพทย์", "when": p.get("created_at"),
+                "text": " ".join(x for x in [p.get("title"), p.get("detail")] if x),
+                "where": " ".join(x for x in [p.get("barn_no"), p.get("pen_no")] if x),
+                "outcome": {"done": "ปิดเคสแล้ว", "claimed": "หมอรับดูแลแล้ว"}.get(p.get("status"), "รอคำตอบ"),
+            })
+    except Exception:
+        pass
+    try:
+        for v in supabase.table("vaccine_log").select("*").order("log_date", desc=True).limit(200).execute().data or []:
+            cands.append({
+                "kind": f"หลังฉีด {v.get('vaccine_name') or 'วัคซีน'}", "when": v.get("log_date"),
+                "text": " ".join(x for x in [v.get("reaction_note"), v.get("note")] if x),
+                "where": " ".join(x for x in [v.get("barn_no"), v.get("pen_no")] if x),
+                "outcome": "",
+            })
+    except Exception:
+        pass
+    try:
+        for h in supabase.table("pig_health_log").select("*").not_.is_("note", "null").order("log_date", desc=True).limit(200).execute().data or []:
+            cands.append({
+                "kind": "บันทึกหมูป่วย", "when": h.get("log_date"),
+                "text": h.get("note") or "", "where": "",
+                "outcome": f"ป่วย {h.get('sick_count')} ตัว",
+            })
+    except Exception:
+        pass
+
+    try:
+        for f in supabase.table("vaccine_followup").select("*").order("check_date", desc=True).limit(200).execute().data or []:
+            sw = {"mild": "บวมเล็กน้อย", "moderate": "บวมปานกลาง", "severe": "บวมมาก"}.get(f.get("swelling") or "", "")
+            bits = [sw, "มีไข้" if f.get("fever") else "", "ซึม" if f.get("lethargy") else "", f.get("note") or ""]
+            cands.append({
+                "kind": f"ตรวจหลังฉีดวันที่ {f.get('days_after')}", "when": f.get("check_date"),
+                "text": " ".join(x for x in bits if x), "where": "",
+                "outcome": f"{f.get('severity') or ''} {f.get('affected_count') or ''} ตัว".strip(),
+            })
+    except Exception:
+        pass
+
+    scored = []
+    for c in cands:
+        if not c["text"]:
+            continue
+        # ถามถึงอาการไหน ต้องเจออาการนั้นในบันทึก ไม่งั้นข้าม
+        if q_symptoms:
+            hit = q_symptoms & _symptoms_in(c["text"])
+            if not hit:
+                continue
+            scored.append((len(hit) * 10 + len(q & _keywords(c["text"])), c))
+            continue
+        ck = _keywords(c["text"])
+        overlap = q & ck
+        # บันทึกสั้น ๆ (เช่น "บวม") มีคำน้อย ถ้าบังคับ 2 คำร่วมจะไม่เจอเลย
+        if len(overlap) >= 2 or (len(ck) <= 3 and overlap):
+            scored.append((len(overlap), c))
+    scored.sort(key=lambda x: (-x[0], str(x[1]["when"])), reverse=False)
+    return [c for _, c in scored[:limit]]
+
+
+def _history_facts(text: str) -> str:
+    """คำนวณคำตอบเชิงประวัติจากฐานข้อมูลจริง คืนข้อความสั้น ๆ ให้ LLM ใช้ต่อ (ไม่เจอ = คืน '')"""
+    start, end, label = _parse_period(text)
+    barn = _parse_barn(text)
+    t = text.replace(" ", "")
+    lines: list[str] = []
+
+    # 1) ค่าสิ่งแวดล้อม: สูงสุด/ต่ำสุด/เฉลี่ย + เกิดเมื่อไหร่
+    metric = _pick_metric(text)
+    if metric:
+        try:
+            rows = (supabase.table("weather_readings").select("*")
+                    .gte("created_at", start.isoformat())
+                    .lte("created_at", (end + timedelta(days=1)).isoformat())
+                    .execute().data or [])
+            vals = [(r.get(metric), r.get("created_at")) for r in rows if r.get(metric) is not None]
+            if vals:
+                name, unit = _METRIC_LABEL[metric]
+                hi = max(vals, key=lambda x: x[0])
+                lo = min(vals, key=lambda x: x[0])
+                avg = sum(v for v, _ in vals) / len(vals)
+                when_hi = _parse_dt(hi[1]).astimezone(BANGKOK).strftime("%d/%m %H:%M")
+                when_lo = _parse_dt(lo[1]).astimezone(BANGKOK).strftime("%d/%m %H:%M")
+                lines.append(
+                    f"{name}ช่วง {label}: สูงสุด {hi[0]}{unit} ({when_hi}) · ต่ำสุด {lo[0]}{unit} ({when_lo}) · "
+                    f"เฉลี่ย {avg:.1f}{unit} · จาก {len(vals)} ค่า"
+                )
+            else:
+                lines.append(f"ช่วง {label} ไม่มีข้อมูลเซนเซอร์บันทึกไว้")
+        except Exception as e:
+            print(f"[warn] สรุปค่าสิ่งแวดล้อมย้อนหลังไม่ได้: {e}")
+
+    # 2) หมูป่วย
+    if any(w in t for w in ("ป่วย", "หมูป่วย", "ไม่สบาย", "ตาย")):
+        try:
+            rows = (supabase.table("pig_health_log").select("*")
+                    .gte("log_date", start.isoformat()).lte("log_date", end.isoformat())
+                    .order("log_date").execute().data or [])
+            if rows:
+                days = [r for r in rows if (r.get("sick_count") or 0) > 0]
+                worst = max(rows, key=lambda r: r.get("sick_count") or 0)
+                lines.append(
+                    f"บันทึกหมูป่วยช่วง {label}: บันทึกไว้ {len(rows)} วัน · มีหมูป่วย {len(days)} วัน · "
+                    f"รวม {sum(r.get('sick_count') or 0 for r in rows)} ตัว · "
+                    f"มากที่สุด {worst.get('sick_count')} ตัว วันที่ {_fmt_day(worst.get('log_date'))}"
+                )
+            else:
+                lines.append(f"ช่วง {label} ไม่มีบันทึกหมูป่วย")
+            if barn:
+                lines.append(f"หมายเหตุ: บันทึกหมูป่วยรายวันไม่ได้แยกตาม{barn} (ระบบเก็บเป็นภาพรวมทั้งฟาร์ม) "
+                             f"ถ้าต้องการรายโรงเรือนให้ดูจากเคสปรึกษาสัตวแพทย์หรือบันทึกวัคซีน")
+        except Exception as e:
+            print(f"[warn] สรุปหมูป่วยย้อนหลังไม่ได้: {e}")
+
+    # 3) การฉีดวัคซีน
+    if any(w in t for w in ("วัคซีน", "ฉีด")):
+        try:
+            q = (supabase.table("vaccine_log").select("*")
+                 .gte("log_date", start.isoformat()).lte("log_date", end.isoformat()))
+            if barn:
+                q = q.eq("barn_no", barn)
+            rows = q.order("log_date").execute().data or []
+            if rows:
+                by_name: dict[str, int] = {}
+                for r in rows:
+                    by_name[r.get("vaccine_name") or "ไม่ระบุ"] = by_name.get(r.get("vaccine_name") or "ไม่ระบุ", 0) + 1
+                top = ", ".join(f"{k} {v} ครั้ง" for k, v in sorted(by_name.items(), key=lambda x: -x[1])[:4])
+                lines.append(
+                    f"การฉีดวัคซีนช่วง {label}{(' ' + barn) if barn else ''}: {len(rows)} ครั้ง · "
+                    f"รวม {sum(int(r.get('pig_count') or 0) for r in rows)} ตัว · {top} · "
+                    f"ล่าสุด {_fmt_day(rows[-1].get('log_date'))}"
+                )
+            else:
+                lines.append(f"ช่วง {label}{(' ' + barn) if barn else ''} ไม่มีบันทึกการฉีดวัคซีน")
+        except Exception as e:
+            print(f"[warn] สรุปวัคซีนย้อนหลังไม่ได้: {e}")
+
+    # 4) งานที่ทำ
+    if any(w in t for w in ("งาน", "ทำเสร็จ", "ค้าง")):
+        try:
+            rows = (supabase.table("farm_tasks").select("*")
+                    .gte("due_date", start.isoformat()).lte("due_date", end.isoformat())
+                    .execute().data or [])
+            if rows:
+                done = sum(1 for r in rows if r.get("status") == "done")
+                issue = sum(1 for r in rows if r.get("status") == "issue")
+                lines.append(f"งานช่วง {label}: ทั้งหมด {len(rows)} งาน · เสร็จ {done} · พบปัญหา {issue} · "
+                             f"ยังไม่เสร็จ {len(rows) - done - issue}")
+        except Exception as e:
+            print(f"[warn] สรุปงานย้อนหลังไม่ได้: {e}")
+
+    # 5) เคยมีอาการคล้ายกันไหม
+    if any(w in t for w in ("คล้าย", "เหมือน", "เคยมี", "เคยเจอ", "เคยเป็น")):
+        cases = _similar_cases(text)
+        if cases:
+            lines.append("เคสเก่าที่ข้อความใกล้เคียง:")
+            for c in cases:
+                where = f" · {c['where']}" if c["where"] else ""
+                out = f" · {c['outcome']}" if c["outcome"] else ""
+                lines.append(f"  {_fmt_day(c['when'])} [{c['kind']}]{where}: {c['text'][:120]}{out}")
+        else:
+            lines.append("ไม่พบเคสเก่าที่อาการใกล้เคียงกันในบันทึก")
+
+    return "\n".join(lines)
+
+
+@app.get("/history-search")
+def history_search(q: str, x_admin_token: str = Header(default="")):
+    """ค้นประวัติด้วยภาษาคน — ใช้จากหน้าเว็บหรือทดสอบตรง ๆ (ข้อมูลภายใน ต้องล็อกอิน)"""
+    if _role_of(x_admin_token) == "guest":
+        raise HTTPException(status_code=401, detail="ข้อมูลภายในฟาร์ม ต้องเข้าสู่ระบบก่อน")
+    start, end, label = _parse_period(q)
+    return {
+        "question": q, "period": {"start": start.isoformat(), "end": end.isoformat(), "label": label},
+        "barn": _parse_barn(q), "facts": _history_facts(q), "similar": _similar_cases(q),
+    }
+
+
 # ---------- งานที่ต้องทำวันนี้ ----------
 # รวมงานจากทุกระบบไว้หน้าเดียว: แผนวัคซีน · ตรวจอาการหลังฉีด · เคสที่หมอรับดูแล · ค่าสิ่งแวดล้อมหลุดช่วง
 # งานอัตโนมัติสร้างจาก source_key ที่ไม่ซ้ำ เรียกกี่ครั้งก็ไม่เกิดงานซ้ำ
@@ -4435,6 +4750,14 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
 
     # ค้นคลังความรู้ (เอกสารของฟาร์ม) ทุกคำถาม — ไม่เจอก็ได้ลิสต์ว่าง ไม่มีผลอะไร
     docs = [] if guest else _rag_search(text)
+    # คำถามเชิงประวัติ ("เดือนนี้กี่ครั้ง" "ช่วงไหนสูงสุด" "เคยมีคล้ายกันไหม")
+    # คำนวณคำตอบจากฐานข้อมูลก่อน แล้วค่อยให้ LLM เรียบเรียง — ห้ามให้ LLM นับเอง
+    history_facts = ""
+    if not guest and _is_history_question(text):
+        try:
+            history_facts = _history_facts(text)
+        except Exception as e:
+            print(f"[warn] ค้นประวัติไม่สำเร็จ: {e}")
     context = _build_context(
         detailed=_needs_forecast(text),
         stats_days=_needs_stats(text),
@@ -4445,6 +4768,8 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
         text=text,
         docs=docs,
     )
+    if history_facts:
+        context += "\n\nผลค้นประวัติจากฐานข้อมูลจริง (ใช้ตัวเลขนี้ตอบ ห้ามคำนวณเอง):\n" + history_facts
 
     # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)
     #    ถ้ายังไม่ได้ตั้ง หรือเรียกไม่สำเร็จ จะคืน None แล้วไหลไป Gemini ต่อเอง
@@ -4513,6 +4838,8 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
 
     # 4) rule-based — ด่านสุดท้าย ตอบได้เสมอ ไม่มีทางพัง
     #    ถ้าค้นเอกสารเจอ ให้อ่านท่อนที่ตรงที่สุดตรง ๆ ยังดีกว่าตอบตามกฎที่ไม่รู้เรื่องนั้น
+    if history_facts:
+        return Answer(answer=history_facts)
     if docs and docs[0]["score"] >= 0.75:
         return Answer(answer=f"จากเอกสาร {docs[0]['title']}: {docs[0]['content'][:400]}")
     return Answer(answer=_rule_based_answer(text))
