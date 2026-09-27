@@ -3407,3 +3407,95 @@ th, td { font-size: 14px; }
   .fd-today-big { font-size: 36px; }
   .fd-today-main { gap: 12px; }
 }
+
+/* ---------- การผสมพันธุ์ ---------- */
+.bd { display: flex; flex-direction: column; gap: 16px; }
+.bd-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.bd-head-icon { width: 54px; height: 54px; border-radius: 14px; background: color-mix(in srgb, var(--neon-pink) 18%, transparent); color: var(--neon-pink); display: grid; place-items: center; font-size: 27px; flex: none; }
+.bd-title { margin: 0; font-size: 25px; font-weight: 800; }
+.bd-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
+.bd-why { display: flex; gap: 10px; align-items: flex-start; padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 9%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); }
+.bd-why i { color: var(--accent); font-size: 21px; flex: none; }
+.bd-why b { display: block; font-size: 15px; margin-bottom: 3px; }
+.bd-why span { font-size: 13.5px; line-height: 1.7; color: var(--text-dim); }
+.bd-sec { display: flex; flex-direction: column; gap: 12px; }
+.bd-sec-title { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.bd-sec-title i { color: var(--accent); font-size: 21px; }
+/* แผนผสม */
+.bd-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; align-items: start; }
+.bd-plan { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.bd-plan.best { border-color: var(--accent); }
+.bd-plan header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bd-plan h3 { margin: 0; font-size: 18px; font-weight: 700; }
+.bd-badge { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: var(--accent); color: #04121a; }
+.bd-plan-sum { margin: 6px 0 12px; font-size: 13.5px; line-height: 1.6; color: var(--text-dim); }
+.bd-steps { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bd-steps li { background: var(--panel-2); border-radius: 12px; padding: 12px 14px; }
+.bd-cross { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bd-parent { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 600; padding: 6px 12px; border-radius: 10px; }
+.bd-parent.sire { background: color-mix(in srgb, #6aa9ff 18%, transparent); color: #9fc6ff; }
+.bd-parent.dam { background: color-mix(in srgb, var(--neon-pink) 18%, transparent); color: var(--neon-pink); }
+.bd-x { font-size: 16px; color: var(--text-dim); font-weight: 700; }
+.bd-out { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--accent); }
+.bd-out i { font-size: 16px; vertical-align: -2px; }
+.bd-step-note { margin-top: 4px; font-size: 12.5px; line-height: 1.55; color: var(--text-dim); }
+.bd-proscons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bd-proscons b { display: flex; align-items: center; gap: 5px; font-size: 13.5px; margin-bottom: 5px; }
+.bd-proscons > div:first-child b i { color: var(--accent); }
+.bd-proscons > div:last-child b i { color: var(--warn); }
+.bd-proscons ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.bd-proscons li { font-size: 12.5px; line-height: 1.55; color: var(--text-dim); }
+/* สายพันธุ์ */
+.bd-breeds { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; align-items: start; }
+.bd-breed { text-align: left; background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 0 14px 14px 0; padding: 14px 16px; color: var(--text); font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.bd-breed.use-sire { border-left-color: #6aa9ff; }
+.bd-breed.use-dam { border-left-color: var(--neon-pink); }
+.bd-breed.use-both { border-left-color: var(--accent); }
+.bd-breed-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bd-breed-top b { font-size: 17px; }
+.bd-use { font-size: 11.5px; padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); }
+.bd-use.sire { color: #9fc6ff; border-color: #6aa9ff; }
+.bd-use.dam { color: var(--neon-pink); border-color: var(--neon-pink); }
+.bd-use.both { color: var(--accent); border-color: var(--accent); }
+.bd-breed-meta { font-size: 12px; color: var(--text-faint); }
+.bd-breed-quick { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--text-dim); }
+.bd-breed-quick i { color: var(--text-faint); font-size: 14px; vertical-align: -2px; margin-right: 4px; }
+.bd-breed-detail { margin-top: 6px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 8px; }
+.bd-breed-detail b { font-size: 13px; }
+.bd-breed-detail ul { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.bd-breed-detail li { font-size: 12.5px; line-height: 1.55; color: var(--text-dim); }
+.bd-breed-note { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; color: var(--accent-2); }
+.bd-more { align-self: flex-start; font-size: 12px; color: var(--accent); }
+/* ปฏิทินผสม-คลอด */
+.bd-calc { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.bd-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-dim); max-width: 260px; }
+.bd-date { font-size: 18px; font-weight: 700; padding: 10px 12px; }
+.bd-timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.bd-tl { background: var(--panel-2); border-radius: 12px; padding: 12px 14px; border: 1px solid transparent; }
+.bd-tl.hi { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+.bd-tl.past { opacity: .5; }
+.bd-tl-day { font-size: 11.5px; color: var(--text-faint); }
+.bd-tl-date { font-size: 16px; font-weight: 800; }
+.bd-tl-label { font-size: 13.5px; font-weight: 600; margin-top: 2px; }
+.bd-tl-desc { font-size: 12px; line-height: 1.5; color: var(--text-dim); margin-top: 2px; }
+.bd-tl-left { font-size: 12px; color: var(--accent); margin-top: 4px; }
+/* ตัวเลข */
+.bd-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+.bd-fact { display: flex; gap: 10px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.bd-fact-icon { width: 38px; height: 38px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); display: grid; place-items: center; font-size: 19px; flex: none; }
+.bd-fact-label { font-size: 12.5px; color: var(--text-dim); }
+.bd-fact b { display: block; font-size: 15.5px; }
+.bd-fact small { display: block; font-size: 12px; line-height: 1.5; color: var(--text-faint); margin-top: 2px; }
+/* คัดพันธุ์ */
+.bd-select { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.bd-keep, .bd-cull { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.bd-keep b, .bd-cull b { display: flex; align-items: center; gap: 6px; font-size: 14.5px; margin-bottom: 8px; }
+.bd-keep b i { color: var(--accent); } .bd-cull b i { color: var(--danger); }
+.bd-keep ul, .bd-cull ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.bd-keep li, .bd-cull li { font-size: 13px; line-height: 1.55; color: var(--text-dim); }
+.bd-source { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--panel-2); }
+.bd-source i { color: var(--accent); flex: none; }
+@media (max-width: 700px) {
+  .bd-title { font-size: 21px; }
+  .bd-proscons { grid-template-columns: 1fr; }
+}
