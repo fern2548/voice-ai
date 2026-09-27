@@ -34,6 +34,8 @@ export const NUTRIENT_NEEDS = [
   { id: 'starter', label: 'สุกรเล็ก', maxWeight: 30, cp: 18, me: 3250 },
   { id: 'grower', label: 'สุกรรุ่น', maxWeight: 60, cp: 16, me: 3150 },
   { id: 'finisher', label: 'สุกรขุน', maxWeight: 999, cp: 14, me: 3100 },
+  // แม่พันธุ์ไม่ได้เลือกจากน้ำหนัก แต่เลือกจากประเภทสุกรโดยตรง (อุ้มท้อง)
+  { id: 'sow', label: 'แม่พันธุ์', maxWeight: null, cp: 14, me: 3050 },
 ]
 
 // วัตถุดิบที่ใช้ผสมได้ — cp โปรตีน (%) · me พลังงาน (kcal/kg) · price ราคาอ้างอิง (บาท/กก.)
@@ -76,6 +78,41 @@ export function feedForAge(age) {
         fcr: a.fcr && b.fcr ? mix('fcr') : b.fcr, perDay: mix('perDay'), cumulative: mix('cumulative'),
         estimated: false,
       }
+    }
+  }
+  return { ...t[t.length - 1], estimated: true }
+}
+
+
+// ประเภทสุกรที่เลือกได้ — ปกติระบบเดาจากอายุให้ แต่เลือกเองได้ถ้ารู้ว่าเป็นคอกไหน
+//   needId ชี้ไปที่เกณฑ์โภชนะใน NUTRIENT_NEEDS · fixedPerDay = ไม่อิงตารางอายุ (แม่พันธุ์)
+export const PIG_TYPES = [
+  { id: 'auto', label: 'ตามอายุ', icon: 'ti-wand', desc: 'ให้ระบบเลือกช่วงให้จากอายุ' },
+  { id: 'nursery', label: 'สุกรเล็ก', icon: 'ti-pig', needId: 'nursery' },
+  { id: 'grower', label: 'สุกรรุ่น', icon: 'ti-pig', needId: 'grower' },
+  { id: 'finisher', label: 'สุกรขุน', icon: 'ti-pig', needId: 'finisher' },
+  { id: 'sow', label: 'แม่พันธุ์', icon: 'ti-pig-money', needId: 'sow', fixedPerDay: 2.5 },
+]
+
+// จำนวนมื้อและเวลาให้อาหาร — สัดส่วนรวมกันได้ 100%
+export const MEAL_PLANS = {
+  2: [{ time: '07:00', label: 'มื้อเช้า', share: 55 }, { time: '16:00', label: 'มื้อเย็น', share: 45 }],
+  3: [{ time: '06:00', label: 'มื้อเช้า', share: 34 }, { time: '12:00', label: 'มื้อกลางวัน', share: 34 }, { time: '17:00', label: 'มื้อเย็น', share: 32 }],
+  4: [{ time: '06:00', label: 'มื้อเช้า', share: 25 }, { time: '10:00', label: 'มื้อสาย', share: 25 }, { time: '14:00', label: 'มื้อบ่าย', share: 25 }, { time: '18:00', label: 'มื้อเย็น', share: 25 }],
+}
+
+// เทียบจากน้ำหนักตัวแทนอายุ — ใช้เมื่อผู้ใช้ชั่งน้ำหนักจริงมา (แม่นกว่าเดาจากอายุ)
+export function feedForWeight(weight) {
+  const t = FEED_TABLE
+  if (weight <= t[0].weight) return { ...t[0], estimated: weight < t[0].weight }
+  if (weight >= t[t.length - 1].weight) return { ...t[t.length - 1], estimated: weight > t[t.length - 1].weight }
+  for (let i = 0; i < t.length - 1; i++) {
+    const a = t[i], b = t[i + 1]
+    if (weight >= a.weight && weight <= b.weight) {
+      const r = (weight - a.weight) / (b.weight - a.weight)
+      const mix = (k) => +(a[k] + (b[k] - a[k]) * r).toFixed(2)
+      return { age: Math.round(a.age + (b.age - a.age) * r), weight, adg: Math.round(a.adg + (b.adg - a.adg) * r),
+        fcr: a.fcr && b.fcr ? mix('fcr') : b.fcr, perDay: mix('perDay'), cumulative: mix('cumulative'), estimated: false }
     }
   }
   return { ...t[t.length - 1], estimated: true }

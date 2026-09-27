@@ -3381,3 +3381,29 @@ th, td { font-size: 14px; }
 .fd-dirty { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 12%, var(--panel-2)); margin-bottom: 12px; font-size: 13.5px; }
 .fd-dirty i { color: var(--warn); font-size: 18px; }
 .fd-recalc { margin-left: auto; padding: 8px 16px; font-size: 13.5px; }
+
+/* ประเภทสุกร + มื้ออาหาร */
+.fd-types { display: flex; gap: 8px; flex-wrap: wrap; }
+.fd-type { display: inline-flex; align-items: center; gap: 6px; padding: 10px 15px; border-radius: 11px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text-dim); font: inherit; font-size: 14px; cursor: pointer; }
+.fd-type i { font-size: 18px; }
+.fd-type.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); color: var(--text); font-weight: 600; }
+.fd-type.on i { color: var(--accent); }
+.fd-today { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--panel)), var(--panel) 65%); }
+.fd-today-main { display: flex; align-items: center; gap: 16px; }
+.fd-today-icon { width: 60px; height: 60px; border-radius: 16px; background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); display: grid; place-items: center; font-size: 30px; flex: none; }
+.fd-today-label { font-size: 14px; color: var(--text-dim); }
+.fd-today-big { font-size: 46px; font-weight: 800; line-height: 1.05; color: var(--accent); font-variant-numeric: tabular-nums; }
+.fd-today-big small { font-size: 18px; font-weight: 700; color: var(--text-dim); }
+.fd-today-sub { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; color: var(--text-dim); }
+.fd-today-sub i { color: var(--accent); font-size: 15px; vertical-align: -2px; margin-right: 3px; }
+.fd-meals { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.fd-meal { background: var(--panel-2); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.fd-meal-time { font-size: 12.5px; color: var(--text-dim); }
+.fd-meal b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fd-meal b small { font-size: 13px; color: var(--text-dim); font-weight: 600; }
+.fd-meal-label { font-size: 12px; color: var(--text-faint); }
+.fd-field > span small { color: var(--text-faint); }
+@media (max-width: 700px) {
+  .fd-today-big { font-size: 36px; }
+  .fd-today-main { gap: 12px; }
+}

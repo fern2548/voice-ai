@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPigBatches } from '../api.js'
-import { FEED_TABLE, INGREDIENTS, PREMIX, feedForAge, needsFor } from '../data/feed.js'
+import {
+  FEED_TABLE, INGREDIENTS, MEAL_PLANS, NUTRIENT_NEEDS, PIG_TYPES, PREMIX, feedForAge, feedForWeight, needsFor,
+} from '../data/feed.js'
 import { solveMix, suggestAdditions, toAmounts } from '../utils/feedMix.js'
 
 // หน้า "อาหารสัตว์" — ใช้งาน 3 ขั้น: ① ใส่อายุ+จำนวน ② ติ๊กวัตถุดิบที่มีแล้วใส่ราคา ③ ได้สูตรที่ถูกที่สุด
@@ -31,6 +33,9 @@ const STEPS = [
 export default function FeedPage() {
   const [age, setAge] = useState(60)
   const [count, setCount] = useState(20)
+  const [pigType, setPigType] = useState('auto')     // เลือกเองได้ หรือให้ระบบเดาจากอายุ
+  const [weight, setWeight] = useState('')           // ชั่งมาจริงก็ใส่ได้ แม่นกว่าเดาจากอายุ
+  const [meals, setMeals] = useState(3)
   const [batches, setBatches] = useState([])
   const [have, setHave] = useState(() => load(HAVE_KEY, []))
   const [prices, setPrices] = useState(() => load(PRICE_KEY, {}))
@@ -54,13 +59,22 @@ export default function FeedPage() {
   const premixPrice = priceOf(PREMIX.id)
   const missingPrice = have.filter((id) => !priceOf(id))
 
-  const row = feedForAge(Number(age) || 0)
-  const need = needsFor(row.weight)
-  const totalDay = row.perDay * (Number(count) || 0)
+  const typeInfo = PIG_TYPES.find((t) => t.id === pigType) || PIG_TYPES[0]
+  const weighed = Number(weight) > 0
+  // ชั่งน้ำหนักมาแล้วให้ยึดน้ำหนัก ไม่งั้นเทียบจากอายุ
+  const row = weighed ? feedForWeight(Number(weight)) : feedForAge(Number(age) || 0)
+  const need = typeInfo.needId
+    ? NUTRIENT_NEEDS.find((n) => n.id === typeInfo.needId) || needsFor(row.weight)
+    : needsFor(row.weight)
+  // แม่พันธุ์ไม่ได้อยู่ในตารางสุกรขุน ใช้ค่ามาตรฐานแม่อุ้มท้องแทน
+  const perPigDay = typeInfo.fixedPerDay ?? row.perDay
+  const pigs = Number(count) || 0
+  const totalDay = perPigDay * pigs
+  const mealPlan = MEAL_PLANS[meals] || MEAL_PLANS[3]
 
   // เก็บผลไว้ตอนกดปุ่ม ไม่คำนวณสดทุกครั้งที่ติ๊ก — ผู้ใช้จะได้เลือกให้ครบก่อนแล้วค่อยดูผลทีเดียว
   const [computed, setComputed] = useState(null)
-  const inputKey = JSON.stringify({ age, count, have, prices, readyPrice })
+  const inputKey = JSON.stringify({ age, count, pigType, weight, have, prices, readyPrice })
   const dirty = computed != null && computed.key !== inputKey
 
   const calculate = () => {
@@ -70,7 +84,7 @@ export default function FeedPage() {
       key: inputKey,
       result: r,
       suggestions: r && !r.enough ? suggestAdditions(usable, INGREDIENTS, need, px) : [],
-      perDay: row.perDay,
+      perDay: perPigDay,
       pigs: Number(count) || 0,
       needAtCalc: need,
     })
@@ -112,15 +126,34 @@ export default function FeedPage() {
 
       {/* ① อายุ + จำนวน */}
       <div className="panel fd-input">
-        <div className="fd-sec-head"><span className="fd-num">1</span> หมูชุดไหน อายุเท่าไหร่</div>
+        <div className="fd-sec-head"><span className="fd-num">1</span> หมูชุดไหน</div>
+
+        <div className="fd-field">
+          <span>ประเภทสุกร</span>
+          <div className="fd-types">
+            {PIG_TYPES.map((t) => (
+              <button type="button" key={t.id} className={`fd-type ${pigType === t.id ? 'on' : ''}`} onClick={() => setPigType(t.id)}>
+                <i className={`ti ${t.icon}`} aria-hidden="true" />
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="fd-input-row">
           <label className="fd-field">
             <span>อายุสุกร (วัน)</span>
-            <input type="number" min="1" max="250" className="chat-input fd-big" value={age} onChange={(e) => setAge(e.target.value)} />
+            <input type="number" min="1" max="250" className="chat-input fd-big" value={age} onChange={(e) => setAge(e.target.value)}
+              disabled={!!typeInfo.fixedPerDay} />
           </label>
           <label className="fd-field">
             <span>จำนวน (ตัว)</span>
             <input type="number" min="1" className="chat-input fd-big" value={count} onChange={(e) => setCount(e.target.value)} />
+          </label>
+          <label className="fd-field">
+            <span>น้ำหนักเฉลี่ย/ตัว (กก.) <small>ชั่งมาแล้วใส่เลย</small></span>
+            <input type="number" min="1" step="0.5" className="chat-input fd-big" placeholder={kg(row.weight)}
+              value={weight} onChange={(e) => setWeight(e.target.value)} disabled={!!typeInfo.fixedPerDay} />
           </label>
           {batches.length > 0 && (
             <label className="fd-field fd-batch">
@@ -138,13 +171,63 @@ export default function FeedPage() {
           )}
         </div>
 
-        <div className="fd-tiles">
-          <div className="fd-tile"><span>น้ำหนักโดยประมาณ</span><b>{kg(row.weight)} <small>กก./ตัว</small></b></div>
-          <div className="fd-tile hi"><span>ให้อาหารวันละ</span><b>{kg(row.perDay)} <small>กก./ตัว</small></b></div>
-          <div className="fd-tile hi"><span>รวมทั้งชุด</span><b>{kg(totalDay)} <small>กก./วัน</small></b></div>
-          <div className="fd-tile"><span>ช่วงการเลี้ยง</span><b className="fd-stage">{need.label}</b><small>ต้องการโปรตีน {need.cp}% · ME {need.me}</small></div>
+        <div className="fd-field">
+          <span>แบ่งให้กี่มื้อ</span>
+          <div className="fd-types">
+            {[2, 3, 4].map((m) => (
+              <button type="button" key={m} className={`fd-type ${meals === m ? 'on' : ''}`} onClick={() => setMeals(m)}>{m} มื้อ</button>
+            ))}
+          </div>
         </div>
-        {row.estimated && <div className="fd-note"><i className="ti ti-info-circle" aria-hidden="true" /> อายุนี้อยู่นอกช่วงของตาราง ใช้ค่าของแถวที่ใกล้ที่สุด</div>}
+        {row.estimated && !typeInfo.fixedPerDay && (
+          <div className="fd-note"><i className="ti ti-info-circle" aria-hidden="true" /> ค่านี้อยู่นอกช่วงของตาราง ใช้ค่าของแถวที่ใกล้ที่สุด</div>
+        )}
+        {typeInfo.fixedPerDay && (
+          <div className="fd-note"><i className="ti ti-info-circle" aria-hidden="true" /> แม่พันธุ์ใช้ค่ามาตรฐานแม่อุ้มท้อง {typeInfo.fixedPerDay} กก./ตัว/วัน (แม่เลี้ยงลูกกินมากกว่านี้ ปรับตามสภาพจริง)</div>
+        )}
+      </div>
+
+      {/* อาหารที่ควรให้วันนี้ */}
+      <div className="panel fd-today">
+        <div className="fd-today-main">
+          <span className="fd-today-icon"><i className="ti ti-bowl-spoon" aria-hidden="true" /></span>
+          <div>
+            <div className="fd-today-label">อาหารที่ควรให้วันนี้</div>
+            <div className="fd-today-big">{kg(totalDay)} <small>กก./วัน</small></div>
+            <div className="fd-today-sub">
+              <span><i className="ti ti-pig" aria-hidden="true" /> เฉลี่ย {kg(perPigDay)} กก./ตัว/วัน</span>
+              <span><i className="ti ti-tools-kitchen-2" aria-hidden="true" /> แบ่งให้ {meals} มื้อ</span>
+              {!typeInfo.fixedPerDay && <span><i className="ti ti-scale" aria-hidden="true" /> น้ำหนัก ~{kg(row.weight)} กก./ตัว</span>}
+              <span><i className="ti ti-target" aria-hidden="true" /> {need.label} · โปรตีน {need.cp}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="fd-meals">
+          {mealPlan.map((m) => (
+            <div className="fd-meal" key={m.time}>
+              <span className="fd-meal-time">{m.time} น.</span>
+              <b>{kg(totalDay * m.share / 100)} <small>กก.</small></b>
+              <span className="fd-meal-label">{m.label} · {m.share}%</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="table-wrap">
+          <table className="data-table fd-table">
+            <thead><tr><th>เวลา</th><th>ปริมาณรวม</th><th>ต่อตัว</th><th>มื้อ</th></tr></thead>
+            <tbody>
+              {mealPlan.map((m) => (
+                <tr key={m.time}>
+                  <td><b>{m.time} น.</b></td>
+                  <td><b>{kg(totalDay * m.share / 100)}</b> กก.</td>
+                  <td>{perPig(perPigDay * m.share / 100)}</td>
+                  <td>{m.label}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showTable && (
