@@ -15,7 +15,7 @@ const SECTIONS = [
   { id: 'bd-popular', label: 'คู่ผสมยอดนิยม', icon: 'ti-git-merge' },
   { id: 'bd-breeds', label: 'สายพันธุ์', icon: 'ti-pig' },
   { id: 'bd-calendar', label: 'วันคลอด', icon: 'ti-calendar-event' },
-  { id: 'bd-facts', label: 'ตัวเลขสำคัญ', icon: 'ti-list-numbers' },
+  { id: 'bd-facts', label: 'ข้อควรรู้', icon: 'ti-clipboard-check' },
   { id: 'bd-select', label: 'คัดตัวทำพันธุ์', icon: 'ti-checkup-list' },
 ]
 
@@ -297,9 +297,9 @@ export default function BreedingPage() {
         </div>
       </section>
 
-      {/* ตัวเลขที่ใช้จริง */}
+      {/* ข้อควรรู้ในการผสมพันธุ์ */}
       <section className="bd-sec pnav-target" id="bd-facts">
-        <h2 className="bd-sec-title"><i className="ti ti-list-numbers" aria-hidden="true" /> ตัวเลขที่ต้องรู้หน้าคอก</h2>
+        <h2 className="bd-sec-title"><i className="ti ti-clipboard-check" aria-hidden="true" /> ข้อควรรู้ในการผสมพันธุ์</h2>
         <div className="bd-facts">
           {BREEDING_FACTS.map((f) => (
             <div className="bd-fact" key={f.label}>
