@@ -58,20 +58,32 @@ export default function FeedPage() {
   const need = needsFor(row.weight)
   const totalDay = row.perDay * (Number(count) || 0)
 
-  const result = useMemo(
-    () => solveMix(usable, need, { ...PREMIX, price: premixPrice ?? 0 }),
-    [usable, need, premixPrice],
-  )
-  // ของที่ยังไม่มี ตัวไหน (หรือคู่ไหน) เติมแล้วทำให้ถึงเกณฑ์
-  const suggestions = useMemo(
-    () => (result && !result.enough ? suggestAdditions(usable, INGREDIENTS, need, { ...PREMIX, price: premixPrice ?? 0 }) : []),
-    [result, usable, need, premixPrice],
-  )
-  const mixRows = result ? toAmounts(result.mix, row.perDay, Number(count) || 0) : []
-  const premixKg = +(totalDay * PREMIX.percent / 100).toFixed(2)
-  const costDay = result?.price != null ? result.price * totalDay : null
+  // เก็บผลไว้ตอนกดปุ่ม ไม่คำนวณสดทุกครั้งที่ติ๊ก — ผู้ใช้จะได้เลือกให้ครบก่อนแล้วค่อยดูผลทีเดียว
+  const [computed, setComputed] = useState(null)
+  const inputKey = JSON.stringify({ age, count, have, prices, readyPrice })
+  const dirty = computed != null && computed.key !== inputKey
+
+  const calculate = () => {
+    const px = { ...PREMIX, price: premixPrice ?? 0 }
+    const r = solveMix(usable, need, px)
+    setComputed({
+      key: inputKey,
+      result: r,
+      suggestions: r && !r.enough ? suggestAdditions(usable, INGREDIENTS, need, px) : [],
+      perDay: row.perDay,
+      pigs: Number(count) || 0,
+      needAtCalc: need,
+    })
+  }
+
+  const result = computed?.result || null
+  const suggestions = computed?.suggestions || []
+  const mixRows = result ? toAmounts(result.mix, computed.perDay, computed.pigs) : []
+  const calcTotalDay = computed ? computed.perDay * computed.pigs : totalDay
+  const premixKg = +(calcTotalDay * PREMIX.percent / 100).toFixed(2)
+  const costDay = result?.price != null ? result.price * calcTotalDay : null
   const ready = Number(readyPrice) > 0 ? Number(readyPrice) : null
-  const saveDay = result?.price != null && ready ? (ready - result.price) * totalDay : null
+  const saveDay = result?.price != null && ready ? (ready - result.price) * calcTotalDay : null
 
   const tooFew = have.length < 2
 
@@ -206,6 +218,12 @@ export default function FeedPage() {
           <input type="number" min="0" step="0.5" inputMode="decimal" className="chat-input fd-price"
             placeholder="เช่น 20" value={readyPrice} onChange={(e) => setReadyPrice(e.target.value)} />
         </label>
+
+        <button type="button" className="ask-btn fd-calc" onClick={calculate} disabled={tooFew}>
+          <i className="ti ti-calculator" aria-hidden="true" />
+          {tooFew ? 'ติ๊กวัตถุดิบอย่างน้อย 2 อย่างก่อน' : 'คำนวณปริมาณและราคา'}
+        </button>
+        {tooFew && <div className="fd-note"><i className="ti ti-info-circle" aria-hidden="true" /> ติ๊กช่อง "มี" หน้าวัตถุดิบที่ฟาร์มมีอยู่ แล้วกดปุ่มคำนวณ</div>}
       </div>
 
       {/* ③ สูตร */}
@@ -215,10 +233,23 @@ export default function FeedPage() {
           {result?.price != null && <span className="fd-price-tag">{money(result.price)} บาท/กก.</span>}
         </div>
 
-        {!result ? (
+        {dirty && (
+          <div className="fd-dirty">
+            <i className="ti ti-refresh" aria-hidden="true" />
+            <span>ข้อมูลเปลี่ยนไปจากตอนคำนวณ</span>
+            <button type="button" className="ask-btn fd-recalc" onClick={calculate}>คำนวณใหม่</button>
+          </div>
+        )}
+
+        {!computed ? (
           <div className="fd-blocker">
             <i className="ti ti-arrow-up" aria-hidden="true" />
-            <div><b>ติ๊กวัตถุดิบก่อน</b><span>ติ๊กว่ามีอะไรบ้างอย่างน้อย 2 อย่าง แล้วระบบจะบอกว่าใช้อย่างละกี่กิโล</span></div>
+            <div><b>ยังไม่ได้คำนวณ</b><span>ติ๊กวัตถุดิบที่มีในขั้นที่ 2 แล้วกดปุ่ม “คำนวณปริมาณและราคา”</span></div>
+          </div>
+        ) : !result ? (
+          <div className="fd-blocker">
+            <i className="ti ti-alert-triangle" aria-hidden="true" />
+            <div><b>ผสมไม่ได้</b><span>ต้องมีวัตถุดิบอย่างน้อย 2 ชนิด</span></div>
           </div>
         ) : (
           <>
