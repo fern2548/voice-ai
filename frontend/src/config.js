@@ -1,3 +1,7 @@
+// โหมด "เปิดอ่านออฟไลน์" — build ด้วย VITE_OFFLINE=1 เพื่อแจกเป็นไฟล์ที่ดับเบิลคลิกเปิดได้
+// ในโหมดนี้ไม่มี backend จึงต้องใช้ HashRouter และไม่ต้องเตือนว่าต่อเซิร์ฟเวอร์ไม่ได้
+export const OFFLINE = import.meta.env.VITE_OFFLINE === '1'
+
 // ที่อยู่ของ backend
 // - ตอน dev ปล่อยว่าง แล้วให้ proxy ใน vite.config.js ส่งต่อไป localhost:8000
 // - ตอน deploy ขึ้นเว็บจริง ตั้ง VITE_API_BASE เป็น URL ของ backend เช่น https://farmy-api.onrender.com
@@ -11,6 +15,7 @@ export const apiUrl = (path) => `${API_BASE}${path}`
 // ถ้าไม่ปลุกไว้ก่อน ผู้ใช้จะกดไมค์ถามแล้วเจอ "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้" ทั้งที่ระบบปกติดี
 // ยิงตั้งแต่ตอนเปิดหน้า ระหว่างที่ผู้ใช้ยังอ่าน/กดไมค์อยู่ เซิร์ฟเวอร์ก็ตื่นทันพอดี
 export function wakeBackend() {
+  if (OFFLINE) return   // ไม่มีเซิร์ฟเวอร์ให้ปลุก
   if (!API_BASE) return // dev ในเครื่อง ไม่ต้องปลุก
   fetch(apiUrl('/health')).catch(() => {})
 }

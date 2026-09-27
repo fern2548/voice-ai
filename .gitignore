@@ -37,3 +37,8 @@ farmy-voice-full.zip
 farmy-voice-ai.zip
 farmy-dashboard.zip
 *.env.development.local
+
+# โฟลเดอร์ build ชั่วคราวสำหรับทำไฟล์แจก
+_offline-build/
+*-เปิดอ่าน-*.zip
+farmy-voice-ส่งต่อ-*.zip

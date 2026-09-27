@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { OFFLINE } from '../config.js'
 import { useLiveData } from '../context/LiveData.jsx'
 import { isStale } from '../utils/sensorStatus.js'
 
@@ -12,7 +13,8 @@ export default function SensorAlert() {
     if (!stale) setDismissed(false)
   }, [stale])
 
-  if (!stale || dismissed) return null
+  // ฉบับเปิดอ่าน ไม่มีเซนเซอร์ต่ออยู่ จึงไม่ต้องเตือน (เช็กหลังเรียก hook ครบแล้ว)
+  if (OFFLINE || !stale || dismissed) return null
 
   return (
     <div className="sensor-alert" role="alert">

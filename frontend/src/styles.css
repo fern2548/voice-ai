@@ -3865,3 +3865,9 @@ th, td { font-size: 14px; }
   .ck-acts { width: 100%; }
   .ck-act { flex: 1; justify-content: center; }
 }
+
+
+/* แถบบอกว่าเป็นฉบับสำหรับเปิดอ่าน (build แบบออฟไลน์) */
+.sensor-alert.info { border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+.sensor-alert.info i { color: var(--accent); }
