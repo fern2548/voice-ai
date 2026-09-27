@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage.jsx'
 import SensorsPage from './pages/SensorsPage.jsx'
 import VaccineGuidePage from './pages/VaccineGuidePage.jsx'
 import DiseasesPage from './pages/DiseasesPage.jsx'
+import FeedPage from './pages/FeedPage.jsx'
 import VaccineInfoPage from './pages/VaccineInfoPage.jsx'
 import TasksPage from './pages/TasksPage.jsx'
 import VetCommunityPage from './pages/VetCommunityPage.jsx'
@@ -35,6 +36,7 @@ const NAV = [
   { to: '/vaccine-info', label: 'ข้อมูลวัคซีน' },
   { to: '/vaccine-guide', label: 'วิธีฉีดวัคซีน' },
   { to: '/diseases', label: 'อาการของโรค' },
+  { to: '/feed', label: 'อาหารสัตว์' },
   { to: '/history', label: 'รายงาน' },
   { to: '/forecast', label: 'สภาพอากาศ · พยากรณ์' },
   { to: '/sensors', label: 'กราฟข้อมูล' },
@@ -70,6 +72,7 @@ function AppShell() {
             <Route path="/vaccine-guide" element={<VaccineGuidePage />} />
             <Route path="/vaccine-info" element={<VaccineInfoPage />} />
             <Route path="/diseases" element={<DiseasesPage />} />
+            <Route path="/feed" element={<FeedPage />} />
             <Route path="/diseases/:id" element={<DiseasesPage />} />
             {/* ลิงก์เดิมที่เคยส่งให้กัน ยังเปิดได้ */}
             <Route path="/disease-fmd" element={<Navigate to="/diseases/fmd" replace />} />
