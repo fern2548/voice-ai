@@ -3503,7 +3503,7 @@ th, td { font-size: 14px; }
 
 /* ---------- เลือกแม่พันธุ์ แล้วแนะนำพ่อพันธุ์ ---------- */
 .bd-match { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: start; }
-.bd-pick { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px 16px 18px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 12px; }
+.bd-pick { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px 16px 18px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 132px; }
 .bd-pick-title { margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
 .bd-pick-title i { color: var(--accent); font-size: 20px; }
 .bd-pick-group { display: flex; flex-direction: column; gap: 9px; }
@@ -3592,3 +3592,25 @@ th, td { font-size: 14px; }
 .bd-alt img { width: 96px; border-radius: 10px; flex: none; background: #f7f3ef; }
 .bd-alt-name { display: block; font-size: 13.5px; font-weight: 600; }
 .bd-alt p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+
+
+/* ---------- แถบหัวข้อในหน้า (ใช้ได้ทุกหน้า) ---------- */
+.pnav { position: sticky; top: 76px; z-index: 30; display: flex; gap: 6px; padding: 7px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; scrollbar-width: none; }
+.pnav::-webkit-scrollbar { display: none; }
+.pnav-btn { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border-radius: 9px;
+  border: 1px solid transparent; background: transparent; color: var(--text-dim); font: inherit; font-size: 13.5px;
+  font-weight: 600; cursor: pointer; white-space: nowrap; }
+.pnav-btn i { font-size: 17px; color: var(--text-faint); }
+.pnav-btn:hover { color: var(--text); background: var(--panel-2); }
+.pnav-btn.on { color: var(--text); background: color-mix(in srgb, var(--accent) 14%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.pnav-btn.on i { color: var(--accent); }
+/* เลื่อนถึงแล้วหัวข้อต้องโผล่ใต้แถบ ไม่โดนบัง */
+.pnav-target { scroll-margin-top: 136px; }
+@media (max-width: 700px) {
+  .pnav { top: 64px; }
+  .pnav-btn { padding: 7px 11px; font-size: 12.5px; }
+  .pnav-target { scroll-margin-top: 120px; }
+}

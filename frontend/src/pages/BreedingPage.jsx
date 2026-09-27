@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import SectionNav from '../components/SectionNav.jsx'
 import {
   BREEDING_FACTS, BREEDING_TIMELINE, BREEDS, CROSS_PLANS, DAM_OPTIONS, GOALS,
   SELECTION, SOURCE_NOTE, recommendSire,
@@ -7,6 +8,16 @@ import {
 // หน้า "การผสมพันธุ์" — ฟาร์มเลือกแม่พันธุ์ที่ตัวเองมี แล้วระบบบอกว่าควรใช้พ่อพันธุ์อะไร
 // แต่ละฟาร์มมีแม่ไม่เหมือนกัน จึงให้เลือกเอง ไม่ฟันธงให้ตายตัว
 // มีเครื่องคำนวณวันคลอดด้วย เพราะผสมแล้วต้องรู้ว่าต้องเตรียมคอกคลอดวันไหน
+
+// หัวข้อในหน้านี้ — ใช้กับแถบด้านบน กดแล้วเลื่อนไปทันที
+const SECTIONS = [
+  { id: 'bd-reco', label: 'คู่ผสมที่แนะนำ', icon: 'ti-target-arrow' },
+  { id: 'bd-popular', label: 'คู่ผสมยอดนิยม', icon: 'ti-git-merge' },
+  { id: 'bd-breeds', label: 'สายพันธุ์', icon: 'ti-pig' },
+  { id: 'bd-calendar', label: 'วันคลอด', icon: 'ti-calendar-event' },
+  { id: 'bd-facts', label: 'ตัวเลขสำคัญ', icon: 'ti-list-numbers' },
+  { id: 'bd-select', label: 'คัดตัวทำพันธุ์', icon: 'ti-checkup-list' },
+]
 
 const USE_LABEL = { sire: 'สายพ่อพันธุ์', dam: 'สายแม่พันธุ์', both: 'ใช้ได้ทั้งพ่อและแม่' }
 const LS_DAM = 'farmy.breeding.dam'
@@ -45,8 +56,10 @@ export default function BreedingPage() {
         </div>
       </header>
 
+      <SectionNav sections={SECTIONS} />
+
       {/* เลือกแม่ + เป้าหมาย → แนะนำพ่อ */}
-      <section className="bd-match">
+      <section className="bd-match pnav-target" id="bd-reco">
         <aside className="bd-pick">
           <h2 className="bd-pick-title"><i className="ti ti-adjustments" aria-hidden="true" /> ข้อมูลสำหรับแนะนำ</h2>
 
@@ -185,7 +198,7 @@ export default function BreedingPage() {
       </div>
 
       {/* แผนผสมที่แนะนำ */}
-      <section className="bd-sec">
+      <section className="bd-sec pnav-target" id="bd-popular">
         <h2 className="bd-sec-title"><i className="ti ti-git-merge" aria-hidden="true" /> คู่ผสมยอดนิยมที่ฟาร์มอื่นใช้</h2>
         <div className="bd-plans">
           {CROSS_PLANS.map((p) => (
@@ -226,7 +239,7 @@ export default function BreedingPage() {
       </section>
 
       {/* สายพันธุ์ */}
-      <section className="bd-sec">
+      <section className="bd-sec pnav-target" id="bd-breeds">
         <h2 className="bd-sec-title"><i className="ti ti-pig" aria-hidden="true" /> พันธุ์ไหนเก่งเรื่องอะไร</h2>
         <div className="bd-breeds">
           {BREEDS.map((b) => (
@@ -257,7 +270,7 @@ export default function BreedingPage() {
       </section>
 
       {/* เครื่องคำนวณวันคลอด */}
-      <section className="bd-sec">
+      <section className="bd-sec pnav-target" id="bd-calendar">
         <h2 className="bd-sec-title"><i className="ti ti-calendar-event" aria-hidden="true" /> ผสมวันนี้ คลอดวันไหน</h2>
         <div className="panel bd-calc">
           <label className="bd-field">
@@ -285,7 +298,7 @@ export default function BreedingPage() {
       </section>
 
       {/* ตัวเลขที่ใช้จริง */}
-      <section className="bd-sec">
+      <section className="bd-sec pnav-target" id="bd-facts">
         <h2 className="bd-sec-title"><i className="ti ti-list-numbers" aria-hidden="true" /> ตัวเลขที่ต้องรู้หน้าคอก</h2>
         <div className="bd-facts">
           {BREEDING_FACTS.map((f) => (
@@ -302,7 +315,7 @@ export default function BreedingPage() {
       </section>
 
       {/* คัดตัวทำพันธุ์ */}
-      <section className="bd-sec">
+      <section className="bd-sec pnav-target" id="bd-select">
         <h2 className="bd-sec-title"><i className="ti ti-checkup-list" aria-hidden="true" /> เลือกตัวไหนไว้ทำพันธุ์</h2>
         <div className="bd-select">
           <div className="bd-keep">
