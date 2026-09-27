@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage.jsx'
 import SensorsPage from './pages/SensorsPage.jsx'
 import VaccineGuidePage from './pages/VaccineGuidePage.jsx'
 import BreedingPage from './pages/BreedingPage.jsx'
+import ChecklistPage from './pages/ChecklistPage.jsx'
 import CleaningPage from './pages/CleaningPage.jsx'
 import DiseasesPage from './pages/DiseasesPage.jsx'
 import FeedPage from './pages/FeedPage.jsx'
@@ -41,6 +42,7 @@ const NAV = [
   { to: '/feed', label: 'อาหารสัตว์' },
   { to: '/breeding', label: 'การผสมพันธุ์' },
   { to: '/cleaning', label: 'ทำความสะอาดโรงเรือน' },
+  { to: '/checklist', label: 'เช็กลิสต์มาตรฐานฟาร์ม' },
   { to: '/history', label: 'รายงาน' },
   { to: '/forecast', label: 'สภาพอากาศ · พยากรณ์' },
   { to: '/sensors', label: 'กราฟข้อมูล' },
@@ -79,6 +81,7 @@ function AppShell() {
             <Route path="/feed" element={<FeedPage />} />
             <Route path="/breeding" element={<BreedingPage />} />
             <Route path="/cleaning" element={<CleaningPage />} />
+            <Route path="/checklist" element={<ChecklistPage />} />
             <Route path="/diseases/:id" element={<DiseasesPage />} />
             {/* ลิงก์เดิมที่เคยส่งให้กัน ยังเปิดได้ */}
             <Route path="/disease-fmd" element={<Navigate to="/diseases/fmd" replace />} />
