@@ -1,13 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  BREEDING_FACTS, BREEDING_TIMELINE, BREEDS, CROSS_PLANS, SELECTION, SOURCE_NOTE,
+  BREEDING_FACTS, BREEDING_TIMELINE, BREEDS, CROSS_PLANS, DAM_OPTIONS, GOALS,
+  SELECTION, SOURCE_NOTE, recommendSire,
 } from '../data/breeding.js'
 
-// หน้า "การผสมพันธุ์" — ตอบว่า "อยากได้ลูกแบบไหน ควรใช้พ่อพันธุ์อะไรผสมกับแม่พันธุ์อะไร"
-// พันธุ์แท้แต่ละพันธุ์เก่งคนละด้าน ผสมข้ามแล้วลูกได้ข้อดีของทั้งสองฝั่ง
+// หน้า "การผสมพันธุ์" — ฟาร์มเลือกแม่พันธุ์ที่ตัวเองมี แล้วระบบบอกว่าควรใช้พ่อพันธุ์อะไร
+// แต่ละฟาร์มมีแม่ไม่เหมือนกัน จึงให้เลือกเอง ไม่ฟันธงให้ตายตัว
 // มีเครื่องคำนวณวันคลอดด้วย เพราะผสมแล้วต้องรู้ว่าต้องเตรียมคอกคลอดวันไหน
 
 const USE_LABEL = { sire: 'สายพ่อพันธุ์', dam: 'สายแม่พันธุ์', both: 'ใช้ได้ทั้งพ่อและแม่' }
+const LS_DAM = 'farmy.breeding.dam'
+const LS_GOAL = 'farmy.breeding.goal'
+const read = (k, fallback) => {
+  try { return localStorage.getItem(k) || fallback } catch { return fallback }
+}
 const todayStr = () => new Date().toLocaleDateString('sv-SE')
 const addDays = (iso, n) => {
   const d = new Date(iso)
@@ -19,18 +25,152 @@ const fmt = (d) => (d ? d.toLocaleDateString('th-TH', { weekday: 'short', day: '
 const daysFromNow = (d) => (d ? Math.round((d - new Date(new Date().toDateString())) / 86400000) : null)
 
 export default function BreedingPage() {
+  const [goal, setGoal] = useState(() => read(LS_GOAL, 'fatten'))
+  const [damId, setDamId] = useState(() => read(LS_DAM, ''))
   const [mateDate, setMateDate] = useState(todayStr())
   const [openBreed, setOpenBreed] = useState(null)
+
+  useEffect(() => { try { localStorage.setItem(LS_GOAL, goal) } catch { /* ไม่เป็นไร */ } }, [goal])
+  useEffect(() => { if (damId) { try { localStorage.setItem(LS_DAM, damId) } catch { /* ไม่เป็นไร */ } } }, [damId])
+
+  const rec = damId ? recommendSire(damId, goal) : null
 
   return (
     <div className="bd">
       <header className="bd-head">
         <span className="bd-head-icon"><i className="ti ti-heart-handshake" aria-hidden="true" /></span>
         <div>
-          <h1 className="bd-title">การผสมพันธุ์</h1>
-          <p className="bd-sub">อยากได้ลูกแบบไหน ควรใช้พ่อพันธุ์อะไรผสมกับแม่พันธุ์อะไร</p>
+          <h1 className="bd-title">แนะนำการผสมพันธุ์สุกร</h1>
+          <p className="bd-sub">เลือกแม่พันธุ์ที่ฟาร์มมี แล้วระบบบอกว่าควรใช้พ่อพันธุ์อะไร</p>
         </div>
       </header>
+
+      {/* เลือกแม่ + เป้าหมาย → แนะนำพ่อ */}
+      <section className="bd-match">
+        <aside className="bd-pick">
+          <h2 className="bd-pick-title"><i className="ti ti-adjustments" aria-hidden="true" /> ข้อมูลสำหรับแนะนำ</h2>
+
+          <div className="bd-pick-group">
+            <span className="bd-pick-label">1. อยากได้ลูกไปทำอะไร</span>
+            <div className="bd-goals">
+              {GOALS.map((g) => (
+                <button type="button" key={g.id} className={`bd-goal ${goal === g.id ? 'on' : ''}`}
+                  onClick={() => setGoal(g.id)}>
+                  <i className={`ti ${g.icon}`} aria-hidden="true" />
+                  <span>
+                    <b>{g.label}</b>
+                    <small>{g.hint}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bd-pick-group">
+            <span className="bd-pick-label">2. แม่พันธุ์ที่ฟาร์มมีตอนนี้</span>
+            <div className="bd-dams">
+              {DAM_OPTIONS.map((d) => (
+                <button type="button" key={d.id} className={`bd-dam ${damId === d.id ? 'on' : ''}`}
+                  onClick={() => setDamId(d.id)} aria-pressed={damId === d.id}>
+                  <img src={d.img} alt="" className="bd-dam-img" />
+                  <span className="bd-dam-text">
+                    <b>{d.short}</b>
+                    <small>{d.look}</small>
+                  </span>
+                  {damId === d.id && <i className="ti ti-circle-check bd-dam-tick" aria-hidden="true" />}
+                </button>
+              ))}
+            </div>
+            <p className="bd-pick-hint">ถ้ามีหลายพันธุ์ ให้เลือกทีละพันธุ์เพื่อดูคำแนะนำของแต่ละกลุ่ม</p>
+          </div>
+        </aside>
+
+        <div className="bd-result">
+          {!rec ? (
+            <div className="bd-empty">
+              <i className="ti ti-arrow-left" aria-hidden="true" />
+              <b>เลือกแม่พันธุ์ที่ฟาร์มมีก่อน</b>
+              <span>เลือกแล้วระบบจะบอกทันทีว่าควรใช้พ่อพันธุ์อะไร และลูกที่ได้จะเป็นอย่างไร</span>
+            </div>
+          ) : (
+            <>
+              <article className="bd-hero">
+                <div className="bd-hero-tag"><i className="ti ti-star-filled" aria-hidden="true" /> คู่ผสมที่แนะนำ</div>
+                <h2 className="bd-hero-pair">
+                  {rec.sire.name} <span className="bd-hero-x">×</span> {rec.dam.short}
+                </h2>
+                <div className="bd-hero-goal">
+                  <i className="ti ti-target-arrow" aria-hidden="true" />
+                  เหมาะสำหรับ{GOALS.find((g) => g.id === goal)?.label}
+                </div>
+                <div className="bd-tags">
+                  {rec.tags.map((t) => <span className="bd-tag" key={t}>{t}</span>)}
+                </div>
+
+                <div className="bd-trio">
+                  <figure className="bd-trio-item">
+                    <img src={rec.sire.img} alt={`สุกรพันธุ์${rec.sire.name}`} />
+                    <figcaption><span className="bd-sex sire"><i className="ti ti-gender-male" aria-hidden="true" /> พ่อพันธุ์</span><b>{rec.sire.name}</b></figcaption>
+                  </figure>
+                  <span className="bd-trio-op">×</span>
+                  <figure className="bd-trio-item">
+                    <img src={rec.dam.img} alt={`สุกรพันธุ์${rec.dam.short}`} />
+                    <figcaption><span className="bd-sex dam"><i className="ti ti-gender-female" aria-hidden="true" /> แม่พันธุ์</span><b>{rec.dam.short}</b></figcaption>
+                  </figure>
+                  <span className="bd-trio-op"><i className="ti ti-arrow-right" aria-hidden="true" /></span>
+                  <figure className="bd-trio-item out">
+                    <img src="/breeds/piglets.svg" alt="ลูกผสมที่ได้" />
+                    <figcaption><span className="bd-sex out">ลูกที่ได้</span><b>{rec.out}</b><small>{rec.outNote}</small></figcaption>
+                  </figure>
+                </div>
+              </article>
+
+              <div className="bd-cards">
+                <div className="bd-card sire">
+                  <header><span>จุดเด่นพ่อพันธุ์</span><i className="ti ti-gender-male" aria-hidden="true" /></header>
+                  <b>{rec.sire.name}</b>
+                  <ul>{rec.sire.strong.map((x) => <li key={x}><i className="ti ti-circle-check" aria-hidden="true" />{x}</li>)}</ul>
+                </div>
+                <div className="bd-card dam">
+                  <header><span>จุดเด่นแม่พันธุ์</span><i className="ti ti-gender-female" aria-hidden="true" /></header>
+                  <b>{rec.dam.short}</b>
+                  <ul>{rec.dam.strong.map((x) => <li key={x}><i className="ti ti-circle-check" aria-hidden="true" />{x}</li>)}</ul>
+                </div>
+                <div className="bd-card out">
+                  <header><span>ผลลัพธ์ลูกผสม</span><i className="ti ti-chart-bar" aria-hidden="true" /></header>
+                  <b>{rec.out}</b>
+                  <ul>{rec.gain.map((x) => <li key={x}><i className="ti ti-circle-check" aria-hidden="true" />{x}</li>)}</ul>
+                </div>
+              </div>
+
+              <div className="bd-notes">
+                <div className="bd-note why">
+                  <b><i className="ti ti-bulb" aria-hidden="true" /> ทำไมถึงแนะนำคู่นี้</b>
+                  <ul>{rec.why.map((x) => <li key={x}>{x}</li>)}</ul>
+                </div>
+                {rec.cautions.length > 0 && (
+                  <div className="bd-note warn">
+                    <b><i className="ti ti-alert-triangle" aria-hidden="true" /> ข้อควรระวัง</b>
+                    <ul>{rec.cautions.map((x) => <li key={x}>{x}</li>)}</ul>
+                  </div>
+                )}
+                {rec.alt && (
+                  <div className="bd-note alt">
+                    <b><i className="ti ti-arrows-shuffle" aria-hidden="true" /> ถ้าไม่มีพ่อพันธุ์ตัวนี้</b>
+                    <div className="bd-alt">
+                      <img src={rec.alt.sire.img} alt={`สุกรพันธุ์${rec.alt.sire.name}`} />
+                      <div>
+                        <span className="bd-alt-name">ใช้พ่อพันธุ์{rec.alt.sire.name}แทนได้</span>
+                        <p>{rec.alt.note}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </section>
 
       <div className="bd-why">
         <i className="ti ti-bulb" aria-hidden="true" />
@@ -38,7 +178,7 @@ export default function BreedingPage() {
           <b>ทำไมต้องผสมข้ามพันธุ์</b>
           <span>
             พันธุ์แท้แต่ละพันธุ์เก่งคนละด้าน — แลนด์เรซเลี้ยงลูกเก่งแต่ขาไม่แข็งแรง ดูร็อคแข็งแรงโตเร็วแต่ให้ลูกไม่ดก
-            พอผสมข้ามพันธุ์ ลูกที่ได้จะรวมข้อดีของทั้งสองฝั่งและโตดีกว่าค่าเฉลี่ยของพ่อแม่ (เรียกว่าพลังอัดแจ หรือ heterosis)
+            พอผสมข้ามพันธุ์ ลูกที่ได้จะรวมข้อดีของทั้งสองฝั่งและโตดีกว่าค่าเฉลี่ยของพ่อแม่
             นี่คือเหตุผลที่ฟาร์มขุนแทบไม่ใช้พันธุ์แท้ล้วน ๆ
           </span>
         </div>
@@ -46,7 +186,7 @@ export default function BreedingPage() {
 
       {/* แผนผสมที่แนะนำ */}
       <section className="bd-sec">
-        <h2 className="bd-sec-title"><i className="ti ti-git-merge" aria-hidden="true" /> แผนผสมที่แนะนำสำหรับผลิตสุกรขุน</h2>
+        <h2 className="bd-sec-title"><i className="ti ti-git-merge" aria-hidden="true" /> คู่ผสมยอดนิยมที่ฟาร์มอื่นใช้</h2>
         <div className="bd-plans">
           {CROSS_PLANS.map((p) => (
             <article className={`bd-plan ${p.recommended ? 'best' : ''}`} key={p.id}>
@@ -92,6 +232,7 @@ export default function BreedingPage() {
           {BREEDS.map((b) => (
             <button type="button" className={`bd-breed use-${b.use} ${openBreed === b.id ? 'on' : ''}`} key={b.id}
               onClick={() => setOpenBreed(openBreed === b.id ? null : b.id)}>
+              {b.img && <img src={b.img} alt={`สุกรพันธุ์${b.name}`} className="bd-breed-img" />}
               <div className="bd-breed-top">
                 <b>{b.name}</b>
                 <span className={`bd-use ${b.use}`}>{USE_LABEL[b.use]}</span>
