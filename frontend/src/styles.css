@@ -3614,3 +3614,143 @@ th, td { font-size: 14px; }
   .pnav-btn { padding: 7px 11px; font-size: 12.5px; }
   .pnav-target { scroll-margin-top: 120px; }
 }
+
+
+/* ---------- ทำความสะอาดโรงเรือน ---------- */
+.cl { display: flex; flex-direction: column; gap: 16px; }
+.cl-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.cl-head-icon { width: 54px; height: 54px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent); display: grid; place-items: center; font-size: 27px; flex: none; }
+.cl-title { margin: 0; font-size: 25px; font-weight: 800; }
+.cl-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
+.cl-sec { display: flex; flex-direction: column; gap: 12px; }
+.cl-sec-title { margin: 0; font-size: 19px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.cl-sec-title i { color: var(--accent); font-size: 22px; }
+.cl-sub-title { margin: 6px 0 0; font-size: 16px; font-weight: 700; }
+.cl-lead { margin: 0; font-size: 13.5px; line-height: 1.7; color: var(--text-dim); }
+/* กฎทอง */
+.cl-golden { display: flex; gap: 12px; align-items: flex-start; padding: 15px 17px; border-radius: 14px;
+  background: color-mix(in srgb, var(--warn) 11%, var(--panel)); border: 1.5px solid color-mix(in srgb, var(--warn) 34%, var(--border)); }
+.cl-golden i { color: var(--warn); font-size: 24px; flex: none; }
+.cl-golden b { display: block; font-size: 16.5px; margin-bottom: 4px; }
+.cl-golden span { font-size: 13.5px; line-height: 1.7; color: var(--text-dim); }
+/* ความคืบหน้า */
+.cl-progress { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+.cl-progress-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cl-progress-top b { font-size: 15px; }
+.cl-reset { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px; padding: 6px 12px;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text-dim); cursor: pointer; }
+.cl-reset:hover { color: var(--text); }
+.cl-bar { margin-top: 10px; height: 8px; border-radius: 20px; background: var(--panel-2); overflow: hidden; }
+.cl-bar span { display: block; height: 100%; border-radius: 20px; background: var(--accent); transition: width .25s; }
+.cl-done-all { margin-top: 10px; display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--accent); }
+/* ขั้นตอนล้างโรงเรือน */
+.cl-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.cl-step { display: flex; gap: 12px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 16px; }
+.cl-step.on { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.cl-step.on .cl-step-top b { text-decoration: line-through; color: var(--text-dim); }
+.cl-check { background: none; border: 0; padding: 0; cursor: pointer; color: var(--text-faint); font-size: 26px;
+  line-height: 1; flex: none; margin-top: 2px; }
+.cl-step.on .cl-check { color: var(--accent); }
+.cl-step-body { min-width: 0; flex: 1; }
+.cl-step-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cl-step-n { width: 22px; height: 22px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; display: grid; place-items: center; flex: none; }
+.cl-step.on .cl-step-n { background: var(--accent); border-color: var(--accent); color: #04121a; }
+.cl-step-top b { font-size: 16px; }
+.cl-step-time { font-size: 11.5px; color: var(--text-faint); display: inline-flex; align-items: center; gap: 4px; }
+.cl-why { margin: 7px 0 0; font-size: 13px; line-height: 1.65; color: var(--text-dim);
+  display: flex; gap: 6px; align-items: flex-start; }
+.cl-why i { color: var(--warn); font-size: 16px; flex: none; margin-top: 2px; }
+.cl-dos { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.cl-dos li { font-size: 12.5px; line-height: 1.6; color: var(--text-faint); }
+/* คำนวณวันลงหมู */
+.cl-calc { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px; }
+.cl-calc h3 { margin: 0; font-size: 16.5px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+.cl-calc h3 i { color: var(--accent); font-size: 20px; }
+.cl-calc-in { display: flex; gap: 12px; flex-wrap: wrap; }
+.cl-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-dim); min-width: 190px; }
+.cl-date { font-size: 15px; font-weight: 600; padding: 9px 12px; }
+.cl-timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.cl-tl { display: flex; gap: 10px; align-items: center; background: var(--panel-2); border-radius: 12px; padding: 11px 13px;
+  border: 1px solid transparent; }
+.cl-tl i { font-size: 21px; color: var(--text-faint); flex: none; }
+.cl-tl.hi { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+.cl-tl.hi i { color: var(--accent); }
+.cl-tl-date { font-size: 15px; font-weight: 800; }
+.cl-tl-label { font-size: 12px; line-height: 1.5; color: var(--text-dim); margin-top: 1px; }
+.cl-calc-note { margin: 0; font-size: 12.5px; color: var(--text-faint); }
+/* ยานพาหนะ */
+.cl-vsteps { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+.cl-vstep { position: relative; display: flex; gap: 11px; align-items: flex-start; text-align: left; font: inherit;
+  color: var(--text); cursor: pointer; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 13px; padding: 13px 38px 13px 14px; }
+.cl-vstep.on { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.cl-vstep-n { width: 24px; height: 24px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--border);
+  font-size: 12.5px; font-weight: 700; display: grid; place-items: center; flex: none; }
+.cl-vstep.on .cl-vstep-n { background: var(--accent); border-color: var(--accent); color: #04121a; }
+.cl-vstep-body { min-width: 0; }
+.cl-vstep-body b { display: block; font-size: 14.5px; }
+.cl-vstep-body b i { color: var(--accent); font-size: 16px; margin-right: 4px; }
+.cl-vstep-body small { display: block; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); margin-top: 3px; }
+.cl-vstep-tick { position: absolute; top: 13px; right: 13px; font-size: 20px; color: var(--text-faint); }
+.cl-vstep.on .cl-vstep-tick { color: var(--accent); }
+/* ความเสี่ยงของรถ */
+.cl-risks { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+.cl-risk { border-radius: 12px; padding: 13px 15px; background: var(--panel); border: 1px solid var(--border); border-left-width: 4px; }
+.cl-risk-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cl-risk-top b { font-size: 14.5px; }
+.cl-risk-badge { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+.cl-risk p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+.cl-risk.hot { border-left-color: var(--danger); }
+.cl-risk.hot .cl-risk-badge { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); }
+.cl-risk.warn { border-left-color: var(--warn); }
+.cl-risk.warn .cl-risk-badge { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+.cl-risk.mid { border-left-color: var(--accent); }
+.cl-risk.mid .cl-risk-badge { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+/* องค์ประกอบ */
+.cl-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; align-items: start; }
+.cl-part { text-align: left; font: inherit; color: var(--text); cursor: pointer; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 14px; padding: 15px 16px; display: flex; flex-direction: column; gap: 6px; }
+.cl-part.on { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.cl-part-icon { width: 40px; height: 40px; border-radius: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent); display: grid; place-items: center; font-size: 21px; }
+.cl-part b { font-size: 16px; }
+.cl-part small { font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+.cl-part-list { list-style: none; margin: 6px 0 0; padding-top: 10px; border-top: 1px dashed var(--border);
+  display: flex; flex-direction: column; gap: 7px; }
+.cl-part-list li { display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+.cl-part-list li i { color: var(--accent); font-size: 15px; flex: none; margin-top: 1px; }
+.cl-part-more { font-size: 12px; color: var(--accent); margin-top: 2px; }
+/* น้ำยา */
+.cl-chems { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.cl-chem { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 7px; }
+.cl-chem > b { font-size: 16px; }
+.cl-chem-row { display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+.cl-chem-row i { font-size: 15px; flex: none; margin-top: 2px; }
+.cl-chem-row.use i { color: var(--text-faint); }
+.cl-chem-row.good i { color: var(--accent); }
+.cl-chem-row.care i { color: var(--warn); }
+.cl-rules { background: color-mix(in srgb, var(--warn) 8%, var(--panel)); border: 1px solid color-mix(in srgb, var(--warn) 26%, var(--border));
+  border-radius: 13px; padding: 14px 16px; }
+.cl-rules b { display: flex; align-items: center; gap: 7px; font-size: 15px; margin-bottom: 8px; }
+.cl-rules b i { color: var(--warn); }
+.cl-rules ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.cl-rules li { font-size: 13px; line-height: 1.65; color: var(--text-dim); }
+/* งานประจำ */
+.cl-routines { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.cl-routine { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 14px 16px; }
+.cl-routine b { display: flex; align-items: center; gap: 7px; font-size: 15px; margin-bottom: 9px; }
+.cl-routine b i { color: var(--accent); font-size: 19px; }
+.cl-routine ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.cl-routine li { font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+.cl-source { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.65;
+  color: var(--text-faint); margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--panel-2); }
+.cl-source i { color: var(--accent); flex: none; }
+@media (max-width: 700px) {
+  .cl-title { font-size: 21px; }
+  .cl-field { min-width: 100%; }
+}
