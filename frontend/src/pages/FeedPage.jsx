@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPigBatches } from '../api.js'
 import { FEED_TABLE, INGREDIENTS, PREMIX, feedForAge, needsFor } from '../data/feed.js'
-import { batchPlan, bestMix } from '../utils/feedMix.js'
+import { solveMix, suggestAdditions, toAmounts } from '../utils/feedMix.js'
 
 // หน้า "อาหารสัตว์" — ใช้งาน 3 ขั้น: ① ใส่อายุ+จำนวน ② ติ๊กวัตถุดิบที่มีแล้วใส่ราคา ③ ได้สูตรที่ถูกที่สุด
 //
@@ -14,14 +14,18 @@ const PRICE_KEY = 'feed-prices'
 const READY_KEY = 'feed-ready-price'
 const money = (n) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const kg = (n) => n.toLocaleString('th-TH', { maximumFractionDigits: 1 })
+// ต่อตัวต่อวันมักไม่ถึง 1 กก. ถ้าปัดเป็นกิโลจะเหลือ 0 — ต่ำกว่า 1 กก. ให้บอกเป็นกรัม
+const perPig = (n) => (n >= 1
+  ? `${n.toLocaleString('th-TH', { maximumFractionDigits: 2 })} กก.`
+  : `${Math.round(n * 1000).toLocaleString('th-TH')} ก.`)
 const load = (k, fallback) => {
   try { const v = localStorage.getItem(k); return v == null ? fallback : JSON.parse(v) } catch { return fallback }
 }
 
 const STEPS = [
   { icon: 'ti-pig', title: 'ใส่อายุกับจำนวนหมู', desc: 'หรือเลือกจากชุดหมูที่บันทึกไว้แล้ว' },
-  { icon: 'ti-checkbox', title: 'ติ๊กวัตถุดิบที่ฟาร์มมี', desc: 'แล้วใส่ราคาที่ซื้อจริงต่อกิโล' },
-  { icon: 'ti-flask', title: 'ระบบหาสูตรที่ถูกที่สุด', desc: 'โปรตีนถึงเกณฑ์ ไม่เกินสัดส่วนที่ปลอดภัย' },
+  { icon: 'ti-checkbox', title: 'ติ๊กว่ามีวัตถุดิบอะไรบ้าง', desc: 'มีแค่ไหนติ๊กแค่นั้น ราคาใส่ทีหลังก็ได้' },
+  { icon: 'ti-scale', title: 'ระบบบอกว่าใช้อย่างละกี่กิโล', desc: 'ต่อตัวต่อวัน และรวมทั้งชุด' },
 ]
 
 export default function FeedPage() {
@@ -42,9 +46,9 @@ export default function FeedPage() {
     const v = Number(prices[id])
     return Number.isFinite(v) && v > 0 ? v : null
   }
-  // เข้าสูตรได้เฉพาะตัวที่ "มี" และ "ใส่ราคาแล้ว"
+  // ใช้ทุกตัวที่ติ๊กว่ามี — ราคาเป็นของเสริม ไม่ใส่ก็คำนวณปริมาณให้ได้
   const usable = useMemo(
-    () => INGREDIENTS.filter((i) => have.includes(i.id) && priceOf(i.id)).map((i) => ({ ...i, price: priceOf(i.id) })),
+    () => INGREDIENTS.filter((i) => have.includes(i.id)).map((i) => ({ ...i, price: priceOf(i.id) || 0 })),
     [have, prices],
   )
   const premixPrice = priceOf(PREMIX.id)
@@ -55,30 +59,21 @@ export default function FeedPage() {
   const totalDay = row.perDay * (Number(count) || 0)
 
   const result = useMemo(
-    () => (usable.length >= 2 ? bestMix(usable, need, { ...PREMIX, price: premixPrice ?? 0 }) : null),
+    () => solveMix(usable, need, { ...PREMIX, price: premixPrice ?? 0 }),
     [usable, need, premixPrice],
   )
-  const mixRows = result ? batchPlan(result.mix, totalDay) : []
+  // ของที่ยังไม่มี ตัวไหน (หรือคู่ไหน) เติมแล้วทำให้ถึงเกณฑ์
+  const suggestions = useMemo(
+    () => (result && !result.enough ? suggestAdditions(usable, INGREDIENTS, need, { ...PREMIX, price: premixPrice ?? 0 }) : []),
+    [result, usable, need, premixPrice],
+  )
+  const mixRows = result ? toAmounts(result.mix, row.perDay, Number(count) || 0) : []
   const premixKg = +(totalDay * PREMIX.percent / 100).toFixed(2)
-  const costDay = result ? result.price * totalDay : 0
+  const costDay = result?.price != null ? result.price * totalDay : null
   const ready = Number(readyPrice) > 0 ? Number(readyPrice) : null
-  const saveDay = result && ready ? (ready - result.price) * totalDay : null
+  const saveDay = result?.price != null && ready ? (ready - result.price) * totalDay : null
 
-  // บอกให้ตรงจุดว่าทำไมยังไม่มีสูตร
-  const blocker = (() => {
-    if (have.length === 0) return 'ติ๊กวัตถุดิบที่ฟาร์มมีก่อน (ด้านล่าง) อย่างน้อย 2 อย่าง'
-    if (missingPrice.length > 0) {
-      const names = INGREDIENTS.filter((i) => missingPrice.includes(i.id)).map((i) => i.name).join(', ')
-      return `ใส่ราคาของ ${names} ก่อน จึงจะคำนวณได้`
-    }
-    if (usable.length < 2) return 'ต้องมีวัตถุดิบที่ใส่ราคาแล้วอย่างน้อย 2 อย่าง'
-    if (!usable.some((i) => i.cp >= 25)) return 'ยังไม่มีวัตถุดิบโปรตีนสูง — ติ๊กกากถั่วเหลือง ปลาป่น หรือไก่ป่น เพิ่ม'
-    if (!usable.some((i) => i.me >= 2800)) return 'ยังไม่มีวัตถุดิบให้พลังงาน — ติ๊กข้าวโพดหรือปลายข้าวเพิ่ม'
-    // ลองปลดเงื่อนไขทีละข้อ เพื่อบอกให้ตรงว่าติดที่โปรตีนหรือพลังงาน (บอกผิดจะยิ่งงง)
-    const cpOnly = bestMix(usable, { cp: need.cp, me: 0 }, { ...PREMIX, price: premixPrice ?? 0 })
-    if (!cpOnly) return `โปรตีนยังไม่ถึง ${need.cp}% จากของที่มี — เพิ่มกากถั่วเหลือง ปลาป่น หรือไก่ป่น`
-    return `โปรตีนถึงแล้ว แต่พลังงานยังไม่ถึง ${need.me} kcal/kg — เพิ่มข้าวโพดหรือน้ำมันพืช`
-  })()
+  const tooFew = have.length < 2
 
   return (
     <div className="fd">
@@ -162,8 +157,8 @@ export default function FeedPage() {
       {/* ② วัตถุดิบที่มี + ราคา */}
       <div className="panel fd-sec">
         <div className="fd-sec-head">
-          <span className="fd-num">2</span> ติ๊กวัตถุดิบที่มี แล้วใส่ราคาที่ซื้อจริง
-          <small>ระบบไม่มีราคาตั้งต้นให้ เพราะราคาตลาดเปลี่ยนตลอด</small>
+          <span className="fd-num">2</span> ติ๊กว่าฟาร์มมีวัตถุดิบอะไรบ้าง
+          <small>ราคาใส่หรือไม่ใส่ก็ได้ — ใส่แล้วถึงจะบอกต้นทุนและเลือกสูตรที่ถูกที่สุดให้</small>
         </div>
         <div className="table-wrap">
           <table className="data-table fd-table">
@@ -216,41 +211,70 @@ export default function FeedPage() {
       {/* ③ สูตร */}
       <div className="panel fd-sec">
         <div className="fd-sec-head">
-          <span className="fd-num">3</span> สูตรที่ถูกที่สุดสำหรับ{need.label}
-          {result && <span className="fd-price-tag">{money(result.price)} บาท/กก.</span>}
+          <span className="fd-num">3</span> ใช้อย่างละกี่กิโล ({need.label})
+          {result?.price != null && <span className="fd-price-tag">{money(result.price)} บาท/กก.</span>}
         </div>
 
         {!result ? (
           <div className="fd-blocker">
             <i className="ti ti-arrow-up" aria-hidden="true" />
-            <div><b>ยังคำนวณไม่ได้</b><span>{blocker}</span></div>
+            <div><b>ติ๊กวัตถุดิบก่อน</b><span>ติ๊กว่ามีอะไรบ้างอย่างน้อย 2 อย่าง แล้วระบบจะบอกว่าใช้อย่างละกี่กิโล</span></div>
           </div>
         ) : (
           <>
+            {!result.enough && (
+              <div className="fd-short">
+                <i className="ti ti-alert-triangle" aria-hidden="true" />
+                <div>
+                  <b>ของที่มียังทำให้ถึงเกณฑ์ไม่ได้ — นี่คือสูตรที่ดีที่สุดเท่าที่ทำได้</b>
+                  <span>
+                    ได้โปรตีน {result.cp}% (ต้องการ {need.cp}%) · พลังงาน {result.me} (ต้องการ {need.me})
+                    {suggestions.length > 0 && (
+                      <> — ถ้าเพิ่ม{' '}
+                        {suggestions.map((g, i) => (
+                          <b key={i}>{i > 0 ? ' หรือ ' : ''}{g.map((x) => `${x.name} ~${x.percent}%`).join(' + ')}</b>
+                        ))}{' '}จะถึงเกณฑ์
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="fd-mix">
               {mixRows.map((m) => (
                 <div className="fd-mix-row" key={m.id}>
                   <div className="fd-bar"><i style={{ width: `${m.percent}%` }} /></div>
                   <b>{m.name}</b>
                   <span className="fd-pct">{m.percent}%</span>
-                  <span className="fd-kg">{kg(m.kg)} กก./วัน</span>
+                  <span className="fd-kg"><b>{perPig(m.kgPerPig)}</b>/ตัว/วัน · รวม {kg(m.kgTotal)} กก.</span>
                 </div>
               ))}
               <div className="fd-mix-row premix">
                 <div className="fd-bar"><i style={{ width: `${PREMIX.percent}%` }} /></div>
                 <b>{PREMIX.name}</b>
                 <span className="fd-pct">{PREMIX.percent}%</span>
-                <span className="fd-kg">{kg(premixKg)} กก./วัน</span>
+                <span className="fd-kg"><b>{perPig(premixKg / Math.max(1, Number(count) || 1))}</b>/ตัว/วัน · รวม {kg(premixKg)} กก.</span>
               </div>
             </div>
 
             <div className="fd-result">
-              <div className="fd-res"><span>โปรตีนที่ได้</span><b className="ok">{result.cp}%</b><small>ต้องการ {need.cp}%</small></div>
+              <div className={`fd-res ${result.cp >= need.cp ? '' : 'low'}`}>
+                <span>โปรตีนที่ได้</span><b className={result.cp >= need.cp ? 'ok' : ''}>{result.cp}%</b><small>ต้องการ {need.cp}%</small>
+              </div>
               <div className={`fd-res ${result.me < need.me ? 'low' : ''}`}>
                 <span>พลังงาน (ME)</span><b>{result.me}</b>
-                <small>{result.me < need.me ? `ต่ำกว่าเกณฑ์ ${need.me} เล็กน้อย — โตช้ากว่าปกติได้` : `ต้องการ ${need.me} kcal/kg`}</small>
+                <small>
+                  {result.me >= need.me
+                    ? `ต้องการ ${need.me} kcal/kg`
+                    : `ต่ำกว่าเกณฑ์ ${need.me} อยู่ ${Math.round((1 - result.me / need.me) * 100)}% — โตช้ากว่าปกติได้`}
+                </small>
               </div>
-              <div className="fd-res"><span>ค่าอาหารต่อวัน</span><b>{money(costDay)} ฿</b><small>ทั้งชุด {count} ตัว</small></div>
+              <div className="fd-res">
+                <span>ค่าอาหารต่อวัน</span>
+                {costDay != null ? <b>{money(costDay)} ฿</b> : <b className="fd-faint">—</b>}
+                <small>{costDay != null ? `ทั้งชุด ${count} ตัว` : 'ใส่ราคาวัตถุดิบเพื่อคิดต้นทุน'}</small>
+              </div>
               {saveDay != null ? (
                 <div className={`fd-res ${saveDay > 0 ? 'save' : 'low'}`}>
                   <span>เทียบอาหารสำเร็จรูป</span>
@@ -261,7 +285,14 @@ export default function FeedPage() {
                 <div className="fd-res"><span>เทียบอาหารสำเร็จรูป</span><b className="fd-faint">—</b><small>ใส่ราคาสำเร็จรูปด้านบนเพื่อเทียบ</small></div>
               )}
             </div>
-            {!premixPrice && <div className="fd-note"><i className="ti ti-info-circle" aria-hidden="true" /> ยังไม่ได้ใส่ราคาพรีมิกซ์ ต้นทุนที่แสดงจึงยังไม่รวมส่วนนี้</div>}
+            {costDay != null && !premixPrice && <div className="fd-note"><i className="ti ti-info-circle" aria-hidden="true" /> ยังไม่ได้ใส่ราคาพรีมิกซ์ ต้นทุนที่แสดงจึงยังไม่รวมส่วนนี้</div>}
+            {missingPrice.length > 0 && (
+              <div className="fd-note">
+                <i className="ti ti-info-circle" aria-hidden="true" />
+                ยังไม่ได้ใส่ราคา {INGREDIENTS.filter((i) => missingPrice.includes(i.id)).map((i) => i.name).join(', ')} —
+                ปริมาณที่แนะนำยังใช้ได้ แต่ต้องใส่ราคาครบถึงจะเทียบได้ว่าสูตรไหนถูกที่สุด
+              </div>
+            )}
           </>
         )}
       </div>
