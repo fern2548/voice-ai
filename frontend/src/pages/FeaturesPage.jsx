@@ -172,54 +172,63 @@ function LocalAISection() {
   )
 }
 
-/* ---------- 4. Gemini AI ---------- */
-function GeminiSection() {
-  const right = useReveal()
-  const questions = ['PRRS คืออะไร?', 'ป้องกัน ASF อย่างไร?', 'Biosecurity ที่ดีควรทำอะไรบ้าง?']
+/* ---------- 4. เครื่องมือหน้าคอก ----------
+   เดิมตอนนี้เป็นตัวอย่างคำถามลอย ๆ อย่าง "PRRS คืออะไร" "Biosecurity ควรทำอะไร"
+   ตอนนี้ฟาร์มมี่มีหน้าที่ตอบเรื่องพวกนั้นจริงแล้ว จึงเอาของจริงมาโชว์แทน */
+const FARM_TOOLS = [
+  {
+    to: '/breeding', icon: 'ti-heart-handshake', title: 'การผสมพันธุ์',
+    ask: 'มีแม่พันธุ์แลนด์เรซ ควรผสมกับพ่อพันธุ์อะไร',
+    does: 'เลือกแม่พันธุ์ที่ฟาร์มมีจริง ระบบแนะนำพ่อพันธุ์ให้ พร้อมบอกว่าลูกที่ได้จะเป็นอย่างไร',
+  },
+  {
+    to: '/feed', icon: 'ti-bowl', title: 'อาหารสัตว์',
+    ask: 'หมู 20 ตัว อายุ 60 วัน ต้องให้อาหารวันละกี่กิโล',
+    does: 'คำนวณปริมาณต่อวันและแบ่งมื้อให้ แล้วผสมสูตรจากวัตถุดิบที่มีอยู่ให้ต้นทุนต่ำที่สุด',
+  },
+  {
+    to: '/diseases', icon: 'ti-stethoscope', title: 'อาการของโรค',
+    ask: 'หมูมีแผลที่กีบ ใช่ปากเท้าเปื่อยไหม',
+    does: 'ภาพอาการแยกทีละอย่างของปากเท้าเปื่อย อหิวาต์สุกร และไข้หวัดใหญ่ พร้อมโรคที่อาการคล้ายกัน',
+  },
+  {
+    to: '/cleaning', icon: 'ti-spray', title: 'ทำความสะอาดโรงเรือน',
+    ask: 'ล้างโรงเรือนเสร็จแล้ว ลงหมูรุ่นใหม่ได้วันไหน',
+    does: '10 ขั้นตอนที่ติ๊กตามได้หน้าคอก ขั้นตอนล้างยานพาหนะ และคำนวณวันพักคอกให้',
+  },
+  {
+    to: '/checklist', icon: 'ti-checklist', title: 'เช็กลิสต์มาตรฐานฟาร์ม',
+    ask: 'วันนี้ต้องตรวจอะไรบ้าง',
+    does: '8 ระบบ 46 ข้อ แยกรายวัน รายสัปดาห์ รายเดือน และทุกรุ่น ข้อไหนไม่ผ่านบอกวิธีแก้ให้',
+  },
+]
+
+function FarmToolsSection() {
+  const navigate = useNavigate()
+  const head = useReveal()
 
   return (
-    <Section className="ft-split reverse">
-      <div className="ft-split-left ft-field-wrap">
-        <DataField />
+    <Section>
+      <div ref={head} className="reveal ft-head">
+        <p className="ft-eyebrow">Farm tools</p>
+        <h2 className="ft-statement">ไม่ได้แค่ตอบ แต่คำนวณและแนะนำให้</h2>
+        <p className="ft-lead">เครื่องมือที่เปิดใช้ได้เลยหน้าคอก</p>
       </div>
 
-      <div ref={right} className="reveal ft-split-right">
-        <p className="ft-eyebrow">Gemini AI</p>
-        <h2 className="ft-statement">ถามได้มากกว่าข้อมูลในฟาร์ม</h2>
-        <p className="ft-lead">เชื่อมต่อความรู้ภายนอก เพื่อช่วยคุณตัดสินใจ</p>
-        <ul className="ft-qlist">
-          {questions.map((q) => <li key={q}>“{q}”</li>)}
-        </ul>
+      <div className="ft-tools">
+        {FARM_TOOLS.map((t) => (
+          <button key={t.to} className="ft-tool" onClick={() => navigate(t.to)}>
+            <div className="ft-tool-head">
+              <i className={`ti ${t.icon}`} aria-hidden="true" />
+              <h3>{t.title}</h3>
+              <i className="ti ti-arrow-up-right ft-tool-go" aria-hidden="true" />
+            </div>
+            <p className="ft-cmd">“{t.ask}”</p>
+            <p className="ft-tool-does">{t.does}</p>
+          </button>
+        ))}
       </div>
     </Section>
-  )
-}
-
-/** สนามข้อมูลที่แผ่ออก — แทนความรู้ภายนอกที่เชื่อมเข้ามา */
-function DataField() {
-  const rings = [{ r: 96, n: 6 }, { r: 158, n: 10 }, { r: 224, n: 14 }]
-  return (
-    <svg className="ft-field" viewBox="-280 -280 560 560" fill="none" aria-hidden="true">
-      <defs>
-        <radialGradient id="ft-core">
-          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <circle r="120" fill="url(#ft-core)" />
-      {rings.map((ring, ri) => (
-        <g key={ri} className={`ft-ring ${ri % 2 ? 'rev' : ''}`}>
-          <circle r={ring.r} stroke="var(--border)" strokeWidth="1" fill="none" opacity="0.6" />
-          {Array.from({ length: ring.n }).map((_, i) => {
-            const a = (i / ring.n) * Math.PI * 2
-            return (
-              <circle key={i} cx={Math.cos(a) * ring.r} cy={Math.sin(a) * ring.r}
-                r={ri === 0 ? 3 : 2} fill="var(--accent)" opacity={0.75 - ri * 0.18} />
-            )
-          })}
-        </g>
-      ))}
-    </svg>
   )
 }
 
@@ -229,9 +238,9 @@ function NavigationSection() {
   const head = useReveal()
   const tiles = [
     { title: 'โรงเรือน', cmd: 'ไปหน้าโรงเรือน', to: '/pig-log', icon: 'ti-building-warehouse' },
-    { title: 'สุขภาพ', cmd: 'ดูหมูป่วยวันนี้', to: '/pig-log', icon: 'ti-activity' },
     { title: 'วัคซีน', cmd: 'บันทึกวัคซีน', to: '/vaccine', icon: 'ti-vaccine' },
-    { title: 'รายงาน', cmd: 'เปิดรายงาน', to: '/history', icon: 'ti-file-text' },
+    { title: 'อาหารสัตว์', cmd: 'เปิดหน้าอาหารสัตว์', to: '/feed', icon: 'ti-bowl' },
+    { title: 'ผสมพันธุ์', cmd: 'เปิดหน้าการผสมพันธุ์', to: '/breeding', icon: 'ti-heart-handshake' },
   ]
 
   return (
@@ -279,7 +288,7 @@ export default function FeaturesPage() {
       <VoiceControlSection />
       <FarmIntelligenceSection />
       <LocalAISection />
-      <GeminiSection />
+      <FarmToolsSection />
       <NavigationSection />
       <FinalCTASection />
     </div>

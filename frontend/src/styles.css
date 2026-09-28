@@ -3871,3 +3871,34 @@ th, td { font-size: 14px; }
 .sensor-alert.info { border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
   background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
 .sensor-alert.info i { color: var(--accent); }
+
+
+/* ---- เครื่องมือหน้าคอก (หน้าทำอะไรได้บ้าง) ---- */
+.ft-tools { display: grid; grid-template-columns: 1fr; gap: 0; }
+@media (min-width: 760px) { .ft-tools { grid-template-columns: 1fr 1fr; } }
+.ft-tool {
+  padding: 34px 8px;
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+  font-family: var(--font);
+  cursor: pointer;
+  transition: border-color 0.6s;
+}
+@media (min-width: 760px) { .ft-tool { padding-inline: 26px; } }
+.ft-tool:hover { border-bottom-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.ft-tool-head { display: flex; align-items: center; gap: 12px; }
+.ft-tool-head > .ti { font-size: 24px; color: var(--text-faint); transition: color 0.5s; }
+.ft-tool:hover .ft-tool-head > .ti { color: var(--accent); }
+.ft-tool-head h3 {
+  margin: 0; font-size: clamp(21px, 2.1vw, 30px);
+  font-weight: 300; line-height: 1.2; letter-spacing: -0.5px;
+  transition: transform 0.6s;
+}
+.ft-tool:hover .ft-tool-head h3 { transform: translateX(5px); }
+.ft-tool-go { margin-left: auto; font-size: 18px; color: var(--text-faint); opacity: 0; transition: opacity 0.4s; }
+.ft-tool:hover .ft-tool-go { opacity: 1; }
+.ft-tool .ft-cmd { margin: 16px 0 0; font-size: 14.5px; }
+.ft-tool-does { margin: 8px 0 0; font-size: 13.5px; line-height: 1.75; color: var(--text-faint); font-weight: 300; }
