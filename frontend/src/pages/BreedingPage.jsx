@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import BreedingLog from '../components/BreedingLog.jsx'
 import SectionNav from '../components/SectionNav.jsx'
 import {
   BREEDING_FACTS, BREEDING_TIMELINE, BREEDS, CROSS_PLANS, DAM_OPTIONS, GOALS,
@@ -15,6 +16,7 @@ const SECTIONS = [
   { id: 'bd-popular', label: 'คู่ผสมยอดนิยม', icon: 'ti-git-merge' },
   { id: 'bd-breeds', label: 'สายพันธุ์', icon: 'ti-pig' },
   { id: 'bd-calendar', label: 'วันคลอด', icon: 'ti-calendar-event' },
+  { id: 'bd-log', label: 'บันทึกการผสม', icon: 'ti-table' },
   { id: 'bd-facts', label: 'ข้อควรรู้', icon: 'ti-clipboard-check' },
   { id: 'bd-select', label: 'คัดตัวทำพันธุ์', icon: 'ti-checkup-list' },
 ]
@@ -295,6 +297,16 @@ export default function BreedingPage() {
             })}
           </div>
         </div>
+      </section>
+
+      {/* ตารางบันทึกการผสมพันธุ์ */}
+      <section className="bd-sec pnav-target" id="bd-log">
+        <h2 className="bd-sec-title"><i className="ti ti-table" aria-hidden="true" /> บันทึกการผสมพันธุ์</h2>
+        <p className="bd-lead">
+          ตารางเดียวกับแบบฟอร์มที่ใช้อยู่ ต่างกันตรงที่ช่องกำหนดกลับสัดและกำหนดคลอด ระบบคำนวณให้เอง
+          และเตือนให้เมื่อใกล้ถึงกำหนด
+        </p>
+        <BreedingLog />
       </section>
 
       {/* ข้อควรรู้ในการผสมพันธุ์ */}

@@ -3902,3 +3902,80 @@ th, td { font-size: 14px; }
 .ft-tool:hover .ft-tool-go { opacity: 1; }
 .ft-tool .ft-cmd { margin: 16px 0 0; font-size: 14.5px; }
 .ft-tool-does { margin: 8px 0 0; font-size: 13.5px; line-height: 1.75; color: var(--text-faint); font-weight: 300; }
+
+
+/* ---------- ตารางบันทึกการผสมพันธุ์ ---------- */
+.bl { display: flex; flex-direction: column; gap: 12px; }
+.bl-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.bl-top-text b { display: block; font-size: 16px; }
+.bl-top-text small { display: block; font-size: 12px; line-height: 1.6; color: var(--text-faint); margin-top: 2px; }
+.bl-top-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.bl-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 600;
+  padding: 9px 15px; border-radius: 10px; cursor: pointer; border: 1px solid var(--border); }
+.bl-btn i { font-size: 16px; }
+.bl-btn.main { background: var(--accent); border-color: var(--accent); color: #04121a; }
+.bl-btn.ghost { background: var(--panel-2); color: var(--text-dim); }
+.bl-btn.ghost:hover { color: var(--text); }
+/* เตือนใกล้กำหนด */
+.bl-soon { display: flex; gap: 11px; align-items: flex-start; padding: 13px 15px; border-radius: 12px;
+  background: color-mix(in srgb, var(--warn) 11%, var(--panel)); border: 1px solid color-mix(in srgb, var(--warn) 32%, var(--border)); }
+.bl-soon > i { color: var(--warn); font-size: 21px; flex: none; }
+.bl-soon b { font-size: 14.5px; }
+.bl-soon ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.bl-soon li { font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+/* ฟอร์มเพิ่ม/แก้ไข */
+.bl-form { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 15px 17px;
+  display: flex; flex-direction: column; gap: 12px; }
+.bl-form-head { display: flex; align-items: center; justify-content: space-between; }
+.bl-form-head b { font-size: 15.5px; }
+.bl-close { background: none; border: 0; color: var(--text-faint); font-size: 19px; cursor: pointer; padding: 2px; }
+.bl-close:hover { color: var(--text); }
+.bl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.bl-f { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-dim); }
+.bl-f.wide { grid-column: 1 / -1; }
+.bl-f .chat-input { font-size: 14px; padding: 9px 11px; }
+.bl-auto { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-dim);
+  padding: 10px 13px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); }
+.bl-auto i { color: var(--accent); font-size: 17px; }
+.bl-auto b { color: var(--text); }
+.bl-err { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--danger); }
+.bl-form-btns { display: flex; gap: 9px; flex-wrap: wrap; }
+/* ตาราง */
+.bl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.bl-table { border-collapse: collapse; width: 100%; min-width: 1100px; font-size: 12.5px; }
+.bl-table th, .bl-table td { border: 1px solid var(--border); padding: 7px 9px; text-align: center; vertical-align: middle; }
+.bl-table th { background: var(--panel-2); font-weight: 700; font-size: 11.5px; line-height: 1.35; color: var(--text-dim); white-space: nowrap; }
+.bl-table td { color: var(--text-dim); white-space: nowrap; }
+.bl-table tr.near td { background: color-mix(in srgb, var(--warn) 9%, transparent); }
+.bl-strong { color: var(--text); font-weight: 700; }
+.bl-calc { color: var(--accent); }
+.bl-left { display: block; font-size: 10.5px; color: var(--warn); margin-top: 1px; }
+.bl-note { white-space: normal; min-width: 130px; text-align: left; }
+.bl-res { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 20px; }
+.bl-res.wait { background: var(--panel-2); color: var(--text-faint); }
+.bl-res.pregnant { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.bl-res.failed { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+.bl-ico { background: none; border: 0; color: var(--text-faint); font-size: 16px; cursor: pointer; padding: 3px 4px; }
+.bl-ico:hover { color: var(--text); }
+.bl-ico.danger:hover { color: var(--danger); }
+/* ว่าง */
+.bl-empty { background: var(--panel); border: 1.5px dashed var(--border); border-radius: 14px; padding: 38px 20px;
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.bl-empty i { font-size: 27px; color: var(--accent); }
+.bl-empty b { font-size: 16px; }
+.bl-empty span { font-size: 13px; color: var(--text-dim); }
+.bl-foot { display: flex; gap: 7px; align-items: flex-start; margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-faint); }
+.bl-foot i { color: var(--accent); flex: none; }
+@media (max-width: 700px) {
+  .bl-top-btns { width: 100%; }
+  .bl-btn { flex: 1; justify-content: center; }
+}
+/* พิมพ์เฉพาะตาราง */
+@media print {
+  body * { visibility: hidden; }
+  .bl-print, .bl-print * { visibility: visible; }
+  .bl-print { position: absolute; left: 0; top: 0; width: 100%; border: 0; overflow: visible; }
+  .bl-table { min-width: 0; font-size: 10.5px; color: #000; }
+  .bl-table th, .bl-table td { border: 1px solid #000; color: #000; background: #fff !important; }
+  .bl-noprint { display: none !important; }
+}
