@@ -15,7 +15,39 @@ const RESULTS = [
   { id: 'failed', label: 'ไม่ติด' },
 ]
 
-const BREED_NAMES = [...BREEDS.map((b) => b.name), 'ลูกผสม', 'อื่น ๆ']
+// พันธุ์ที่มีในระบบ — ถ้าฟาร์มใช้พันธุ์อื่น เลือก "อื่น ๆ" แล้วพิมพ์ชื่อเองได้
+const KNOWN_BREEDS = [...BREEDS.map((b) => b.name), 'ลูกผสม']
+const OTHER = 'อื่น ๆ'
+
+/** ช่องเลือกพันธุ์ เลือก "อื่น ๆ" แล้วมีช่องพิมพ์โผล่ขึ้นมา */
+function BreedPicker({ value, onChange, id }) {
+  // ถ้าค่าที่เก็บไว้ไม่ใช่พันธุ์ในรายการ แปลว่าเคยพิมพ์เองไว้ ให้เปิดช่องพิมพ์ค้างไว้
+  const [typing, setTyping] = useState(() => !!value && !KNOWN_BREEDS.includes(value))
+
+  const pick = (e) => {
+    const v = e.target.value
+    if (v === OTHER) { setTyping(true); onChange('') }
+    else { setTyping(false); onChange(v) }
+  }
+
+  return (
+    <>
+      <select className="chat-input" value={typing ? OTHER : value} onChange={pick} id={id}>
+        <option value="">— เลือก —</option>
+        {KNOWN_BREEDS.map((b) => <option key={b} value={b}>{b}</option>)}
+        <option value={OTHER}>{OTHER} (พิมพ์เอง)</option>
+      </select>
+      {typing && (
+        <input
+          className="chat-input bl-other"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="พิมพ์ชื่อพันธุ์"
+        />
+      )}
+    </>
+  )
+}
 
 const todayStr = () => new Date().toLocaleDateString('sv-SE')
 const addDays = (iso, n) => {
@@ -64,6 +96,7 @@ export default function BreedingLog() {
   }, [rows])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const setVal = (k) => (v) => setForm((f) => ({ ...f, [k]: v }))
 
   const startAdd = () => { setForm({ ...EMPTY, mateDate: todayStr() }); setEditId(null); setErr(''); setOpen(true) }
   const startEdit = (r) => { setForm({ ...r }); setEditId(r.id); setErr(''); setOpen(true) }
@@ -188,21 +221,15 @@ export default function BreedingLog() {
           <div className="bl-grid">
             <label className="bl-f"><span>เบอร์แม่สุกร *</span>
               <input className="chat-input" value={form.damNo} onChange={set('damNo')} placeholder="เช่น 125" /></label>
-            <label className="bl-f"><span>พันธุ์แม่</span>
-              <select className="chat-input" value={form.damBreed} onChange={set('damBreed')}>
-                <option value="">— เลือก —</option>
-                {BREED_NAMES.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select></label>
+            <div className="bl-f"><span>พันธุ์แม่</span>
+              <BreedPicker value={form.damBreed} onChange={setVal('damBreed')} /></div>
             <label className="bl-f"><span>สายพันธุ์แม่</span>
               <input className="chat-input" value={form.damLine} onChange={set('damLine')} placeholder="เช่น L-12" /></label>
 
             <label className="bl-f"><span>เบอร์พ่อสุกร</span>
               <input className="chat-input" value={form.sireNo} onChange={set('sireNo')} placeholder="เช่น 48" /></label>
-            <label className="bl-f"><span>พันธุ์พ่อ</span>
-              <select className="chat-input" value={form.sireBreed} onChange={set('sireBreed')}>
-                <option value="">— เลือก —</option>
-                {BREED_NAMES.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select></label>
+            <div className="bl-f"><span>พันธุ์พ่อ</span>
+              <BreedPicker value={form.sireBreed} onChange={setVal('sireBreed')} /></div>
             <label className="bl-f"><span>สายพันธุ์พ่อ</span>
               <input className="chat-input" value={form.sireLine} onChange={set('sireLine')} placeholder="เช่น D-07" /></label>
 

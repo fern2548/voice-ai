@@ -3979,3 +3979,4 @@ th, td { font-size: 14px; }
   .bl-table th, .bl-table td { border: 1px solid #000; color: #000; background: #fff !important; }
   .bl-noprint { display: none !important; }
 }
+.bl-other { margin-top: 6px; }
