@@ -3,7 +3,7 @@ import { useAdminAuth } from '../context/AdminAuth.jsx'
 import usePolling from '../hooks/usePolling.js'
 import { getTasks, getVaccineDue } from '../api.js'
 
-// ทางลัดใต้ปุ่มไมค์ — เดิมหน้าแรกมีแค่ไมค์ จะไปหน้าอื่นต้องเปิดเมนูทุกครั้ง
+// ตารางทางลัดของหน้า "รวมทุกเมนู" — เปิดหน้าเดียวเห็นทุกอย่างที่ระบบทำได้
 // จัดเป็นกลุ่มตามงานที่ทำ ไม่ได้เรียงยาวเป็นแถวเดียว จะได้กวาดตาหาเจอเร็ว
 // หน้าที่ต้องล็อกอิน (internal) จะไม่ขึ้นให้คนนอกเห็น เพราะกดไปก็เข้าไม่ได้
 
@@ -40,7 +40,7 @@ const GROUPS = [
   },
 ]
 
-export default function HomeShortcuts() {
+export default function MenuGrid() {
   const { isAdmin } = useAdminAuth()
 
   // ดึงเฉพาะตอนล็อกอินแล้ว คนนอกเรียกไม่ได้อยู่แล้ว ขอไปก็ได้ 401 เปล่า ๆ

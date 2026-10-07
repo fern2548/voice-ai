@@ -19,6 +19,7 @@ import SensorsPage from './pages/SensorsPage.jsx'
 import VaccineGuidePage from './pages/VaccineGuidePage.jsx'
 import BreedingPage from './pages/BreedingPage.jsx'
 import ChecklistPage from './pages/ChecklistPage.jsx'
+import MenuPage from './pages/MenuPage.jsx'
 import CleaningPage from './pages/CleaningPage.jsx'
 import DiseasesPage from './pages/DiseasesPage.jsx'
 import FeedPage from './pages/FeedPage.jsx'
@@ -30,6 +31,7 @@ import VaccinePlanPage from './pages/VaccinePlanPage.jsx'
 // internal: true = เฉพาะคนในบริษัท (ต้องล็อกอิน) — คนนอกเห็นแต่เมนูข้อมูลปกติ
 const NAV = [
   { to: '/overview', label: 'หน้าแรก' },
+  { to: '/menu', label: 'รวมทุกเมนู' },
   { to: '/features', label: 'ทำอะไรได้บ้าง' },
   { to: '/tasks', label: 'งานวันนี้', internal: true },
   { to: '/pig-log', label: 'โรงเรือน', internal: true },
@@ -69,6 +71,7 @@ function AppShell() {
           <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<OverviewPage />} />
+            <Route path="/menu" element={<MenuPage />} />
             <Route path="/features" element={<FeaturesPage />} />
             <Route path="/forecast" element={<ForecastPage />} />
             <Route path="/trend" element={<TrendComparePage />} />

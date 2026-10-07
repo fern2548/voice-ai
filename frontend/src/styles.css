@@ -4025,3 +4025,13 @@ th, td { font-size: 14px; }
   .hs-ico { width: 40px; height: 40px; font-size: 21px; }
   .hs-label { font-size: 12px; }
 }
+
+
+/* ---------- หน้ารวมทุกเมนู ---------- */
+.mn { display: flex; flex-direction: column; gap: 6px; }
+.mn-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+.mn-head-icon { width: 54px; height: 54px; border-radius: 14px; flex: none; display: grid; place-items: center;
+  font-size: 27px; color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.mn-title { margin: 0; font-size: 25px; font-weight: 800; }
+.mn-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
+@media (max-width: 700px) { .mn-title { font-size: 21px; } }

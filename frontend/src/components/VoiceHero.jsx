@@ -109,6 +109,7 @@ export default function VoiceHero() {
 
       <p className="vh-foot">
         Farmy Voice เป็น AI และอาจให้ข้อมูลคลาดเคลื่อนได้ ·{' '}
+        <Link to="/menu" className="vh-foot-link">รวมทุกเมนู</Link>{' · '}
         <Link to="/features" className="vh-foot-link">ดูว่าทำอะไรได้บ้าง</Link>
       </p>
     </section>
