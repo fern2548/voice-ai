@@ -3980,3 +3980,48 @@ th, td { font-size: 14px; }
   .bl-noprint { display: none !important; }
 }
 .bl-other { margin-top: 6px; }
+
+
+/* ---------- ทางลัดหน้าแรก ---------- */
+.hs { display: flex; flex-direction: column; gap: 22px; padding: 4px 0 40px; }
+/* แถบแจ้งเตือน */
+.hs-alerts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.hs-alert { display: flex; align-items: center; gap: 10px; padding: 13px 15px; border-radius: 12px;
+  text-decoration: none; color: var(--text);
+  background: color-mix(in srgb, var(--warn) 11%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--warn) 32%, var(--border)); }
+.hs-alert > i:first-child { font-size: 20px; color: var(--warn); flex: none; }
+.hs-alert span { font-size: 14px; font-weight: 600; }
+.hs-alert-go { margin-left: auto; font-size: 17px; color: var(--text-faint); }
+.hs-alert:hover { border-color: var(--warn); }
+/* กลุ่ม */
+.hs-group { display: flex; flex-direction: column; gap: 11px; }
+.hs-group-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text-faint);
+  letter-spacing: .02em; }
+.hs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.hs-tile { display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 9px; padding: 17px 10px 15px; min-height: 104px; border-radius: 14px; text-decoration: none;
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  transition: border-color .2s, transform .15s, background .2s; }
+.hs-tile:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel)); transform: translateY(-2px); }
+.hs-tile:active { transform: translateY(0); }
+.hs-ico { position: relative; width: 44px; height: 44px; border-radius: 13px; flex: none;
+  display: grid; place-items: center; font-size: 23px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.hs-tile:hover .hs-ico { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.hs-badge { position: absolute; top: -5px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 20px; background: var(--danger); color: #fff; font-size: 11.5px; font-weight: 700;
+  display: grid; place-items: center; border: 2px solid var(--bg); }
+.hs-label { font-size: 13px; font-weight: 600; line-height: 1.35; text-align: center; }
+.hs-login { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 12px 14px;
+  border-radius: 10px; background: var(--panel-2); font-size: 12.5px; line-height: 1.6;
+  color: var(--text-faint); }
+.hs-login i { color: var(--accent); flex: none; }
+@media (max-width: 700px) {
+  .hs { gap: 18px; }
+  .hs-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .hs-tile { min-height: 94px; padding: 14px 7px 12px; }
+  .hs-ico { width: 40px; height: 40px; font-size: 21px; }
+  .hs-label { font-size: 12px; }
+}
