@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getVaccineHistory, getVaccineSchedule } from '../api.js'
 import { useVoiceAI } from '../context/VoiceAI.jsx'
 import { useAdminAuth } from '../context/AdminAuth.jsx'
 import { ROUTE_LABEL, VACCINES, findVaccine } from '../data/vaccineCatalog.js'
 
-// หน้า "ข้อมูลวัคซีนสุกร" — สรุปวัคซีน 1 ตัวแบบดูปุ๊บรู้: ฉีดยังไง กี่มล. ซ้ำเมื่อไหร่ กำหนดการ สิ่งที่ควรรู้
+// หน้า "ข้อมูลวัคซีนสุกร" — มองครั้งเดียวต้องรู้ว่า ฉีดยังไง เมื่อไหร่ ต้องระวังอะไร
+// โครง: ชื่อวัคซีน → แถบสรุป 3 ช่อง → 2 คอลัมน์ (ซ้าย=รูป+กำหนดการ ขวา=สิ่งที่ควรรู้) → 3 ปุ่ม
 // ผสมข้อมูล 2 แหล่ง: แคตตาล็อก (data/vaccineCatalog.js) + ของจริงจากฐานข้อมูล (ฉีดล่าสุด / รอบที่ตั้งไว้)
 
 const fmtDate = (iso) => {
@@ -14,11 +15,12 @@ const fmtDate = (iso) => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })
 }
 
-function Stat({ icon, big, small }) {
+function Stat({ icon, label, big, small }) {
   return (
     <div className="vi-stat">
       <span className="vi-stat-icon"><i className={`ti ${icon}`} aria-hidden="true" /></span>
-      <div>
+      <div className="vi-stat-text">
+        <div className="vi-stat-label">{label}</div>
         <div className="vi-stat-big">{big}</div>
         {small && <div className="vi-stat-small">{small}</div>}
       </div>
@@ -65,23 +67,10 @@ export default function VaccineInfoPage() {
 
   return (
     <div className="vi">
-      {/* หัวเรื่อง + หมู */}
+      {/* ชื่อวัคซีน + หมูเล็ก ๆ */}
       <header className="vi-head">
-        <div className="vi-head-text">
-          <div className="vi-crumb"><Link to="/overview">หน้าแรก</Link> › ข้อมูลวัคซีนสุกร</div>
-          <div className="vi-head-row">
-            <span className="vi-head-icon"><i className="ti ti-vaccine" aria-hidden="true" /></span>
-            <div>
-              <h1 className="vi-title">ข้อมูลวัคซีนสุกร</h1>
-              <div className="vi-name">{v.fullName}</div>
-              <div className="vi-sub">ข้อมูลสำคัญแบบย่อ เพื่อใช้งานได้ง่าย</div>
-            </div>
-          </div>
-        </div>
-        <div className="vi-pig">
-          <div className="vi-bubble">ดูแลสุกร<br />ให้แข็งแรง<br />ไปด้วยกันนะครับ</div>
-          <img src="/guide/piglet.webp" alt="" className="vi-pig-img" />
-        </div>
+        <h1 className="vi-name">{v.fullName}</h1>
+        <img src="/guide/piglet.webp" alt="" className="vi-pig-img" />
       </header>
 
       {/* เลือกวัคซีน */}
@@ -91,32 +80,31 @@ export default function VaccineInfoPage() {
         ))}
       </div>
 
-      {/* 3 ตัวเลขใหญ่ */}
+      {/* แถบสรุป 3 ช่อง */}
       <div className="vi-stats">
-        <Stat icon="ti-vaccine" big={routeLabel} small={`(${v.route})`} />
-        <Stat icon="ti-droplet" big={v.dose || 'ยึดตามฉลาก'} small={v.dose ? null : 'ปริมาณต่อตัว'} />
-        <Stat icon="ti-calendar-repeat" big={repeatText ? `ฉีดซ้ำ${repeatText}` : 'ยึดตามฉลาก'} small={!v.repeat && live.rule ? 'จากกำหนดในระบบ' : null} />
+        <Stat icon="ti-vaccine" label="วิธีฉีด" big={routeLabel} small={`(${v.route})`} />
+        <Stat icon="ti-droplet" label="ขนาดยา" big={v.dose || 'ยึดตามฉลาก'} small={v.dose ? 'ต่อตัว' : null} />
+        <Stat icon="ti-calendar-repeat" label="ฉีดซ้ำ" big={repeatText || 'ยึดตามฉลาก'}
+          small={!v.repeat && live.rule ? 'จากกำหนดในระบบ' : null} />
       </div>
 
-      {/* 3 การ์ด */}
-      <div className="vi-cards">
-        <div className="vi-card">
-          <div className="vi-card-head"><i className="ti ti-flask" aria-hidden="true" /> รูปวัคซีน</div>
+      {/* 2 คอลัมน์ */}
+      <div className="vi-main">
+        {/* ซ้าย — รูปวัคซีน + กำหนดการฉีด */}
+        <div className="vi-col">
           <div className="vi-bottle">
             {imgOk ? (
               <img src={v.image} alt={`ขวดวัคซีน${v.name}`} onError={() => setImgOk(false)} />
             ) : (
-              <div className="vi-bottle-fallback"><i className="ti ti-flask-2" aria-hidden="true" /><span>ยังไม่มีรูป — วางไฟล์ที่ public{v.image}</span></div>
+              <div className="vi-bottle-fallback"><i className="ti ti-flask-2" aria-hidden="true" /><span>ยังไม่มีรูปวัคซีนตัวนี้</span></div>
             )}
+            <div className="vi-bottle-meta">
+              {v.kind && <span className="vi-kind">{v.kind}</span>}
+              {v.packs.map((p) => <span key={p} className="vi-pack">ขนาด {p}</span>)}
+            </div>
           </div>
-          {v.kind && <div className="vi-kind">{v.kind}</div>}
-          {v.packs.length > 0 && (
-            <div className="vi-packs">{v.packs.map((p) => <span key={p} className="vi-pack">ขนาด {p}</span>)}</div>
-          )}
-        </div>
 
-        <div className="vi-card">
-          <div className="vi-card-head"><i className="ti ti-calendar-event" aria-hidden="true" /> กำหนดการฉีด</div>
+          <h2 className="vi-h"><i className="ti ti-calendar-event" aria-hidden="true" /> กำหนดการฉีด</h2>
           {v.schedule.length > 0 ? (
             <div className="vi-rows">
               {v.scheduleTitle && <div className="vi-case">{v.scheduleTitle}</div>}
@@ -133,39 +121,48 @@ export default function VaccineInfoPage() {
           ) : (
             <div className="vi-empty">ยังไม่มีกำหนดการในแคตตาล็อก — ยึดตามฉลาก</div>
           )}
+
           {/* ของจริงจากฟาร์ม — คนในเท่านั้น */}
-          {isAdmin && <div className="vi-live">
-            <div className="vi-live-row">
-              <span className="vi-live-k">ฉีดล่าสุดในฟาร์ม</span>
-              <span className="vi-live-v">{live.last ? `${fmtDate(live.last.log_date)}${live.last.barn_no ? ` · ${live.last.barn_no}` : ''}` : 'ยังไม่มีบันทึก'}</span>
+          {isAdmin && (
+            <div className="vi-live">
+              <div className="vi-live-row">
+                <span className="vi-live-k">ฉีดล่าสุดในฟาร์ม</span>
+                <span className="vi-live-v">{live.last ? `${fmtDate(live.last.log_date)}${live.last.barn_no ? ` · ${live.last.barn_no}` : ''}` : 'ยังไม่มีบันทึก'}</span>
+              </div>
+              <div className="vi-live-row">
+                <span className="vi-live-k">นัดครั้งถัดไป</span>
+                <span className={`vi-live-v ${live.last?.next_due_date ? 'due' : ''}`}>{live.last?.next_due_date ? fmtDate(live.last.next_due_date) : '—'}</span>
+              </div>
             </div>
-            <div className="vi-live-row">
-              <span className="vi-live-k">นัดครั้งถัดไป</span>
-              <span className={`vi-live-v ${live.last?.next_due_date ? 'due' : ''}`}>{live.last?.next_due_date ? fmtDate(live.last.next_due_date) : '—'}</span>
-            </div>
-          </div>}
+          )}
         </div>
 
-        <div className="vi-card">
-          <div className="vi-card-head"><i className="ti ti-bulb" aria-hidden="true" /> สิ่งที่ควรรู้</div>
+        {/* ขวา — สิ่งที่ควรรู้ */}
+        <div className="vi-col">
+          <h2 className="vi-h"><i className="ti ti-bulb" aria-hidden="true" /> สิ่งที่ควรรู้</h2>
           <ul className="vi-notes">
             {v.notes.map((n, i) => (
-              <li key={n}><span className="vi-note-icon"><i className={`ti ${['ti-temperature', 'ti-file-description', 'ti-circle-check'][i] || 'ti-point'}`} aria-hidden="true" /></span>{n}</li>
+              <li key={n}>
+                <span className="vi-note-icon">
+                  <i className={`ti ${['ti-temperature', 'ti-file-description', 'ti-circle-check'][i] || 'ti-point'}`} aria-hidden="true" />
+                </span>
+                {n}
+              </li>
             ))}
           </ul>
         </div>
       </div>
 
-      {/* 3 ปุ่ม */}
+      {/* 3 ปุ่มใหญ่ */}
       <div className="vi-actions">
         <button type="button" className="vi-btn primary" onClick={askAI}>
-          <i className="ti ti-message-chatbot" aria-hidden="true" /> ถาม AI <i className="ti ti-chevron-right vi-btn-arrow" aria-hidden="true" />
+          <i className="ti ti-message-chatbot" aria-hidden="true" /> ถาม AI
         </button>
         <button type="button" className="vi-btn" onClick={() => navigate('/vaccine-guide')}>
-          <i className="ti ti-player-play" aria-hidden="true" /> ดูวิธีฉีด <i className="ti ti-chevron-right vi-btn-arrow" aria-hidden="true" />
+          <i className="ti ti-player-play" aria-hidden="true" /> ดูวิธีฉีด
         </button>
         <button type="button" className="vi-btn primary" onClick={() => navigate(`/vaccine?vaccine=${encodeURIComponent(v.name)}`)}>
-          <i className="ti ti-clipboard-text" aria-hidden="true" /> {isAdmin ? 'บันทึกการฉีด' : 'บันทึกการฉีด (คนใน)'} <i className="ti ti-chevron-right vi-btn-arrow" aria-hidden="true" />
+          <i className="ti ti-clipboard-text" aria-hidden="true" /> {isAdmin ? 'บันทึกการฉีด' : 'บันทึกการฉีด (คนใน)'}
         </button>
       </div>
     </div>
