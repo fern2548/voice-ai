@@ -115,18 +115,32 @@ function DiseaseDetail({ d }) {
 
       <div className="fm-grid">
         {d.signs.map((s, i) => (
-          <section className="fm-card" key={s.id}>
+          <section className={`fm-card ${d.imageHasText ? 'tall' : ''}`} key={s.id}>
             <div className="fm-card-img">
-              <SignImage id={s.id} alt={`ภาพอาการ${s.title}`} />
-              <span className="fm-badge">{['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ'][i] || i + 1}</span>
+              <SignImage id={s.id} alt={`ภาพอาการ${s.title} — ${s.where} · ${s.list.join(' · ')}`} />
+              {!d.imageHasText && <span className="fm-badge">{['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ'][i] || i + 1}</span>}
             </div>
             <div className="fm-card-body">
-              <h2 className="fm-card-title">{s.title}</h2>
-              <div className="fm-stage"><i className="ti ti-clock" aria-hidden="true" /> {s.stage}</div>
-              <div className="fm-where"><i className="ti ti-map-pin" aria-hidden="true" /> ดูที่: {s.where}</div>
-              <ul className="fm-signs">
-                {s.list.map((x) => <li key={x}><i className="ti ti-point-filled" aria-hidden="true" />{x}</li>)}
-              </ul>
+              {d.imageHasText ? (
+                // ข้อความอยู่ในรูปแล้ว เก็บฉบับตัวอักษรไว้ให้กดอ่าน/ค้นหา/โปรแกรมอ่านหน้าจอ
+                <details className="fm-text">
+                  <summary>อ่านเป็นข้อความ</summary>
+                  <div className="fm-stage"><i className="ti ti-clock" aria-hidden="true" /> {s.stage}</div>
+                  <div className="fm-where"><i className="ti ti-map-pin" aria-hidden="true" /> ดูที่: {s.where}</div>
+                  <ul className="fm-signs">
+                    {s.list.map((x) => <li key={x}><i className="ti ti-point-filled" aria-hidden="true" />{x}</li>)}
+                  </ul>
+                </details>
+              ) : (
+                <>
+                  <h2 className="fm-card-title">{s.title}</h2>
+                  <div className="fm-stage"><i className="ti ti-clock" aria-hidden="true" /> {s.stage}</div>
+                  <div className="fm-where"><i className="ti ti-map-pin" aria-hidden="true" /> ดูที่: {s.where}</div>
+                  <ul className="fm-signs">
+                    {s.list.map((x) => <li key={x}><i className="ti ti-point-filled" aria-hidden="true" />{x}</li>)}
+                  </ul>
+                </>
+              )}
               <button type="button" className="btn-clear fm-ask" onClick={() => askVet(s)}>
                 <i className="ti ti-stethoscope" aria-hidden="true" /> เจออาการแบบนี้ ปรึกษาสัตวแพทย์
               </button>

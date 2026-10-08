@@ -3248,6 +3248,13 @@ th, td { font-size: 14px; }
 .fm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; align-items: stretch; }
 .fm-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
 .fm-card-img { position: relative; background: #f7f3ef; display: grid; place-items: center; padding: 8px; aspect-ratio: 4 / 3; }
+/* รูปที่เป็นการ์ดเต็ม (มีข้อความในรูป) เป็นแนวตั้ง ต้องให้พื้นที่สูงกว่าปกติ */
+.fm-card.tall .fm-card-img { aspect-ratio: 4 / 5; background: transparent; padding: 0; }
+.fm-card.tall .fm-img { border-radius: 0; }
+.fm-card.tall .fm-card-body { padding-top: 12px; }
+.fm-text > summary { cursor: pointer; font-size: 12.5px; color: var(--text-faint); padding: 2px 0; }
+.fm-text[open] > summary { margin-bottom: 8px; color: var(--text-dim); }
+.fm-text > div, .fm-text > ul { margin-top: 6px; }
 .fm-img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 8px; }
 .fm-badge { position: absolute; top: 12px; left: 12px; width: 28px; height: 28px; border-radius: 8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
 .fm-card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
@@ -3301,7 +3308,7 @@ th, td { font-size: 14px; }
 /* แถบรูปอาการ */
 .dz-thumbs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
 .dz-thumb-box { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.dz-thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 9px;
+.dz-thumb { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; border-radius: 9px;
   background: #f7f3ef; border: 1px solid var(--border); display: block; }
 .dz-thumb-box figcaption { font-size: 11.5px; line-height: 1.4; color: var(--text-faint); text-align: center;
   overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
