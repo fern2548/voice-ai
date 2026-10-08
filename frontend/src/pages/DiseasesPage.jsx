@@ -39,7 +39,7 @@ function DiseaseList({ notFound }) {
   return (
     <div className="fm">
       <header className="fm-head">
-        <span className="fm-head-icon"><i className="ti ti-mood-sick" aria-hidden="true" /></span>
+        <span className="fm-head-icon img"><img src="/diseases/icon-symptoms.webp" alt="" /></span>
         <div>
           <h1 className="fm-title">อาการของโรค</h1>
           <p className="fm-sub">ดูภาพอาการของโรคสำคัญในสุกร เทียบกับที่เห็นจริงในคอก</p>
@@ -58,7 +58,11 @@ function DiseaseList({ notFound }) {
         {ready.map((d) => (
           <Link to={`/diseases/${d.id}`} className={`dz-card ${d.tone}`} key={d.id}>
             <div className="dz-top">
-              <span className="dz-icon"><i className={`ti ${d.icon}`} aria-hidden="true" /></span>
+              <span className={`dz-icon ${d.iconImg ? 'img' : ''}`}>
+                {d.iconImg
+                  ? <img src={d.iconImg} alt="" loading="lazy" />
+                  : <i className={`ti ${d.icon}`} aria-hidden="true" />}
+              </span>
               <div className="dz-title">
                 <h2>{d.name}</h2>
                 <small>{d.en}</small>
@@ -105,7 +109,11 @@ function DiseaseDetail({ d }) {
     <div className="fm">
       <header className="fm-head">
         <Link to="/diseases" className="fm-back" aria-label="กลับไปรายชื่อโรค"><i className="ti ti-arrow-left" aria-hidden="true" /></Link>
-        <span className="fm-head-icon"><i className={`ti ${d.icon}`} aria-hidden="true" /></span>
+        <span className={`fm-head-icon ${d.iconImg ? 'img' : ''}`}>
+          {d.iconImg
+            ? <img src={d.iconImg} alt="" />
+            : <i className={`ti ${d.icon}`} aria-hidden="true" />}
+        </span>
         <div>
           <h1 className="fm-title">อาการโรค{d.name}</h1>
           <p className="fm-sub">{d.en} · ใช้เทียบกับที่เห็นจริงในคอก</p>

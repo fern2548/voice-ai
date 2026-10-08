@@ -4082,3 +4082,10 @@ th, td { font-size: 14px; }
 .dz-card.red .dz-key i { color: var(--danger); }
 .dz-card.pink .dz-key i { color: var(--neon-pink); }
 .dz-card.amber .dz-key i { color: var(--warn); }
+
+
+/* ไอคอนโรคแบบรูปวาด — สื่อความหมายชัดกว่าไอคอนฟอนต์ ไม่ต้องมีพื้นหลังสีทับ */
+.fm-head-icon.img, .dz-icon.img { background: transparent; padding: 0; }
+.fm-head-icon.img img, .dz-icon.img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.fm-head-icon.img { width: 60px; height: 60px; }
+.dz-icon.img { width: 52px; height: 52px; }

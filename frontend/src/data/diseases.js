@@ -14,6 +14,7 @@ export const DISEASES = [
     name: 'ปากและเท้าเปื่อย',
     en: 'Foot and Mouth Disease (FMD)',
     icon: 'ti-paw',
+    iconImg: '/diseases/icon-fmd.webp',
     keySigns: [
       { icon: 'ti-mood-tongue', label: 'แผลที่ปาก' },
       { icon: 'ti-paw', label: 'แผลที่กีบ' },
@@ -94,6 +95,7 @@ export const DISEASES = [
     name: 'อหิวาต์สุกร',
     en: 'Classical Swine Fever (CSF)',
     icon: 'ti-temperature-plus',
+    iconImg: '/diseases/icon-csf.webp',
     keySigns: [
       { icon: 'ti-temperature-plus', label: 'ไข้สูง' },
       { icon: 'ti-droplets', label: 'จุดเลือดออก' },
@@ -173,6 +175,7 @@ export const DISEASES = [
     name: 'ไข้หวัดใหญ่ในสุกร',
     en: 'Swine Influenza (SI)',
     icon: 'ti-lungs',
+    iconImg: '/diseases/icon-si.webp',
     keySigns: [
       { icon: 'ti-lungs', label: 'ไอ หายใจหอบ' },
       { icon: 'ti-droplet', label: 'น้ำมูกใส' },
