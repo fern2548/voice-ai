@@ -66,6 +66,17 @@ function DiseaseList({ notFound }) {
             </div>
             <p className="dz-sum">{d.summary}</p>
 
+            {/* ป้ายสัญญาณเด่น — ไอคอนอย่างเดียวตีความได้หลายอย่าง ใส่คำกำกับไว้ด้วย */}
+            {d.keySigns?.length > 0 && (
+              <div className="dz-keys">
+                {d.keySigns.map((k) => (
+                  <span className="dz-key" key={k.label}>
+                    <i className={`ti ${k.icon}`} aria-hidden="true" /> {k.label}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* รูปอาการขึ้นมาให้เห็นเลย ไม่ต้องกดเข้าไปก่อนถึงจะรู้ว่าหน้าตาเป็นยังไง */}
             <div className="dz-thumbs">
               {d.signs.map((sg) => (

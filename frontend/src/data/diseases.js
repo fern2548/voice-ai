@@ -13,7 +13,12 @@ export const DISEASES = [
     id: 'fmd',
     name: 'ปากและเท้าเปื่อย',
     en: 'Foot and Mouth Disease (FMD)',
-    icon: 'ti-virus',
+    icon: 'ti-paw',
+    keySigns: [
+      { icon: 'ti-mood-tongue', label: 'แผลที่ปาก' },
+      { icon: 'ti-paw', label: 'แผลที่กีบ' },
+      { icon: 'ti-droplet', label: 'น้ำลายไหล' },
+    ],
     tone: 'red',
     ready: true,
     // รูปชุดนี้เป็นการ์ดเต็ม มีหัวข้อ ตำแหน่งที่ต้องดู และรายการอาการอยู่ในรูปแล้ว
@@ -88,7 +93,12 @@ export const DISEASES = [
     id: 'csf',
     name: 'อหิวาต์สุกร',
     en: 'Classical Swine Fever (CSF)',
-    icon: 'ti-virus-search',
+    icon: 'ti-temperature-plus',
+    keySigns: [
+      { icon: 'ti-temperature-plus', label: 'ไข้สูง' },
+      { icon: 'ti-droplets', label: 'จุดเลือดออก' },
+      { icon: 'ti-walk', label: 'เดินโซเซ' },
+    ],
     tone: 'red',
     ready: true,
     // รูปชุดนี้เป็นการ์ดเต็ม มีข้อความอยู่ในรูปแล้ว เหมือนของปากและเท้าเปื่อย
@@ -163,6 +173,11 @@ export const DISEASES = [
     name: 'ไข้หวัดใหญ่ในสุกร',
     en: 'Swine Influenza (SI)',
     icon: 'ti-lungs',
+    keySigns: [
+      { icon: 'ti-lungs', label: 'ไอ หายใจหอบ' },
+      { icon: 'ti-droplet', label: 'น้ำมูกใส' },
+      { icon: 'ti-bolt', label: 'ลามทั้งคอก' },
+    ],
     tone: 'amber',
     ready: true,
     // รูปชุดนี้เป็นการ์ดเต็ม มีข้อความอยู่ในรูปแล้ว

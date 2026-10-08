@@ -4071,3 +4071,14 @@ th, td { font-size: 14px; }
 .mn-title { margin: 0; font-size: 25px; font-weight: 800; }
 .mn-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); }
 @media (max-width: 700px) { .mn-title { font-size: 21px; } }
+
+
+/* ป้ายสัญญาณเด่นบนการ์ดโรค */
+.dz-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+.dz-key { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600;
+  padding: 5px 11px; border-radius: 20px; background: var(--panel-2); color: var(--text-dim);
+  border: 1px solid var(--border); }
+.dz-key i { font-size: 15px; }
+.dz-card.red .dz-key i { color: var(--danger); }
+.dz-card.pink .dz-key i { color: var(--neon-pink); }
+.dz-card.amber .dz-key i { color: var(--warn); }
