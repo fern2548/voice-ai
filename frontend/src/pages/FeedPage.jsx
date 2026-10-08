@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import SectionNav from '../components/SectionNav.jsx'
 import { getPigBatches } from '../api.js'
 import {
   FEED_TABLE, INGREDIENTS, MEAL_PLANS, NUTRIENT_NEEDS, PIG_TYPES, PREMIX, feedForAge, feedForWeight, needsFor,
@@ -28,6 +29,14 @@ const STEPS = [
   { icon: 'ti-pig', title: 'ใส่อายุกับจำนวนหมู', desc: 'หรือเลือกจากชุดหมูที่บันทึกไว้แล้ว' },
   { icon: 'ti-checkbox', title: 'ติ๊กว่ามีวัตถุดิบอะไรบ้าง', desc: 'มีแค่ไหนติ๊กแค่นั้น ราคาใส่ทีหลังก็ได้' },
   { icon: 'ti-scale', title: 'ระบบบอกว่าใช้อย่างละกี่กิโล', desc: 'ต่อตัวต่อวัน และรวมทั้งชุด' },
+]
+
+// หัวข้อในหน้านี้ — ใช้กับแถบด้านบน กดแล้วเลื่อนไปทันที
+const SECTIONS = [
+  { id: 'fd-pigs', label: 'ใส่ข้อมูลหมู', icon: 'ti-pig' },
+  { id: 'fd-today', label: 'อาหารวันนี้', icon: 'ti-bowl-spoon' },
+  { id: 'fd-have', label: 'วัตถุดิบที่มี', icon: 'ti-checkbox' },
+  { id: 'fd-mix', label: 'สูตรผสม', icon: 'ti-scale' },
 ]
 
 export default function FeedPage() {
@@ -114,6 +123,8 @@ export default function FeedPage() {
         </button>
       </header>
 
+      <SectionNav sections={SECTIONS} />
+
       <ol className="fd-steps">
         {STEPS.map((s, i) => (
           <li key={s.title}>
@@ -125,7 +136,7 @@ export default function FeedPage() {
       </ol>
 
       {/* ① อายุ + จำนวน */}
-      <div className="panel fd-input">
+      <div className="panel fd-input pnav-target" id="fd-pigs">
         <div className="fd-sec-head"><span className="fd-num">1</span> หมูชุดไหน</div>
 
         <div className="fd-field">
@@ -188,7 +199,7 @@ export default function FeedPage() {
       </div>
 
       {/* อาหารที่ควรให้วันนี้ */}
-      <div className="panel fd-today">
+      <div className="panel fd-today pnav-target" id="fd-today">
         <div className="fd-today-main">
           <span className="fd-today-icon"><i className="ti ti-bowl-spoon" aria-hidden="true" /></span>
           <div>
@@ -250,7 +261,7 @@ export default function FeedPage() {
       )}
 
       {/* ② วัตถุดิบที่มี + ราคา */}
-      <div className="panel fd-sec">
+      <div className="panel fd-sec pnav-target" id="fd-have">
         <div className="fd-sec-head">
           <span className="fd-num">2</span> ติ๊กว่าฟาร์มมีวัตถุดิบอะไรบ้าง
           <small>ราคาใส่หรือไม่ใส่ก็ได้ — ใส่แล้วถึงจะบอกต้นทุนและเลือกสูตรที่ถูกที่สุดให้</small>
@@ -310,7 +321,7 @@ export default function FeedPage() {
       </div>
 
       {/* ③ สูตร */}
-      <div className="panel fd-sec">
+      <div className="panel fd-sec pnav-target" id="fd-mix">
         <div className="fd-sec-head">
           <span className="fd-num">3</span> ใช้อย่างละกี่กิโล ({need.label})
           {result?.price != null && <span className="fd-price-tag">{money(result.price)} บาท/กก.</span>}
