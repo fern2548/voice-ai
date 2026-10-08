@@ -15,7 +15,7 @@ const GROUPS = [
       { to: '/pig-log', label: 'โรงเรือน', icon: 'ti-building-warehouse', internal: true },
       { to: '/vaccine', label: 'วัคซีน', icon: 'ti-vaccine', internal: true, badge: 'due' },
       { to: '/vaccine-plan', label: 'แผนวัคซีนตามอายุ', icon: 'ti-calendar-stats', internal: true },
-      { to: '/diseases', label: 'อาการของโรค', icon: 'ti-stethoscope' },
+      { to: '/diseases', label: 'อาการของโรค', icon: 'ti-mood-sick' },
       { to: '/vet', label: 'ปรึกษาสัตวแพทย์', icon: 'ti-message-circle', internal: true },
     ],
   },

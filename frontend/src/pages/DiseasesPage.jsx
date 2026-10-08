@@ -39,7 +39,7 @@ function DiseaseList({ notFound }) {
   return (
     <div className="fm">
       <header className="fm-head">
-        <span className="fm-head-icon"><i className="ti ti-virus" aria-hidden="true" /></span>
+        <span className="fm-head-icon"><i className="ti ti-mood-sick" aria-hidden="true" /></span>
         <div>
           <h1 className="fm-title">อาการของโรค</h1>
           <p className="fm-sub">ดูภาพอาการของโรคสำคัญในสุกร เทียบกับที่เห็นจริงในคอก</p>
