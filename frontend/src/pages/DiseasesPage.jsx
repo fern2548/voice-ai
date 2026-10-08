@@ -6,6 +6,15 @@ import { DISEASES, findDisease } from '../data/diseases.js'
 // เพิ่มโรคใหม่แก้ที่ data/diseases.js ไฟล์เดียว ไม่ต้องแตะหน้านี้
 // หน้านี้ช่วย "สังเกต" ไม่ใช่ "วินิจฉัย" — ยืนยันโรคต้องสัตวแพทย์เท่านั้น
 
+/** รูปย่อของอาการ โชว์บนการ์ดรายชื่อโรค ให้กวาดตาเทียบกับที่เห็นในคอกได้เลย */
+function SignThumb({ id, alt }) {
+  const [src, setSrc] = useState(`/diseases/${id}.webp`)
+  return (
+    <img className="dz-thumb" src={src} alt={alt} loading="lazy"
+      onError={() => setSrc((p) => (p.endsWith('.webp') ? `/diseases/${id}.svg` : p))} />
+  )
+}
+
 function SignImage({ id, alt }) {
   // ลองรูปถ่ายจริงของฟาร์มก่อน ไม่มีค่อยใช้ภาพวาด
   const [src, setSrc] = useState(`/diseases/${id}.webp`)
@@ -24,8 +33,8 @@ export default function DiseasesPage() {
 
 // ---------- รายชื่อโรค ----------
 function DiseaseList({ notFound }) {
+  // โชว์เฉพาะโรคที่มีภาพอาการแล้ว โรคที่ยังไม่มีไม่ต้องขึ้นให้รก
   const ready = DISEASES.filter((d) => d.ready)
-  const soon = DISEASES.filter((d) => !d.ready)
 
   return (
     <div className="fm">
@@ -41,39 +50,36 @@ function DiseaseList({ notFound }) {
         <div className="fm-warn">
           <i className="ti ti-info-circle" aria-hidden="true" />
           <div><b>ยังไม่มีภาพอาการของ {notFound}</b>
-            <span>เลือกโรคที่มีข้อมูลด้านล่าง หรือบอกได้ว่าอยากให้ทำโรคไหนก่อน</span></div>
+            <span>เลือกจากโรคด้านล่างที่มีภาพอาการแล้ว</span></div>
         </div>
       )}
 
       <div className="dz-grid">
         {ready.map((d) => (
           <Link to={`/diseases/${d.id}`} className={`dz-card ${d.tone}`} key={d.id}>
-            <span className="dz-icon"><i className={`ti ${d.icon}`} aria-hidden="true" /></span>
-            <div className="dz-body">
-              <h2>{d.name}</h2>
-              <small>{d.en}</small>
-              <p>{d.summary}</p>
-              <span className="dz-tag"><i className="ti ti-photo" aria-hidden="true" /> {d.signs.length} ตำแหน่งอาการ</span>
+            <div className="dz-top">
+              <span className="dz-icon"><i className={`ti ${d.icon}`} aria-hidden="true" /></span>
+              <div className="dz-title">
+                <h2>{d.name}</h2>
+                <small>{d.en}</small>
+              </div>
             </div>
-            <i className="ti ti-chevron-right dz-go" aria-hidden="true" />
+            <p className="dz-sum">{d.summary}</p>
+
+            {/* รูปอาการขึ้นมาให้เห็นเลย ไม่ต้องกดเข้าไปก่อนถึงจะรู้ว่าหน้าตาเป็นยังไง */}
+            <div className="dz-thumbs">
+              {d.signs.map((sg) => (
+                <figure className="dz-thumb-box" key={sg.id}>
+                  <SignThumb id={sg.id} alt={`อาการที่${sg.title}`} />
+                  <figcaption>{sg.title}</figcaption>
+                </figure>
+              ))}
+            </div>
+
+            <span className="dz-go">ดูอาการทั้งหมด {d.signs.length} ตำแหน่ง <i className="ti ti-arrow-right" aria-hidden="true" /></span>
           </Link>
         ))}
       </div>
-
-      {soon.length > 0 && (
-        <section className="panel fm-sec">
-          <div className="fm-sec-head"><i className="ti ti-clock" aria-hidden="true" /> โรคที่ยังไม่มีภาพอาการ</div>
-          <div className="dz-soon">
-            {soon.map((d) => (
-              <div className="dz-soon-item" key={d.id}>
-                <i className={`ti ${d.icon}`} aria-hidden="true" />
-                <div><b>{d.name}</b><small>{d.summary}</small></div>
-              </div>
-            ))}
-          </div>
-          <p className="fm-note">อยากให้ทำโรคไหนก่อน บอกได้ — ใช้โครงเดียวกับโรคปากและเท้าเปื่อย เพิ่มได้เรื่อย ๆ</p>
-        </section>
-      )}
     </div>
   )
 }

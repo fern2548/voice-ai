@@ -3276,22 +3276,43 @@ th, td { font-size: 14px; }
 @media (max-width: 700px) { .fm-title { font-size: 21px; } .fm-go { margin-left: 0; } }
 
 /* รายชื่อโรคในหน้า "อาการของโรค" */
-.dz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
-.dz-card { --c: var(--danger); display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); border-left: 4px solid var(--c); background: var(--panel); color: var(--text); text-decoration: none; }
-.dz-card.amber { --c: var(--warn); }
-.dz-card:hover { border-color: var(--c); }
-.dz-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); font-size: 23px; flex: none; }
-.dz-body { flex: 1; min-width: 0; }
-.dz-body h2 { margin: 0; font-size: 18px; font-weight: 700; }
-.dz-body small { color: var(--text-dim); font-size: 12px; }
-.dz-body p { margin: 6px 0 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); }
-.dz-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--accent); border: 1px solid var(--accent); border-radius: 20px; padding: 2px 10px; }
-.dz-go { color: var(--text-faint); font-size: 20px; align-self: center; }
-.dz-soon { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
-.dz-soon-item { display: flex; gap: 10px; align-items: flex-start; background: var(--panel-2); border-radius: 12px; padding: 11px 13px; opacity: .78; }
-.dz-soon-item i { color: var(--text-dim); font-size: 20px; flex: none; }
-.dz-soon-item b { display: block; font-size: 14px; }
-.dz-soon-item small { color: var(--text-dim); font-size: 12.5px; line-height: 1.5; }
+.dz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; align-items: start; }
+.dz-card { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px 16px; border-radius: 16px;
+  text-decoration: none; color: var(--text); background: var(--panel);
+  border: 1px solid var(--border); border-left: 5px solid var(--border);
+  transition: border-color .2s, transform .15s; }
+.dz-card:hover { transform: translateY(-2px); }
+.dz-card.red { border-left-color: var(--danger); }
+.dz-card.red:hover { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); border-left-color: var(--danger); }
+.dz-card.pink { border-left-color: var(--neon-pink); }
+.dz-card.pink:hover { border-color: color-mix(in srgb, var(--neon-pink) 45%, var(--border)); border-left-color: var(--neon-pink); }
+.dz-card.amber { border-left-color: var(--warn); }
+.dz-card.amber:hover { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); border-left-color: var(--warn); }
+.dz-top { display: flex; align-items: center; gap: 12px; }
+.dz-icon { width: 46px; height: 46px; border-radius: 13px; flex: none; display: grid; place-items: center;
+  font-size: 23px; background: var(--panel-2); color: var(--text-dim); }
+.dz-card.red .dz-icon { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.dz-card.pink .dz-icon { background: color-mix(in srgb, var(--neon-pink) 14%, transparent); color: var(--neon-pink); }
+.dz-card.amber .dz-icon { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.dz-title { min-width: 0; }
+.dz-title h2 { margin: 0; font-size: 18.5px; font-weight: 700; line-height: 1.3; }
+.dz-title small { display: block; font-size: 11.5px; color: var(--text-faint); margin-top: 1px; }
+.dz-sum { margin: 0; font-size: 13px; line-height: 1.7; color: var(--text-dim); }
+/* แถบรูปอาการ */
+.dz-thumbs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+.dz-thumb-box { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dz-thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 9px;
+  background: #f7f3ef; border: 1px solid var(--border); display: block; }
+.dz-thumb-box figcaption { font-size: 11.5px; line-height: 1.4; color: var(--text-faint); text-align: center;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.dz-go { display: inline-flex; align-items: center; gap: 6px; margin-top: 2px;
+  font-size: 13px; font-weight: 600; color: var(--accent); }
+.dz-go i { font-size: 16px; transition: transform .2s; }
+.dz-card:hover .dz-go i { transform: translateX(3px); }
+@media (max-width: 420px) {
+  .dz-thumbs { gap: 7px; }
+}
+
 .fm-back { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); display: grid; place-items: center; color: var(--text); font-size: 19px; text-decoration: none; flex: none; }
 .fm-back:hover { border-color: var(--accent); color: var(--accent); }
 
