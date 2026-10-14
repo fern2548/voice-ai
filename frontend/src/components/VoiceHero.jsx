@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useVoiceAI } from '../context/VoiceAI.jsx'
+import VoiceDiseaseCards from './VoiceDiseaseCards.jsx'
 
 /**
  * หน้าแรก — ยกโครงมาจากเว็บ Farmy Voice (พอร์ต 5174) ทั้งดุ้น
@@ -43,9 +44,11 @@ export default function VoiceHero() {
       ? messages.slice(lastUserIdx + 1).find((m) => m.role !== 'user') || null
       : null
   const showThread = lastUser != null
+  // มีการ์ดโรคเมื่อไหร่ หน้าต้องยืดและเลื่อนได้ ไม่ใช่จอเดียวจบเหมือนตอนปกติ
+  const hasCards = Boolean(lastBot?.cards)
 
   return (
-    <section className="vh-hero">
+    <section className={`vh-hero ${hasCards ? 'has-cards' : ''}`}>
       <div className="vh-glow" aria-hidden="true" />
 
       <div className="vh-inner">
@@ -104,6 +107,9 @@ export default function VoiceHero() {
 
           {showThread && lastUser && <p className="vh-q">“{lastUser.text}”</p>}
           {showThread && lastBot && <p className="vh-a">{lastBot.text}</p>}
+
+          {/* ถามเรื่องอาการ จะได้การ์ดโรคพร้อมภาพต่อท้ายคำตอบ อยู่ในหน้านี้เลย ไม่เด้งไปหน้าอื่น */}
+          {showThread && lastBot?.cards && <VoiceDiseaseCards result={lastBot.cards} />}
         </div>
       </div>
 

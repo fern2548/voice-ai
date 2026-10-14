@@ -4,6 +4,28 @@ import { askAI } from '../api.js'
 import { speak, isMuted, setMuted, listVoices, getSavedVoiceURI, setSavedVoiceURI } from '../utils/voice.js'
 import { createRecognizer, pickBestTranscript } from '../utils/speech.js'
 import { parseNavCommand, navReply } from '../utils/voiceNav.js'
+import { matchSymptoms } from '../data/symptomIndex.js'
+import { findDisease } from '../data/diseases.js'
+
+// คำที่บอกชัดว่าอยาก "เปิดหน้า" จริง ๆ ไม่ใช่ถามเรื่องอาการ
+// ถ้าไม่มีคำพวกนี้ คำถามที่มีอาการปนอยู่จะตอบเป็นการ์ดในหน้าเดิม ไม่เด้งไปหน้าอื่น
+const OPEN_PAGE_WORDS = ['เปิดหน้า', 'ไปหน้า', 'ไปที่หน้า', 'เข้าหน้า', 'พาไปหน้า', 'ขอดูหน้า', 'แสดงหน้า', 'ดูหน้า']
+
+/** ประโยคที่ระบบจะพูดตอบเวลาจับอาการได้ ให้สั้นพอจะฟังจบ รายละเอียดไปอ่านบนการ์ดเอา */
+function symptomReply(sym) {
+  // พูดแค่ 4 ชื่อพอ ยาวกว่านี้ฟังไม่ทัน ที่เหลือไปอ่านบนการ์ดเอา
+  const names = [...(sym.cards || []), ...(sym.others || [])]
+    .map((m) => findDisease(m.id)?.name)
+    .filter(Boolean)
+    .slice(0, 4)
+  const signs = sym.hits.slice(0, 3).join(' ')
+  const head = signs ? `จากอาการ ${signs} ` : 'จากอาการที่บอกมา '
+  if (!names.length) return `${head}ยังไม่พอจะบอกได้ว่าเป็นโรคอะไรครับ ลองเล่าอาการเพิ่มอีกนิดนะครับ`
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(' ')} และ${names[names.length - 1]}`
+  return `${head}เข้าได้กับ ${list} ครับ `
+    + 'ดูภาพอาการและสิ่งที่ต้องสังเกตเพิ่มได้ด้านล่าง '
+    + 'การยืนยันโรคต้องให้สัตวแพทย์ตรวจนะครับ'
+}
 
 // ส่งประวัติแค่ไม่กี่เทิร์นล่าสุดให้ backend (backend ก็ตัดซ้ำอีกชั้น) — ประหยัด token/TPM
 const SEND_TURNS = 6 // = 3 คู่ถาม-ตอบล่าสุด
@@ -49,9 +71,16 @@ export function VoiceAIProvider({ children }) {
     if (!q || busy) return
     setQuestion('')
 
+    // ถามเรื่องอาการโรค — ให้ AI ตอบข้อความตามปกติ แล้วแนบการ์ดรูปอาการไปท้ายคำตอบ
+    // (ไม่แทนที่คำตอบ AI เพราะคำอธิบายกับวิธีดูแลยังต้องให้ AI ตอบ การ์ดช่วยแค่ให้เห็นภาพ)
+    // เช็กก่อนคำสั่งเปิดหน้า เพราะ "ดูอาการปากเท้าเปื่อย" ควรขึ้นการ์ดในหน้านี้ ไม่ใช่เด้งไปหน้าโรค
+    const t = q.replace(/\s+/g, '')
+    const wantsPage = OPEN_PAGE_WORDS.some((w) => t.includes(w))
+    const sym = wantsPage ? null : matchSymptoms(q)
+
     // คำสั่งเปิดหน้า ทำในเบราว์เซอร์เลย ไม่ต้องส่งให้เซิร์ฟเวอร์
     // เปิดได้ทันที และไม่เปลืองโควตา AI กับคำสั่งที่ไม่ต้องคิด
-    const nav = parseNavCommand(q)
+    const nav = sym ? null : parseNavCommand(q)
     if (nav) {
       const reply = navReply(nav)
       setMessages((prev) => [...prev, { role: 'user', text: q }, { role: 'model', text: reply }])
@@ -76,15 +105,23 @@ export function VoiceAIProvider({ children }) {
     setMessages((prev) => [...prev, { role: 'user', text: q }])
     try {
       const d = await askAI(q, history)
-      setMessages((prev) => [...prev, { role: 'model', text: d.answer }])
-      speak(d.answer)
+      setMessages((prev) => [...prev, { role: 'model', text: d.answer, cards: sym || undefined }])
+      // บอกด้วยเสียงว่ามีรูปให้ดู ผู้ใช้ที่ไม่ได้มองจอจะได้รู้ว่าต้องเลื่อนลง
+      speak(sym ? `${d.answer} ดูภาพอาการของแต่ละโรคได้ด้านล่างครับ` : d.answer)
     } catch (err) {
       // แยกให้ตรงสาเหตุ ไม่งั้นผู้ใช้จะนึกว่าเซิร์ฟเวอร์ล่ม ทั้งที่แค่ต้องล็อกอินใหม่
+      // ถ้า AI ล่มแต่จับอาการได้ ยังตอบจากคลังคำอาการของฟาร์มเองได้ พร้อมการ์ดรูป
       const text =
         err?.status === 401
           ? 'เซสชันหมดอายุแล้วครับ กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
-          : 'ขออภัยครับ ตอนนี้เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้งนะครับ'
-      setMessages((prev) => [...prev, { role: 'model', text }])
+          : sym
+            ? symptomReply(sym)
+            : 'ขออภัยครับ ตอนนี้เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้งนะครับ'
+      setMessages((prev) => [
+        ...prev,
+        { role: 'model', text, cards: err?.status === 401 ? undefined : sym || undefined },
+      ])
+      if (sym && err?.status !== 401) speak(text)
     } finally {
       setBusy(false)
     }

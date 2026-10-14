@@ -4106,3 +4106,199 @@ th, td { font-size: 14px; }
 .bd-breed.use-sire .bd-breed-facts li i { background: color-mix(in srgb, #6aa9ff 15%, transparent); color: #6aa9ff; }
 .bd-breed.use-dam .bd-breed-facts li i { background: color-mix(in srgb, var(--neon-pink) 15%, transparent); color: var(--neon-pink); }
 .bd-breed.use-both .bd-breed-facts li i { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+
+/* ============================================================
+   การ์ดโรคจากอาการที่พูด (หน้า Voice AI เท่านั้น)
+   ผู้ใช้พูดว่าเห็นอาการอะไร ระบบขึ้นโรคที่เข้าเค้า + ภาพ + สิ่งที่ต้องดูเพิ่ม
+   ทุกอย่างจบในหน้าเดิม ไม่มีลิงก์พาไปหน้าอื่น
+   ============================================================ */
+
+/* ปกติหน้านี้จอเดียวจบ พอมีการ์ดต้องปล่อยให้ยืดและเลื่อนลงอ่านได้ */
+.vh-hero.has-cards {
+  overflow: visible;
+  justify-content: flex-start;
+  min-height: auto;
+  padding-bottom: 48px;
+}
+.vh-hero.has-cards .vh-bar-wrap { margin-top: 28px; }
+.vh-hero.has-cards .vh-thread { min-height: 0; }
+.vh-hero.has-cards .vh-foot { position: static; margin-top: 32px; padding-inline: 0; }
+
+.vdx {
+  margin: 28px auto 0;
+  width: 100%;
+  max-width: 820px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.vdx-warn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 32%, transparent);
+}
+.vdx-warn i { color: var(--warn); font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.vdx-warn b { color: var(--text); font-weight: 600; }
+
+.vdx-card {
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.vdx-card.red { border-inline-start: 4px solid var(--danger); }
+.vdx-card.amber { border-inline-start: 4px solid var(--warn); }
+
+.vdx-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vdx-icon {
+  width: 52px; height: 52px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+.vdx-icon img { width: 100%; height: 100%; object-fit: cover; }
+.vdx-icon i { font-size: 26px; color: var(--accent); }
+.vdx-name { flex: 1 1 160px; min-width: 0; }
+.vdx-name h3 { font-size: 19px; font-weight: 600; color: var(--text); line-height: 1.3; }
+.vdx-name small { font-size: 12.5px; color: var(--text-faint); }
+.vdx-urgent {
+  flex-shrink: 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vdx-urgent.red { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.vdx-urgent.amber { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+
+.vdx-hits { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+.vdx-hits-label { font-size: 12.5px; color: var(--text-faint); margin-inline-end: 2px; }
+.vdx-hit {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.vdx-imgs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.vdx-img-btn {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel-2);
+  cursor: zoom-in;
+  font: inherit;
+  text-align: start;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.vdx-img-btn:hover { border-color: var(--accent); transform: translateY(-2px); }
+.vdx-img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; object-position: top; }
+.vdx-img-cap {
+  display: block;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--panel-2);
+}
+.vdx-img-zoom {
+  position: absolute;
+  top: 7px; inset-inline-end: 7px;
+  width: 26px; height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.42);
+  font-size: 15px;
+}
+.vdx-imghint { margin-top: 7px; font-size: 12.5px; color: var(--text-faint); }
+
+.vdx-observe {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+}
+.vdx-observe h4 {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 14.5px; font-weight: 600; color: var(--text);
+}
+.vdx-observe h4 i { color: var(--accent); font-size: 17px; }
+.vdx-observe ul { margin: 9px 0 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 6px; }
+.vdx-observe li { font-size: 15px; line-height: 1.65; color: var(--text-dim); }
+
+.vdx-others {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px dashed var(--border);
+}
+.vdx-others i { color: var(--text-faint); font-size: 17px; flex-shrink: 0; margin-top: 2px; }
+.vdx-others b { font-size: 14px; color: var(--text); }
+.vdx-others ul { margin: 7px 0 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 5px; }
+.vdx-others li { font-size: 14px; line-height: 1.6; color: var(--text-dim); }
+
+/* ---- ภาพใหญ่เต็มจอ ---- */
+.vdx-lb {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: rgba(0, 0, 0, 0.82);
+  cursor: zoom-out;
+}
+.vdx-lb-close {
+  position: absolute;
+  top: 16px; inset-inline-end: 16px;
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 22px;
+  cursor: pointer;
+}
+.vdx-lb-close:hover { background: rgba(255, 255, 255, 0.28); }
+.vdx-lb-inner { max-width: 560px; width: 100%; cursor: default; }
+.vdx-lb-img {
+  display: block;
+  width: 100%;
+  max-height: 78svh;
+  object-fit: contain;
+  border-radius: 14px;
+}
+.vdx-lb-cap { margin-top: 12px; text-align: center; color: #fff; }
+.vdx-lb-cap b { display: block; font-size: 17px; font-weight: 600; }
+.vdx-lb-cap span { display: block; margin-top: 4px; font-size: 14px; opacity: 0.72; }
