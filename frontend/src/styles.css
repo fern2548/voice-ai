@@ -4125,7 +4125,7 @@ th, td { font-size: 14px; }
 /* สลับลำดับ: ผลลัพธ์ขึ้นก่อน กล่องถามหลบลงไปอยู่ล่างสุด
    ใช้ sticky ไม่ใช่ปล่อยไหลไปท้ายสุด เพราะการ์ดยาว ถ้าปล่อยไหล
    ผู้ใช้ต้องเลื่อนผ่านการ์ดทั้งหมดกว่าจะเจอกล่องถามอีกที */
-.vh-hero.has-cards .vh-thread { order: 1; min-height: 0; margin-top: 0; max-width: min(1500px, 100%); }
+.vh-hero.has-cards .vh-thread { order: 1; min-height: 0; margin-top: 0; max-width: min(1800px, 100%); }
 /* คำถามกับคำตอบย่อลง เพราะ AI อ่านออกเสียงให้อยู่แล้ว ตัวหนังสือมีไว้เผื่อคนปิดเสียง
    ที่ว่างที่ได้คืนมาเอาไปให้รูปอาการซึ่งเป็นของหลักบนหน้านี้ */
 .vh-hero.has-cards .vh-q { font-size: 14px; margin-top: 4px; }
@@ -4160,7 +4160,7 @@ th, td { font-size: 14px; }
 .vdx {
   margin: 20px auto 0;
   width: 100%;
-  max-width: min(1500px, 100%);
+  max-width: min(1800px, 100%);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -4182,15 +4182,11 @@ th, td { font-size: 14px; }
 .vdx-warn i { color: var(--warn); font-size: 18px; flex-shrink: 0; margin-top: 1px; }
 .vdx-warn b { color: var(--text); font-weight: 600; }
 
-.vdx-card {
-  padding: 16px;
-  border-radius: var(--radius);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-}
-.vdx-card.red { border-inline-start: 4px solid var(--danger); }
-.vdx-card.amber { border-inline-start: 4px solid var(--warn); }
+/* ไม่มีกรอบครอบการ์ดแล้ว — กรอบกินความกว้างไปโดยเปล่าประโยชน์
+   รูปจึงได้พื้นที่เต็มหน้า ส่วนข้อความที่ต้องอ่านเป็นข้อ ๆ ยังมีกล่องของตัวเอง (.vdx-observe) */
+.vdx-card { padding: 0; border: none; background: none; box-shadow: none; }
+/* หลายโรคขึ้นพร้อมกัน ใช้เส้นคั่นบาง ๆ แทนกรอบ จะได้รู้ว่าอันไหนของโรคไหน */
+.vdx-card + .vdx-card { margin-top: 6px; padding-top: 26px; border-top: 1px solid var(--border); }
 
 .vdx-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .vdx-icon {
@@ -4237,11 +4233,11 @@ th, td { font-size: 14px; }
      ส่วนหัวเรื่องกับรายการที่ต้องสังเกตยังอยู่ในกรอบตามเดิม */
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
-  margin: 16px -16px 0;
+  margin: 16px 0 0;
 }
 /* จอมือถือเอา 2 ใบต่อแถว ถ้าเต็มความกว้างจะต้องเลื่อนยาวมากเวลาขึ้น 3 โรค */
 @media (max-width: 639px) {
-  .vdx-imgs { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-inline: -8px; }
+  .vdx-imgs { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 }
 .vdx-img-btn {
   position: relative;
