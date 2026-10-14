@@ -134,7 +134,7 @@ export default function BreedingPage() {
                   </figure>
                   <span className="bd-trio-op"><i className="ti ti-arrow-right" aria-hidden="true" /></span>
                   <figure className="bd-trio-item out">
-                    <img src="/breeds/piglets.svg" alt="ลูกผสมที่ได้" />
+                    <img src="/breeds/photo-piglets.svg" alt="ลูกผสมที่ได้" />
                     <figcaption><span className="bd-sex out">ลูกที่ได้</span><b>{rec.out}</b><small>{rec.outNote}</small></figcaption>
                   </figure>
                 </div>

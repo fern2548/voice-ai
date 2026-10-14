@@ -163,27 +163,27 @@ export const SOURCE_NOTE = 'เรียบเรียงจากเอกส�
 export const DAM_OPTIONS = [
   {
     id: 'ly', name: 'ลูกผสม แลนด์เรซ × ลาร์จไวท์', short: 'แม่ลูกผสม (LY)',
-    img: '/breeds/ly.svg', look: 'ขาว หูปรกเล็กน้อย ลำตัวยาว',
+    img: '/breeds/photo-ly.svg', look: 'ขาว หูปรกเล็กน้อย ลำตัวยาว',
     strong: ['เลี้ยงลูกเก่ง น้ำนมดี', 'ให้ลูกดก 11-12 ตัวต่อครอก', 'แข็งแรงกว่าพันธุ์แท้'],
   },
   {
     id: 'landrace', name: 'แลนด์เรซ (พันธุ์แท้)', short: 'แลนด์เรซ',
-    img: '/breeds/landrace.svg', look: 'ขาว หูปรกปิดตา ลำตัวยาวมาก',
+    img: '/breeds/photo-landrace.webp', look: 'ขาว หูปรกปิดตา ลำตัวยาวมาก',
     strong: ['แม่พันธุ์เลี้ยงลูกดี', 'ให้ลูกดก', 'ลำตัวยาว ได้ซี่โครงมาก'],
   },
   {
     id: 'largewhite', name: 'ลาร์จไวท์ (พันธุ์แท้)', short: 'ลาร์จไวท์',
-    img: '/breeds/largewhite.svg', look: 'ขาว หูตั้ง โครงใหญ่',
+    img: '/breeds/photo-largewhite.webp', look: 'ขาว หูตั้ง โครงใหญ่',
     strong: ['โครงใหญ่ ขาแข็งแรง', 'เลี้ยงลูกเก่ง', 'ปรับตัวเข้ากับสภาพเลี้ยงได้ดี'],
   },
   {
     id: 'duroc', name: 'ดูร็อคเจอร์ซี่ (พันธุ์แท้)', short: 'ดูร็อค',
-    img: '/breeds/duroc.svg', look: 'แดง หูปรก ลำตัวหนา',
+    img: '/breeds/photo-duroc.webp', look: 'แดง หูปรก ลำตัวหนา',
     strong: ['แข็งแรง ทนทาน', 'โตเร็ว เนื้อคุณภาพดี'],
   },
   {
     id: 'native', name: 'สุกรพื้นเมือง', short: 'พื้นเมือง',
-    img: '/breeds/native.svg', look: 'ดำ หลังแอ่น ท้องยาน ตัวเล็ก',
+    img: '/breeds/photo-native.webp', look: 'ดำ หลังแอ่น ท้องยาน ตัวเล็ก',
     strong: ['ทนโรค ทนอากาศร้อน', 'กินอาหารหยาบได้', 'แม่เลี้ยงลูกเก่งตามธรรมชาติ'],
   },
 ]
@@ -195,19 +195,19 @@ export const GOALS = [
 
 const SIRE = {
   duroc: {
-    id: 'duroc', name: 'ดูร็อคเจอร์ซี่', img: '/breeds/duroc.svg', look: 'แดง หูปรก ลำตัวหนา',
+    id: 'duroc', name: 'ดูร็อคเจอร์ซี่', img: '/breeds/photo-duroc.webp', look: 'แดง หูปรก ลำตัวหนา',
     strong: ['โตเร็ว', 'ซากดี เนื้อคุณภาพดี', 'แข็งแรง ทนทาน'],
   },
   pietrain: {
-    id: 'pietrain', name: 'เปียแตรง', img: '/breeds/pietrain.svg', look: 'ขาวเหลืองลายดำ สะโพกเด่น',
+    id: 'pietrain', name: 'เปียแตรง', img: '/breeds/photo-pietrain.webp', look: 'ขาวเหลืองลายดำ สะโพกเด่น',
     strong: ['เนื้อแดงสูงที่สุด', 'สะโพกและไหล่เป็นมัด', 'เปอร์เซ็นต์ซากดีมาก'],
   },
   largewhite: {
-    id: 'largewhite', name: 'ลาร์จไวท์', img: '/breeds/largewhite.svg', look: 'ขาว หูตั้ง โครงใหญ่',
+    id: 'largewhite', name: 'ลาร์จไวท์', img: '/breeds/photo-largewhite.webp', look: 'ขาว หูตั้ง โครงใหญ่',
     strong: ['โครงใหญ่ ขาแข็งแรง', 'ถ่ายทอดความเลี้ยงลูกเก่งให้ลูกสาว', 'หาพ่อพันธุ์ได้ง่าย'],
   },
   landrace: {
-    id: 'landrace', name: 'แลนด์เรซ', img: '/breeds/landrace.svg', look: 'ขาว หูปรก ลำตัวยาว',
+    id: 'landrace', name: 'แลนด์เรซ', img: '/breeds/photo-landrace.webp', look: 'ขาว หูปรก ลำตัวยาว',
     strong: ['ลำตัวยาว ได้ซี่โครงมาก', 'ถ่ายทอดความเลี้ยงลูกเก่งให้ลูกสาว', 'ให้ลูกดก'],
   },
 }

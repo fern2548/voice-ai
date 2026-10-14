@@ -3581,7 +3581,8 @@ th, td { font-size: 14px; }
 .bd-tag { font-size: 12.5px; font-weight: 600; padding: 5px 12px; border-radius: 20px; background: var(--panel); border: 1px solid var(--border); color: var(--text-dim); }
 .bd-trio { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 .bd-trio-item { margin: 0; flex: 1 1 150px; max-width: 210px; text-align: center; }
-.bd-trio-item img { width: 100%; border-radius: 12px; display: block; background: #f7f3ef; }
+.bd-trio-item img { width: 100%; aspect-ratio: 6 / 5; object-fit: contain;
+  border-radius: 12px; display: block; background: #f7f3ef; }
 .bd-trio-item figcaption { margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .bd-trio-item figcaption b { font-size: 14.5px; }
 .bd-trio-item figcaption small { font-size: 11.5px; color: var(--text-faint); }
