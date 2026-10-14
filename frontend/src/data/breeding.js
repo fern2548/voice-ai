@@ -163,7 +163,7 @@ export const SOURCE_NOTE = 'เรียบเรียงจากเอกส�
 export const DAM_OPTIONS = [
   {
     id: 'ly', name: 'ลูกผสม แลนด์เรซ × ลาร์จไวท์', short: 'แม่ลูกผสม (LY)',
-    img: '/breeds/photo-ly.svg', look: 'ขาว หูปรกเล็กน้อย ลำตัวยาว',
+    img: '/breeds/photo-ly.webp', look: 'ขาว หูปรกเล็กน้อย ลำตัวยาว',
     strong: ['เลี้ยงลูกเก่ง น้ำนมดี', 'ให้ลูกดก 11-12 ตัวต่อครอก', 'แข็งแรงกว่าพันธุ์แท้'],
   },
   {
