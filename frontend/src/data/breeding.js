@@ -72,7 +72,7 @@ export const BREEDS = [
   {
     id: 'native',
     img: '/breeds/native.svg',
-    photo: '/breeds/photo-native.svg',
+    photo: '/breeds/photo-native.webp',
     name: 'สุกรพื้นเมือง',
     en: 'Native',
     origin: 'ไทย (ไหหลำ ราด/พวง ควาย ป่า)',
