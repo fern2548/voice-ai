@@ -4012,18 +4012,31 @@ _SYMPTOM_SKIP = ("กี่ตัว", "กี่คอก", "เท่าไห
 
 
 def _symptom_hits(text: str):
-    """คืนรายการ (ชื่อโรค, น้ำหนัก, สิ่งที่ควรดูเพิ่ม, คำอาการที่เจอ) เรียงจากเข้าเค้าที่สุด"""
+    """คืนรายการ (ชื่อโรค, น้ำหนัก, สิ่งที่ควรดูเพิ่ม, คำอาการที่เจอ) เรียงจากเข้าเค้าที่สุด
+
+    เกณฑ์ต้องตรงกับ matchSymptoms() ฝั่งหน้าเว็บ (frontend/src/data/symptomIndex.js)
+    ไม่งั้นจะเกิดกรณีที่หน้าเว็บขึ้นการ์ดโรค แต่ข้อความที่ AI พูดไปตอบเรื่องอื่น
+    """
     t = text.replace(" ", "")
-    if not any(c in t for c in _SYMPTOM_CUES):
-        return []
+    # ถามจำนวน = ถามข้อมูลฟาร์ม ไม่ใช่ถามโรค (เว้นแต่พูดถึงโรคชัด ๆ มาด้วย)
     if any(c in t for c in _SYMPTOM_SKIP) and not any(
             c in t for c in ("โรคอะไร", "โรคไหน", "เป็นโรค", "อาการ")):
         return []
+
     out = []
     for words, name, weight, observe in _SYMPTOM_DISEASES:
         hit = next((w for w in sorted(words, key=len, reverse=True) if w in t), None)
         if hit:
             out.append((name, weight, observe, hit))
+    if not out:
+        return []
+
+    # อาการที่ชี้เฉพาะ (น้ำหนัก 2 ขึ้นไป) บอกได้เลยว่าเป็นเรื่องโรค ไม่ต้องมีคำถามกำกับ
+    # เช่น "สุกรมีแผลที่กีบเท้า" พูดลอย ๆ ก็รู้ว่าถามเรื่องโรค
+    # ส่วนอาการกว้าง ๆ อย่าง "ไข้" ต้องมีคำถามกำกับ ไม่งั้นประโยคทั่วไปจะมาเข้าทางนี้หมด
+    if max(h[1] for h in out) < 2 and not any(c in t for c in _SYMPTOM_CUES):
+        return []
+
     out.sort(key=lambda x: -x[1])
     return out
 
