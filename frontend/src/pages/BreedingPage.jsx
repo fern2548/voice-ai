@@ -247,17 +247,19 @@ export default function BreedingPage() {
           {BREEDS.map((b) => (
             <button type="button" className={`bd-breed use-${b.use} ${openBreed === b.id ? 'on' : ''}`} key={b.id}
               onClick={() => setOpenBreed(openBreed === b.id ? null : b.id)}>
-              {b.img && <img src={b.img} alt={`สุกรพันธุ์${b.name}`} className="bd-breed-img" />}
+              <img src={b.photo || b.img} alt={`สุกรพันธุ์${b.name}`} className="bd-breed-photo" loading="lazy" />
               <div className="bd-breed-top">
                 <b>{b.name}</b>
                 <span className={`bd-use ${b.use}`}>{USE_LABEL[b.use]}</span>
               </div>
               <div className="bd-breed-meta">{b.en} · {b.origin}</div>
-              <div className="bd-breed-quick">
-                <span><i className="ti ti-palette" aria-hidden="true" /> {b.color}</span>
-                <span><i className="ti ti-scale" aria-hidden="true" /> โตเต็มที่ {b.mature}</span>
-                <span><i className="ti ti-baby-carriage" aria-hidden="true" /> {b.litter}</span>
-              </div>
+              <ul className="bd-breed-facts">
+                <li><i className="ti ti-dna-2" aria-hidden="true" /> {b.color}</li>
+                <li><i className="ti ti-scale" aria-hidden="true" /> โตเต็มที่ {b.mature}</li>
+                {b.litter && b.litter !== '—' && (
+                  <li><i className="ti ti-pig" aria-hidden="true" /> {b.litter}</li>
+                )}
+              </ul>
               {openBreed === b.id && (
                 <div className="bd-breed-detail">
                   <div><b>จุดเด่น</b><ul>{b.strong.map((x) => <li key={x}>{x}</li>)}</ul></div>
