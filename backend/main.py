@@ -63,12 +63,19 @@ if GEMINI_API_KEY:
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:3b")
 
-# AI ตัวที่สองของ CPF — ใช้ตอบก่อน Gemini ถ้าตั้งค่าไว้
+# AI ของ CPF — ใช้เป็น "ตัวสำรอง" ต่อจาก Gemini (เมื่อ Gemini ล่มหรือโควตาหมด)
 # ห้ามใส่คีย์ตรงนี้เด็ดขาด repo เป็นสาธารณะ ให้ตั้งเป็นค่าลับบน Render เท่านั้น
-# ถ้าไม่ได้ตั้ง CPF_API_BASE ระบบจะข้ามตัวนี้ไปใช้ Gemini เหมือนเดิม (ไม่พัง)
+# ไม่ได้ตั้งค่าไว้ก็ข้ามไปเอง ไม่พัง
+#
+# ต่อได้ 2 แบบ เลือกอย่างใดอย่างหนึ่ง
+#   CPF_ASK_URL   = https://ota.plotnexuslab.com/ai/api/ask   (รูปแบบของ CPF เอง — ใช้บน Render)
+#   CPF_API_BASE  = http://127.0.0.1:8010                     (รูปแบบ OpenAI ผ่านตัวแปลงในกล่อง)
+# ถ้าตั้งทั้งคู่ จะใช้ CPF_ASK_URL ก่อน เพราะต่อตรงไม่ต้องพึ่งตัวแปลง
 CPF_API_KEY = os.environ.get("CPF_API_KEY", "")
 CPF_API_BASE = os.environ.get("CPF_API_BASE", "").rstrip("/")
+CPF_ASK_URL = os.environ.get("CPF_ASK_URL", "").strip()
 CPF_MODEL = os.environ.get("CPF_MODEL", "")
+CPF_LEVEL = int(os.environ.get("CPF_LEVEL", "1"))
 
 # ---------- LINE Messaging API ----------
 # ใช้ broadcast (ส่งหาทุกคนที่แอด bot เป็นเพื่อน) เพราะฟาร์มนี้มีผู้ใช้คนเดียว/ทีมเล็ก
@@ -762,7 +769,7 @@ def health():
         "llm_configured": _llm is not None,
         "llm_model": GEMINI_MODEL,
         # บอกว่า AI ของ CPF ต่อไว้หรือยัง จะได้ไล่ปัญหาได้โดยไม่ต้องเปิด log
-        "cpf_configured": bool(CPF_API_BASE and CPF_API_KEY),
+        "cpf_configured": bool((CPF_ASK_URL or CPF_API_BASE) and CPF_API_KEY),
         "lab_configured": bool(LAB_API_KEY),
         # None = ยังไม่เคยพัง (หรือยังไม่มีใครถาม) / มีข้อความ = ครั้งล่าสุดพังเพราะอะไร
         "llm_last_error": _LAST_LLM_ERROR,
@@ -4946,14 +4953,64 @@ def _redact_secrets(msg: str) -> str:
     return msg[:300]
 
 
-def _cpf_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -> Optional[str]:
-    """ลองตอบด้วย AI ของ CPF — คืน None ถ้ายังไม่ได้ตั้งค่า หรือเรียกไม่สำเร็จ
-    ให้ caller ไปใช้ Gemini ต่อ เว็บจะได้ไม่พังเพราะ AI ตัวเดียวล่ม
+# ผู้ช่วยของ CPF เป็น "ผู้ช่วยข้อมูลฟาร์ม" ถามเรื่องโรคสัตว์เมื่อไหร่มันจะปฏิเสธ
+# ปฏิเสธมาก็ไม่มีประโยชน์กับผู้ใช้ ให้ถือว่าตอบไม่ได้ แล้วไหลไปใช้ตัวถัดไปแทน
+_CPF_REFUSAL = (
+    "ไม่สามารถวินิจฉัย", "ไม่สามารถให้คำแนะนำทางการแพทย์", "เป็นผู้ช่วยดูแลข้อมูลฟาร์มเท่านั้น",
+    "ไม่สามารถตอบได้", "ไม่รู้จักข้อมูลนี้", "ขออภัย แต่ฉันไม่สามารถ", "ขออภัย แต่ฉันเป็น",
+)
 
-    เขียนตามมาตรฐาน OpenAI-compatible (/chat/completions) ซึ่ง AI gateway
-    ส่วนใหญ่ใช้กัน ถ้า CPF ใช้รูปแบบอื่นแก้แค่ฟังก์ชันนี้ที่เดียว
+
+def _cpf_usable(answer: str) -> Optional[str]:
+    """คืนคำตอบถ้าใช้ได้จริง · คืน None ถ้าเป็นคำปฏิเสธหรือสั้นจนไม่มีเนื้อหา"""
+    a = (answer or "").strip()
+    if len(a) < 15:
+        return None
+    if any(w in a for w in _CPF_REFUSAL):
+        print("[info] CPF ปฏิเสธคำถามนี้ ข้ามไปใช้ตัวถัดไป")
+        return None
+    return a
+
+
+def _cpf_answer_native(text: str, context: str) -> Optional[str]:
+    """คุยกับ CPF ด้วยรูปแบบของเขาเอง — POST {q, level} + X-API-Key
+
+    ใช้ตอนรันบน Render ซึ่งไม่มีตัวแปลง (cpf_shim.py) เหมือนในกล่อง
+    ผู้ช่วยตัวนี้ต่อกับเซนเซอร์ของฟาร์มอยู่แล้ว แต่แนบ CONTEXT ของเราไปด้วย
+    เผื่อเป็นคำถามเรื่องข้อมูลที่อยู่ฝั่งเรา (เช่นบันทึกวัคซีน)
     """
-    if not (CPF_API_BASE and CPF_API_KEY):
+    ctx = (context or "")[:2000]
+    q = f"CONTEXT (ข้อมูลจริงจากสถานี):\n{ctx}\n\nคำถาม: {text}" if ctx else text
+    try:
+        resp = httpx.post(
+            CPF_ASK_URL,
+            headers={"X-API-Key": CPF_API_KEY},
+            json={"q": q, "level": CPF_LEVEL},
+            timeout=45,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("ok", True):
+            return None
+        return _cpf_usable(data.get("answer") or "")
+    except Exception as e:
+        global _LAST_LLM_ERROR
+        _LAST_LLM_ERROR = _redact_secrets(f"CPF {type(e).__name__}: {e}")
+        print(f"[warn] CPF ตอบไม่สำเร็จ: {e}")
+        return None
+
+
+def _cpf_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -> Optional[str]:
+    """ลองตอบด้วย AI ของ CPF — คืน None ถ้ายังไม่ได้ตั้งค่า เรียกไม่สำเร็จ หรือ CPF ปฏิเสธ
+    ให้ caller ไปใช้ตัวถัดไปต่อ เว็บจะได้ไม่พังเพราะ AI ตัวเดียวล่ม
+
+    ต่อได้สองแบบ: รูปแบบของ CPF เอง (CPF_ASK_URL) หรือ OpenAI-compatible (CPF_API_BASE)
+    """
+    if not CPF_API_KEY:
+        return None
+    if CPF_ASK_URL:
+        return _cpf_answer_native(text, context)
+    if not CPF_API_BASE:
         return None
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -4978,12 +5035,11 @@ def _cpf_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -> O
         )
         resp.raise_for_status()
         data = resp.json()
-        answer = (data["choices"][0]["message"]["content"] or "").strip()
-        return answer or None
+        return _cpf_usable(data["choices"][0]["message"]["content"] or "")
     except Exception as e:
         global _LAST_LLM_ERROR
         _LAST_LLM_ERROR = _redact_secrets(f"CPF {type(e).__name__}: {e}")
-        print(f"[warn] CPF ตอบไม่สำเร็จ ลอง Gemini ต่อ: {e}")
+        print(f"[warn] CPF ตอบไม่สำเร็จ: {e}")
         return None
 
 
@@ -5026,7 +5082,7 @@ def _ollama_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -
 
 @app.post("/ask", response_model=Answer)
 def ask(q: Question, x_admin_token: str = Header(default="")):
-    """ถาม-ตอบเรื่องสภาพอากาศ — ลำดับ: Gemini (ถ้ามีคีย์) -> Ollama local (ถ้ารันอยู่) -> rule-based
+    """ถาม-ตอบเรื่องสภาพอากาศ — ลำดับ: Gemini -> CPF -> Ollama local -> rule-based
 
     ประหยัด token/ทรัพยากร:
     - แนบ CONTEXT แบบละเอียด (history+forecast) เฉพาะเมื่อคำถามเกี่ยวกับพยากรณ์/แนวโน้ม
@@ -5121,13 +5177,7 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
         if stock:
             context += "\n\n" + stock
 
-    # 1) AI ของ CPF ก่อน (ถ้าตั้งค่า CPF_API_BASE + CPF_API_KEY ไว้)
-    #    ถ้ายังไม่ได้ตั้ง หรือเรียกไม่สำเร็จ จะคืน None แล้วไหลไป Gemini ต่อเอง
-    cpf_answer = _cpf_answer(text, context, q.history)
-    if cpf_answer:
-        return Answer(answer=cpf_answer)
-
-    # 2) Gemini (ถ้าตั้งค่าคีย์ไว้) — ยิงครั้งเดียวต่อคำถาม ไม่ retry เพื่อไม่ให้เปลืองโควตา
+    # 1) Gemini (ถ้าตั้งค่าคีย์ไว้) — ยิงครั้งเดียวต่อคำถาม ไม่ retry เพื่อไม่ให้เปลืองโควตา
     if _llm is not None:
         # ต่อบทสนทนาแบบ multi-turn: เอาประวัติล่าสุดไม่เกิน MAX_HISTORY_TURNS เทิร์น
         contents = []
@@ -5180,6 +5230,14 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
                 except Exception as e2:
                     _LAST_LLM_ERROR = _redact_secrets(f"Gemini retry {type(e2).__name__}: {e2}")
             print(f"[warn] Gemini ตอบไม่สำเร็จ ลอง Ollama ต่อ: {e}")
+
+    # 2) AI ของ CPF — ตัวสำรองเมื่อ Gemini ล่มหรือโควตาหมด
+    #    ข้ามไปเลยถ้าเป็นคำถามเรื่องอาการโรค เพราะผู้ช่วยของ CPF ปฏิเสธเรื่องโรคสัตว์เสมอ
+    #    (ทดสอบแล้วทั้ง level 1/2/3) ตอบด้วยคลังคำอาการของเราเองดีกว่า
+    if not _needs_symptom_info(text):
+        cpf_answer = _cpf_answer(text, context, q.history)
+        if cpf_answer:
+            return Answer(answer=cpf_answer)
 
     # 3) Ollama local (ถ้ารันอยู่ในเครื่อง) — ไม่มีค่าใช้จ่าย/ไม่จำกัดโควตา
     ollama_answer = _ollama_answer(text, context, q.history)
