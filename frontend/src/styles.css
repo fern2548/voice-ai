@@ -4120,9 +4120,30 @@ th, td { font-size: 14px; }
   min-height: auto;
   padding-bottom: 48px;
 }
-.vh-hero.has-cards .vh-bar-wrap { margin-top: 28px; }
-.vh-hero.has-cards .vh-thread { min-height: 0; }
-.vh-hero.has-cards .vh-foot { position: static; margin-top: 32px; padding-inline: 0; }
+.vh-hero.has-cards { padding-top: 20px; }
+
+/* สลับลำดับ: ผลลัพธ์ขึ้นก่อน กล่องถามหลบลงไปอยู่ล่างสุด
+   ใช้ sticky ไม่ใช่ปล่อยไหลไปท้ายสุด เพราะการ์ดยาว ถ้าปล่อยไหล
+   ผู้ใช้ต้องเลื่อนผ่านการ์ดทั้งหมดกว่าจะเจอกล่องถามอีกที */
+.vh-hero.has-cards .vh-thread { order: 1; min-height: 0; margin-top: 0; }
+.vh-hero.has-cards .vh-bar-wrap {
+  order: 2;
+  position: sticky;
+  bottom: 14px;
+  margin-top: 28px;
+  z-index: 5;
+}
+/* ไล่เฉดพื้นหลังใต้กล่อง กันเนื้อหาเลื่อนทะลุขึ้นมาให้เห็นหลังกล่อง */
+.vh-hero.has-cards .vh-bar-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -22px -40px -26px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--bg) 58%, color-mix(in srgb, var(--bg) 70%, transparent) 82%, transparent);
+}
+.vh-hero.has-cards .vh-bar { box-shadow: 0 14px 40px -14px rgba(0, 0, 0, 0.45); }
+.vh-hero.has-cards .vh-foot { position: static; margin-top: 28px; padding-inline: 0; }
 
 .vdx {
   margin: 28px auto 0;

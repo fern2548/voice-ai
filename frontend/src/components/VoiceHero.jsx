@@ -52,8 +52,14 @@ export default function VoiceHero() {
       <div className="vh-glow" aria-hidden="true" />
 
       <div className="vh-inner">
-        <h1 className="vh-title">Farmy Voice ผู้ช่วยเสียงประจำฟาร์มของคุณ</h1>
-        <p className="vh-sub">ถามข้อมูล สั่งงาน และเข้าถึงฟาร์ม ด้วยเสียงของคุณ</p>
+        {/* มีการ์ดโรคแล้ว เอาหัวเรื่องออก ให้ผลลัพธ์ขึ้นแทนที่ไปเลย
+            (CSS ย้ายกล่องถามลงไปติดขอบล่างให้เอง ผู้ใช้จึงยังถามต่อได้โดยไม่ต้องเลื่อนกลับขึ้นมา) */}
+        {!hasCards && (
+          <>
+            <h1 className="vh-title">Farmy Voice ผู้ช่วยเสียงประจำฟาร์มของคุณ</h1>
+            <p className="vh-sub">ถามข้อมูล สั่งงาน และเข้าถึงฟาร์ม ด้วยเสียงของคุณ</p>
+          </>
+        )}
 
         {/* แคปซูลรับคำสั่ง */}
         <form className="vh-bar-wrap" onSubmit={submit}>
