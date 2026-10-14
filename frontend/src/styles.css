@@ -4126,18 +4126,19 @@ th, td { font-size: 14px; }
    ใช้ sticky ไม่ใช่ปล่อยไหลไปท้ายสุด เพราะการ์ดยาว ถ้าปล่อยไหล
    ผู้ใช้ต้องเลื่อนผ่านการ์ดทั้งหมดกว่าจะเจอกล่องถามอีกที */
 .vh-hero.has-cards .vh-thread { order: 1; min-height: 0; margin-top: 0; max-width: min(1800px, 100%); }
-/* คำถามกับคำตอบย่อลง เพราะ AI อ่านออกเสียงให้อยู่แล้ว ตัวหนังสือมีไว้เผื่อคนปิดเสียง
-   ที่ว่างที่ได้คืนมาเอาไปให้รูปอาการซึ่งเป็นของหลักบนหน้านี้ */
-.vh-hero.has-cards .vh-q { font-size: 14px; margin-top: 4px; }
+/* คำถามที่ถามไว้เป็นตัวรอง ไม่ต้องเด่น */
+.vh-hero.has-cards .vh-q { font-size: 15px; margin-top: 4px; }
+/* คำตอบของ AI เป็นตัวหลัก ขยายเต็มความกว้างเท่าแถบรูป และหนาพอให้อ่านจากระยะไกลได้
+   (ในโรงเรือนผู้ใช้มักวางเครื่องไว้ห่างตัว ไม่ได้จ้องใกล้ ๆ เหมือนนั่งโต๊ะ)
+   clamp = จอเล็กไม่ล้น จอใหญ่ไม่โตเกินจนอ่านยาก */
 .vh-hero.has-cards .vh-a {
-  margin-top: 8px;
-  max-width: 1040px;
-  font-size: 14.5px;
-  font-weight: 300;
-  line-height: 1.65;
-  color: var(--text-dim);
+  margin-top: 10px;
+  max-width: 100%;
+  font-size: clamp(17px, 1.45vw, 24px);
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--text);
 }
-@media (min-width: 640px) { .vh-hero.has-cards .vh-a { font-size: 15px; } }
 .vh-hero.has-cards .vh-bar-wrap {
   order: 2;
   position: sticky;
