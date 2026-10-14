@@ -4128,16 +4128,16 @@ th, td { font-size: 14px; }
 .vh-hero.has-cards .vh-thread { order: 1; min-height: 0; margin-top: 0; max-width: min(1800px, 100%); }
 /* คำถามที่ถามไว้เป็นตัวรอง ไม่ต้องเด่น */
 .vh-hero.has-cards .vh-q { font-size: 15px; margin-top: 4px; }
-/* คำตอบของ AI เป็นตัวหลัก ขยายเต็มความกว้างเท่าแถบรูป และหนาพอให้อ่านจากระยะไกลได้
-   (ในโรงเรือนผู้ใช้มักวางเครื่องไว้ห่างตัว ไม่ได้จ้องใกล้ ๆ เหมือนนั่งโต๊ะ)
+/* คำตอบของ AI ขยายเต็มความกว้างเท่าแถบรูป แต่ใช้เส้นบางสีจาง
+   ตัวหนาสีเข้มจะแย่งสายตาไปจากรูปอาการซึ่งเป็นของหลักบนหน้านี้
    clamp = จอเล็กไม่ล้น จอใหญ่ไม่โตเกินจนอ่านยาก */
 .vh-hero.has-cards .vh-a {
   margin-top: 10px;
   max-width: 100%;
   font-size: clamp(17px, 1.45vw, 24px);
-  font-weight: 600;
+  font-weight: 300;
   line-height: 1.6;
-  color: var(--text);
+  color: var(--text-dim);
 }
 .vh-hero.has-cards .vh-bar-wrap {
   order: 2;
