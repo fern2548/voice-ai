@@ -195,7 +195,16 @@ function NewPost({ onDone, presetTitle = '' }) {
         age_stage: f.age_stage || null,
       })
       setF(EMPTY); setImage(null); onDone(f.title.trim())
-    } catch (x) { setErr(x?.detail || 'โพสต์ไม่สำเร็จ') } finally { setBusy(false) }
+    } catch (x) {
+      // บอกสาเหตุให้ชัด ไม่งั้นผู้ใช้เห็นแค่ "ไม่สำเร็จ" แล้วไม่รู้จะทำยังไงต่อ
+      setErr(
+        x?.detail
+        || (x?.status === 500 ? 'เซิร์ฟเวอร์ผิดพลาด — ระบบคอมมูนิตี้ยังตั้งค่าไม่ครบ กรุณาแจ้งผู้ดูแลระบบ'
+          : x?.status === 401 ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'
+            : x?.status ? `โพสต์ไม่สำเร็จ (รหัส ${x.status})`
+              : 'โพสต์ไม่สำเร็จ — ติดต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง'),
+      )
+    } finally { setBusy(false) }
   }
 
   return (
