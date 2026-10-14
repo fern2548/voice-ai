@@ -4125,7 +4125,7 @@ th, td { font-size: 14px; }
 /* สลับลำดับ: ผลลัพธ์ขึ้นก่อน กล่องถามหลบลงไปอยู่ล่างสุด
    ใช้ sticky ไม่ใช่ปล่อยไหลไปท้ายสุด เพราะการ์ดยาว ถ้าปล่อยไหล
    ผู้ใช้ต้องเลื่อนผ่านการ์ดทั้งหมดกว่าจะเจอกล่องถามอีกที */
-.vh-hero.has-cards .vh-thread { order: 1; min-height: 0; margin-top: 0; max-width: 1040px; }
+.vh-hero.has-cards .vh-thread { order: 1; min-height: 0; margin-top: 0; max-width: min(1500px, 100%); }
 /* คำถามกับคำตอบย่อลง เพราะ AI อ่านออกเสียงให้อยู่แล้ว ตัวหนังสือมีไว้เผื่อคนปิดเสียง
    ที่ว่างที่ได้คืนมาเอาไปให้รูปอาการซึ่งเป็นของหลักบนหน้านี้ */
 .vh-hero.has-cards .vh-q { font-size: 14px; margin-top: 4px; }
@@ -4160,7 +4160,7 @@ th, td { font-size: 14px; }
 .vdx {
   margin: 20px auto 0;
   width: 100%;
-  max-width: 1040px;
+  max-width: min(1500px, 100%);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -4232,42 +4232,49 @@ th, td { font-size: 14px; }
 
 .vdx-imgs {
   display: grid;
-  /* จอคอมได้ 4 ใบเรียงเดียว ใบละ ~240px — การ์ดอาการมีตัวหนังสือในรูป เล็กกว่านี้อ่านไม่ออก */
+  /* การ์ดอาการมีตัวหนังสืออยู่ในรูป ต้องใหญ่พอจะอ่านออกโดยไม่ต้องกดขยาย
+     margin ติดลบ = หักระยะ padding ของการ์ดทิ้ง รูปจึงทะลุกรอบออกไปชนขอบการ์ดเต็ม ๆ
+     ส่วนหัวเรื่องกับรายการที่ต้องสังเกตยังอยู่ในกรอบตามเดิม */
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
-  margin-top: 14px;
+  margin: 16px -16px 0;
 }
 /* จอมือถือเอา 2 ใบต่อแถว ถ้าเต็มความกว้างจะต้องเลื่อนยาวมากเวลาขึ้น 3 โรค */
 @media (max-width: 639px) {
-  .vdx-imgs { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .vdx-imgs { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-inline: -8px; }
 }
 .vdx-img-btn {
   position: relative;
   display: block;
   width: 100%;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--panel-2);
+  border: none;
+  background: none;
   cursor: zoom-in;
   font: inherit;
   text-align: start;
-  transition: border-color 0.15s, transform 0.15s;
+  transition: transform 0.15s;
 }
-.vdx-img-btn:hover { border-color: var(--accent); transform: translateY(-2px); }
-.vdx-img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; object-position: top; }
+.vdx-img-btn:hover { transform: translateY(-3px); }
+.vdx-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 14px;
+}
+.vdx-img-btn:hover .vdx-img { box-shadow: 0 14px 32px -14px rgba(0, 0, 0, 0.5); }
 .vdx-img-cap {
   display: block;
-  padding: 8px 11px;
+  padding: 8px 4px 0;
   font-size: 13.5px;
   font-weight: 500;
-  color: var(--text);
-  background: var(--panel-2);
+  color: var(--text-dim);
 }
 .vdx-img-zoom {
   position: absolute;
-  top: 7px; inset-inline-end: 7px;
+  top: 9px; inset-inline-end: 9px;
   width: 26px; height: 26px;
   display: grid;
   place-items: center;
@@ -4276,7 +4283,7 @@ th, td { font-size: 14px; }
   background: rgba(0, 0, 0, 0.42);
   font-size: 15px;
 }
-.vdx-imghint { margin-top: 7px; font-size: 12.5px; color: var(--text-faint); }
+.vdx-imghint { margin-top: 10px; font-size: 12.5px; color: var(--text-faint); }
 
 .vdx-observe {
   margin-top: 14px;
@@ -4329,7 +4336,7 @@ th, td { font-size: 14px; }
   cursor: pointer;
 }
 .vdx-lb-close:hover { background: rgba(255, 255, 255, 0.28); }
-.vdx-lb-inner { max-width: 560px; width: 100%; cursor: default; }
+.vdx-lb-inner { max-width: 640px; width: 100%; cursor: default; }
 .vdx-lb-img {
   display: block;
   width: 100%;
