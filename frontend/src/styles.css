@@ -4092,8 +4092,10 @@ th, td { font-size: 14px; }
 .dz-icon.img { width: 52px; height: 52px; }
 
 /* การ์ดสายพันธุ์ — รูปหมูแยกต่อพันธุ์อยู่บน ข้อความเป็น HTML แก้ไขได้ */
-.bd-breed-photo { width: 100%; aspect-ratio: 6 / 5; object-fit: contain;
-  background: transparent; border-radius: 12px; display: block; }
+/* การ์ดสายพันธุ์ใช้รูปที่มีพื้นหลังในตัว (ไม่ใช่ไดคัท) จึงให้เต็มกรอบ
+   ส่วนรูปไดคัทใช้ในรายการแม่พันธุ์ แถวคู่ผสม และกล่องพ่อพันธุ์ทางเลือก */
+.bd-breed-photo { width: 100%; aspect-ratio: 6 / 5; object-fit: cover;
+  background: #fbfaf7; border-radius: 12px; display: block; }
 .bd-breed-facts { list-style: none; margin: 8px 0 0; padding: 0;
   display: flex; flex-direction: column; gap: 7px; }
 .bd-breed-facts li { display: flex; gap: 9px; align-items: flex-start;

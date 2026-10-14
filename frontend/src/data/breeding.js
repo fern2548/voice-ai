@@ -8,7 +8,7 @@ export const BREEDS = [
   {
     id: 'largewhite',
     img: '/breeds/largewhite.svg',
-    photo: '/breeds/photo-largewhite.webp',
+    photo: '/breeds/card-largewhite.webp',
     name: 'ลาร์จไวท์',
     en: 'Large White',
     origin: 'อังกฤษ · เข้าไทย พ.ศ. 2482',
@@ -24,7 +24,7 @@ export const BREEDS = [
   {
     id: 'landrace',
     img: '/breeds/landrace.svg',
-    photo: '/breeds/photo-landrace.webp',
+    photo: '/breeds/card-landrace.webp',
     name: 'แลนด์เรซ',
     en: 'Landrace',
     origin: 'เดนมาร์ก · เข้าไทย พ.ศ. 2506',
@@ -40,7 +40,7 @@ export const BREEDS = [
   {
     id: 'duroc',
     img: '/breeds/duroc.svg',
-    photo: '/breeds/photo-duroc.webp',
+    photo: '/breeds/card-duroc.webp',
     name: 'ดูร็อคเจอร์ซี่',
     en: 'Duroc Jersey',
     origin: 'อเมริกา',
@@ -56,7 +56,7 @@ export const BREEDS = [
   {
     id: 'pietrain',
     img: '/breeds/pietrain.svg',
-    photo: '/breeds/photo-pietrain.webp',
+    photo: '/breeds/card-pietrain.webp',
     name: 'เปียแตรง',
     en: 'Pietrain',
     origin: 'เบลเยียม',
@@ -72,7 +72,7 @@ export const BREEDS = [
   {
     id: 'native',
     img: '/breeds/native.svg',
-    photo: '/breeds/photo-native.webp',
+    photo: '/breeds/card-native.webp',
     name: 'สุกรพื้นเมือง',
     en: 'Native',
     origin: 'ไทย (ไหหลำ ราด/พวง ควาย ป่า)',
