@@ -4972,7 +4972,8 @@ def _cpf_usable(answer: str) -> Optional[str]:
     return a
 
 
-def _cpf_answer_native(text: str, context: str) -> Optional[str]:
+def _cpf_answer_native(text: str, context: str,
+                       history: Optional[list[ChatTurn]] = None) -> Optional[str]:
     """คุยกับ CPF ด้วยรูปแบบของเขาเอง — POST {q, level} + X-API-Key
 
     ใช้ตอนรันบน Render ซึ่งไม่มีตัวแปลง (cpf_shim.py) เหมือนในกล่อง
@@ -4980,7 +4981,15 @@ def _cpf_answer_native(text: str, context: str) -> Optional[str]:
     เผื่อเป็นคำถามเรื่องข้อมูลที่อยู่ฝั่งเรา (เช่นบันทึกวัคซีน)
     """
     ctx = (context or "")[:2000]
-    q = f"CONTEXT (ข้อมูลจริงจากสถานี):\n{ctx}\n\nคำถาม: {text}" if ctx else text
+    # API ของ CPF ไม่มีช่องส่งประวัติบทสนทนา แต่ผู้ช่วยตัวนี้ชอบถามกลับเป็นเมนู
+    # ("ต้องการดูจุดใดครับ 1. ... 2. ...") ถ้าไม่แนบประวัติไป พอผู้ใช้ตอบ "1"
+    # มันจะไม่รู้ว่ากำลังคุยเรื่องอะไรอยู่ จึงเอาไปต่อไว้ในข้อความเลย
+    prev = ""
+    turns = (history or [])[-4:]
+    if turns:
+        lines = [("ผู้ใช้: " if t.role != "model" else "ผู้ช่วย: ") + t.text for t in turns]
+        prev = "บทสนทนาก่อนหน้า:\n" + "\n".join(lines) + "\n\n"
+    q = (f"CONTEXT (ข้อมูลจริงจากสถานี):\n{ctx}\n\n" if ctx else "") + prev + f"คำถาม: {text}"
     try:
         resp = httpx.post(
             CPF_ASK_URL,
@@ -5009,7 +5018,7 @@ def _cpf_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -> O
     if not CPF_API_KEY:
         return None
     if CPF_ASK_URL:
-        return _cpf_answer_native(text, context)
+        return _cpf_answer_native(text, context, history)
     if not CPF_API_BASE:
         return None
 
