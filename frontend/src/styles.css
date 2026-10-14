@@ -3556,7 +3556,7 @@ th, td { font-size: 14px; }
 .bd-dams { display: flex; flex-direction: column; gap: 8px; }
 .bd-dam { position: relative; display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; color: var(--text); cursor: pointer;
   background: var(--panel-2); border: 1.5px solid var(--border); border-radius: 12px; padding: 7px 10px; }
-.bd-dam-img { width: 62px; height: 40px; object-fit: cover; object-position: center 40%; border-radius: 8px; background: #f7f3ef; flex: none; }
+.bd-dam-img { width: 62px; height: 46px; object-fit: contain; border-radius: 8px; background: transparent; flex: none; }
 .bd-dam-text { min-width: 0; }
 .bd-dam-text b { display: block; font-size: 13.5px; }
 .bd-dam-text small { display: block; font-size: 11px; line-height: 1.4; color: var(--text-faint); margin-top: 1px; }
@@ -3582,7 +3582,7 @@ th, td { font-size: 14px; }
 .bd-trio { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 .bd-trio-item { margin: 0; flex: 1 1 150px; max-width: 210px; text-align: center; }
 .bd-trio-item img { width: 100%; aspect-ratio: 6 / 5; object-fit: contain;
-  border-radius: 12px; display: block; background: #f7f3ef; }
+  border-radius: 12px; display: block; background: transparent; }
 .bd-trio-item figcaption { margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .bd-trio-item figcaption b { font-size: 14.5px; }
 .bd-trio-item figcaption small { font-size: 11.5px; color: var(--text-faint); }
@@ -3626,7 +3626,7 @@ th, td { font-size: 14px; }
 }
 .bd-note.alt b i { color: #6aa9ff; }
 .bd-alt { display: flex; gap: 12px; align-items: center; }
-.bd-alt img { width: 96px; border-radius: 10px; flex: none; background: #f7f3ef; }
+.bd-alt img { width: 96px; border-radius: 10px; flex: none; background: transparent; }
 .bd-alt-name { display: block; font-size: 13.5px; font-weight: 600; }
 .bd-alt p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
 
@@ -4093,7 +4093,7 @@ th, td { font-size: 14px; }
 
 /* การ์ดสายพันธุ์ — รูปหมูแยกต่อพันธุ์อยู่บน ข้อความเป็น HTML แก้ไขได้ */
 .bd-breed-photo { width: 100%; aspect-ratio: 6 / 5; object-fit: contain;
-  background: #fbfaf7; border-radius: 12px; display: block; }
+  background: transparent; border-radius: 12px; display: block; }
 .bd-breed-facts { list-style: none; margin: 8px 0 0; padding: 0;
   display: flex; flex-direction: column; gap: 7px; }
 .bd-breed-facts li { display: flex; gap: 9px; align-items: flex-start;
