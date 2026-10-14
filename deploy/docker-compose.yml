@@ -5,11 +5,47 @@
 #   docker compose logs -f api        ดูสิ่งที่เซิร์ฟเวอร์ทำ
 #   docker compose down               หยุด (ข้อมูลยังอยู่)
 #
-# 5 ตัว: ฐานข้อมูล · ประตูอ่านข้อมูล · ประตูหน้าบ้าน · เซิร์ฟเวอร์ · หน้าเว็บ
+# 6 ตัว: Tailscale · ฐานข้อมูล · ประตูอ่านข้อมูล · ประตูหน้าบ้าน · เซิร์ฟเวอร์ · หน้าเว็บ
 # กินหน่วยความจำรวมราว 700 MB — เบากว่าชุดเต็มของ Supabase ราว 5 เท่า
 # เพราะตัดส่วนที่ระบบเราไม่ได้ใช้ออกหมด (ระบบสมาชิก ที่เก็บไฟล์ อัปเดตสด อีเมล)
 
 services:
+  # ตัวเชื่อมเข้าเครือข่าย Tailscale
+  #
+  # ฐานข้อมูล เซิร์ฟเวอร์ และหน้าเว็บ ใช้เน็ตเวิร์กร่วมกับตัวนี้ (network_mode)
+  # ผลคือทั้งสามตัวกลายเป็นเครื่องเดียวในสายตา Tailscale ชื่อ "farmy"
+  # เปิดจากเครื่องไหนก็ได้ที่อยู่ในเครือข่ายเดียวกัน โดยไม่ต้องเปิดพอร์ตออกอินเทอร์เน็ต
+  #   http://farmy:8080   หน้าเว็บ
+  #   http://farmy:8000   เซิร์ฟเวอร์ API
+  #   farmy:5432          ฐานข้อมูล (ต่อด้วย DBeaver / pgAdmin ได้)
+  #
+  # ต้องมี TS_AUTHKEY ใน .env (สร้างที่ Tailscale admin -> Settings -> Keys)
+  # และกล่องต้องมี /dev/net/tun (เครื่อง Linux ทั่วไปมีอยู่แล้ว)
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: farmy-tailscale
+    hostname: farmy
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      # ห้ามให้ Tailscale ไปเปลี่ยน DNS ในคอนเทนเนอร์
+      # ไม่งั้นตัวอื่นจะหาชื่อ gateway / postgrest ในชุดนี้ไม่เจอ
+      TS_EXTRA_ARGS: --accept-dns=false
+      TZ: Asia/Bangkok
+    volumes:
+      # เก็บสถานะการล็อกอินไว้ รีสตาร์ทแล้วไม่ต้องใช้คีย์ใหม่
+      - ts-state:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    # พอร์ตของ api กับ web ย้ายมาประกาศที่นี่ เพราะสองตัวนั้นใช้เน็ตเวิร์กของตัวนี้
+    # (เปิดจากตัวเครื่องเองได้เหมือนเดิม นอกเหนือจากทาง Tailscale)
+    ports:
+      - "8000:8000"
+      - "8080:80"
+    restart: unless-stopped
+
   db:
     image: postgres:17-alpine
     container_name: farmy-db
@@ -28,14 +64,18 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-    # ไม่เปิดพอร์ตออกข้างนอก ฐานข้อมูลเข้าถึงได้เฉพาะจากตัวอื่นในชุดนี้
-    # อยากต่อด้วยเครื่องมือจัดการฐานข้อมูล ค่อยเปิดเป็น "127.0.0.1:5432:5432"
+    # ไม่เปิดพอร์ตออกอินเทอร์เน็ต เข้าถึงได้จากตัวอื่นในชุดนี้
+    # กับจากเครื่องที่อยู่ในเครือข่าย Tailscale เดียวกันเท่านั้น (farmy:5432)
+    network_mode: service:tailscale
+    depends_on:
+      - tailscale
 
   postgrest:
     image: postgrest/postgrest:v12.2.3
     container_name: farmy-postgrest
     environment:
-      PGRST_DB_URI: postgres://authenticator:${DB_PASSWORD}@db:5432/postgres
+      # db ย้ายไปอยู่ในเน็ตเวิร์กของ tailscale แล้ว จึงเรียกผ่านชื่อนั้นแทน
+      PGRST_DB_URI: postgres://authenticator:${DB_PASSWORD}@tailscale:5432/postgres
       PGRST_DB_SCHEMAS: public
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET}
@@ -64,8 +104,9 @@ services:
       TZ: Asia/Bangkok
     depends_on:
       - gateway
-    ports:
-      - "8000:8000"
+      - tailscale
+    # พอร์ต 8000 ประกาศไว้ที่ตัว tailscale แล้ว
+    network_mode: service:tailscale
     restart: unless-stopped
 
   web:
@@ -76,8 +117,9 @@ services:
     container_name: farmy-web
     depends_on:
       - api
-    ports:
-      - "8080:80"
+      - tailscale
+    # พอร์ต 8080 ประกาศไว้ที่ตัว tailscale แล้ว
+    network_mode: service:tailscale
     restart: unless-stopped
 
   backup:
@@ -85,6 +127,8 @@ services:
     container_name: farmy-backup
     environment:
       PGPASSWORD: ${DB_PASSWORD}
+      # db ย้ายไปอยู่ในเน็ตเวิร์กของ tailscale แล้ว จึงเรียกผ่านชื่อนั้นแทน
+      DB_HOST: tailscale
       BACKUP_HOUR: ${BACKUP_HOUR:-2}
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
       TZ: Asia/Bangkok
@@ -100,3 +144,4 @@ services:
 
 volumes:
   db-data:
+  ts-state:

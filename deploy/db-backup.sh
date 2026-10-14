@@ -17,7 +17,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }
 run_backup() {
   FILE="$OUT_DIR/farmy-$(date +%Y-%m-%d_%H%M).sql"
   # --clean --if-exists ทำให้ไฟล์นี้กู้คืนทับของเดิมได้เลย ไม่ต้องล้างฐานข้อมูลก่อน
-  if pg_dump -h db -U postgres --clean --if-exists postgres > "$FILE" 2>/tmp/err; then
+  if pg_dump -h "${DB_HOST:-db}" -U postgres --clean --if-exists postgres > "$FILE" 2>/tmp/err; then
     gzip -f "$FILE"
     log "สำเร็จ: ${FILE}.gz ($(du -h "${FILE}.gz" | cut -f1))"
   else
