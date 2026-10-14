@@ -1,7 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 198" width="360" height="198" role="img" aria-labelledby="t d">
   <title id="t">ลูกผสมที่ได้</title><desc id="d">ภาพวาดลูกสุกรลูกผสมสามตัวยืนรวมกัน</desc>
-  <rect width="360" height="230" fill="#f7f3ef"/>
-  <ellipse cx="180" cy="186" rx="140" ry="13" fill="#e6dcd4"/>
     <g>
       <path d="M63.76 156.12 q-3 12 0 19 M82.36 157.98 q-2 12 1 19
                M108.4 157.98 q2 12 -1 19 M125.75999999999999 156.12 q3 12 0 19"
