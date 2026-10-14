@@ -77,6 +77,12 @@ CPF_ASK_URL = os.environ.get("CPF_ASK_URL", "").strip()
 CPF_MODEL = os.environ.get("CPF_MODEL", "")
 CPF_LEVEL = int(os.environ.get("CPF_LEVEL", "1"))
 
+# เสียงพูดไทย (ผู้หญิง) ของ CPF — ใช้แทนเสียงสังเคราะห์ของเบราว์เซอร์ซึ่งอ่านไทยได้แย่
+# ตัวบริการคืน "ลิงก์ไฟล์ .wav" กลับมา และไฟล์นั้นเปิดได้โดยไม่ต้องใช้คีย์
+# เราจึงส่งแค่ลิงก์ให้หน้าเว็บไปโหลดเอง คีย์อยู่ที่เซิร์ฟเวอร์ที่เดียว ไม่หลุดไปอยู่ในเบราว์เซอร์
+CPF_TTS_URL = os.environ.get("CPF_TTS_URL", "https://ota.plotnexuslab.com/ai/api/tts")
+CPF_TTS_KEY = os.environ.get("CPF_TTS_KEY", "")
+
 # ---------- LINE Messaging API ----------
 # ใช้ broadcast (ส่งหาทุกคนที่แอด bot เป็นเพื่อน) เพราะฟาร์มนี้มีผู้ใช้คนเดียว/ทีมเล็ก
 # ไม่ต้องรู้ userId ล่วงหน้า แค่มี Channel Access Token ก็พอ
@@ -430,7 +436,7 @@ _PUBLIC_PREFIXES = ("/ingest", "/r/", "/cron/")
 # ข้อมูล "ภายใน" (หมูป่วย บันทึกวัคซีน คลังความรู้ ตั้งค่า) ต้องล็อกอิน = คนในบริษัท
 # จัดการผู้ใช้ / แก้คลังความรู้ = admin เท่านั้น (ชื่อบัญชีใน ADMIN_USERS)
 ADMIN_USERS = {u.strip() for u in (os.environ.get("ADMIN_USERS") or os.environ.get("KNOWLEDGE_ADMINS") or "admin").split(",") if u.strip()}
-_GUEST_PATHS = {"/weather", "/history", "/predict", "/stats", "/readings-log", "/predictions-log", "/ask", "/admin/whoami"}
+_GUEST_PATHS = {"/weather", "/history", "/predict", "/stats", "/readings-log", "/predictions-log", "/ask", "/tts", "/admin/whoami"}
 _GUEST_PREFIXES = ("/lab/",)
 
 
@@ -2362,6 +2368,39 @@ def get_vet_post(post_id: int):
         print(f"[warn] นับยอดดูไม่สำเร็จ: {e}")
     post["comments"] = supabase.table("vet_comments").select("*").eq("post_id", post_id).order("created_at").execute().data or []
     return post
+
+
+class TTSRequest(BaseModel):
+    text: str
+
+
+@app.post("/tts")
+def text_to_speech(body: TTSRequest):
+    """แปลงข้อความเป็นเสียงพูดไทยด้วยบริการของ CPF
+
+    คืนแต่ลิงก์ไฟล์เสียง ไม่ได้ส่งไฟล์ผ่านเซิร์ฟเวอร์เรา จะได้ไม่กินแบนด์วิดท์
+    ถ้าขอไม่สำเร็จคืนรายการว่าง หน้าเว็บจะถอยไปใช้เสียงของเบราว์เซอร์เอง (ไม่พัง ไม่เงียบ)
+    """
+    text = (body.text or "").strip()
+    key = CPF_TTS_KEY or CPF_API_KEY
+    if not (text and key and CPF_TTS_URL):
+        return {"urls": [], "voice": ""}
+    try:
+        resp = httpx.post(
+            CPF_TTS_URL,
+            headers={"X-API-Key": key},
+            json={"text": text[:1000]},   # ยาวกว่านี้สังเคราะห์นานเกินกว่าผู้ใช้จะรอไหว
+            timeout=45,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        # คีย์ใน JSON ของเขาเป็นภาษาไทย เผื่อวันหลังเปลี่ยนเป็นอังกฤษไว้ด้วย
+        parts = data.get("ท่อน") or data.get("parts") or []
+        urls = [p.get("ลิงก์") or p.get("url") for p in parts if isinstance(p, dict)]
+        return {"urls": [u for u in urls if u], "voice": data.get("เสียง") or ""}
+    except Exception as e:
+        print(f"[warn] ขอเสียงพูดจาก CPF ไม่สำเร็จ: {e}")
+        return {"urls": [], "voice": ""}
 
 
 @app.post("/vet-posts", dependencies=[Depends(verify_admin_token)])
