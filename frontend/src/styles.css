@@ -2630,16 +2630,16 @@ th, td { font-size: 14px; }
 .vg-main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, 1fr); gap: 16px; align-items: start; }
 .vg-figure { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; padding: 10px; background: #fff; cursor: zoom-in; display: block; }
 .vg-img { display: block; width: 100%; height: auto; border-radius: 10px; }
-.vg-side { display: flex; flex-direction: column; gap: 10px; }
-.vg-info { display: flex; gap: 14px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
-.vg-info-icon { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; flex: none; }
+.vg-side { display: flex; flex-direction: column; gap: 12px; }
+.vg-info { display: flex; gap: 15px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 17px 19px; }
+.vg-info-icon { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; font-size: 25px; flex: none; }
 .vg-info-icon.green { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .vg-info-icon.amber { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
 .vg-info-icon.red { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
-.vg-info-title { font-weight: 700; font-size: 15px; margin-bottom: 3px; }
-.vg-info-text { font-size: 13.5px; color: var(--text-dim); line-height: 1.6; }
+.vg-info-title { font-weight: 700; font-size: 18px; margin-bottom: 5px; }
+.vg-info-text { font-size: 16px; color: var(--text-dim); line-height: 1.75; }
 .vg-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 2px; }
-.vg-btn { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 10px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--panel); color: var(--text); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; transition: border-color .15s, filter .15s; }
+.vg-btn { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 15px 12px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--panel); color: var(--text); font: inherit; font-weight: 600; font-size: 15.5px; cursor: pointer; transition: border-color .15s, filter .15s; }
 .vg-btn:hover { border-color: var(--accent); }
 .vg-btn.primary { background: var(--accent); border-color: var(--accent); color: #04121a; }
 .vg-btn.primary:hover { filter: brightness(1.08); }
