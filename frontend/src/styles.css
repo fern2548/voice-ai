@@ -4174,13 +4174,13 @@ th, td { font-size: 14px; }
   align-items: flex-start;
   padding: 14px 16px;
   border-radius: 12px;
-  font-size: clamp(14px, 1vw, 18px);
+  font-size: clamp(14px, 1.15vw, 22px);
   line-height: 1.6;
   color: var(--text-dim);
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn) 32%, transparent);
 }
-.vdx-warn i { color: var(--warn); font-size: clamp(18px, 1.2vw, 23px); flex-shrink: 0; margin-top: 1px; }
+.vdx-warn i { color: var(--warn); font-size: clamp(18px, 1.45vw, 28px); flex-shrink: 0; margin-top: 1px; }
 .vdx-warn b { color: var(--text); font-weight: 600; }
 
 /* ไม่มีกรอบครอบการ์ดแล้ว — กรอบกินความกว้างไปโดยเปล่าประโยชน์
@@ -4191,7 +4191,7 @@ th, td { font-size: 14px; }
 
 .vdx-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .vdx-icon {
-  width: clamp(52px, 3.6vw, 70px); height: clamp(52px, 3.6vw, 70px);
+  width: clamp(52px, 4.4vw, 84px); height: clamp(52px, 4.4vw, 84px);
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -4200,15 +4200,15 @@ th, td { font-size: 14px; }
   background: var(--panel-2);
 }
 .vdx-icon img { width: 100%; height: 100%; object-fit: cover; }
-.vdx-icon i { font-size: clamp(26px, 1.9vw, 36px); color: var(--accent); }
+.vdx-icon i { font-size: clamp(26px, 2.3vw, 44px); color: var(--accent); }
 .vdx-name { flex: 1 1 160px; min-width: 0; }
-.vdx-name h3 { font-size: clamp(19px, 1.35vw, 26px); font-weight: 600; color: var(--text); line-height: 1.3; }
-.vdx-name small { font-size: clamp(12.5px, 0.85vw, 16px); color: var(--text-faint); }
+.vdx-name h3 { font-size: clamp(19px, 1.65vw, 32px); font-weight: 600; color: var(--text); line-height: 1.3; }
+.vdx-name small { font-size: clamp(12.5px, 1vw, 19px); color: var(--text-faint); }
 .vdx-urgent {
   flex-shrink: 0;
   padding: 6px 13px;
   border-radius: 999px;
-  font-size: clamp(12.5px, 0.9vw, 17px);
+  font-size: clamp(12.5px, 1.05vw, 20px);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -4216,11 +4216,11 @@ th, td { font-size: 14px; }
 .vdx-urgent.amber { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
 
 .vdx-hits { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
-.vdx-hits-label { font-size: clamp(12.5px, 0.85vw, 16px); color: var(--text-faint); margin-inline-end: 2px; }
+.vdx-hits-label { font-size: clamp(12.5px, 1vw, 19px); color: var(--text-faint); margin-inline-end: 2px; }
 .vdx-hit {
   padding: 5px 12px;
   border-radius: 999px;
-  font-size: clamp(13px, 0.9vw, 17px);
+  font-size: clamp(13px, 1.05vw, 20px);
   font-weight: 500;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -4265,7 +4265,7 @@ th, td { font-size: 14px; }
 .vdx-img-cap {
   display: block;
   padding: 9px 4px 0;
-  font-size: clamp(13.5px, 0.95vw, 18px);
+  font-size: clamp(13.5px, 1.15vw, 22px);
   font-weight: 500;
   color: var(--text-dim);
 }
@@ -4280,22 +4280,22 @@ th, td { font-size: 14px; }
   background: rgba(0, 0, 0, 0.42);
   font-size: 15px;
 }
-.vdx-imghint { margin-top: 10px; font-size: clamp(12.5px, 0.8vw, 16px); color: var(--text-faint); }
+.vdx-imghint { margin-top: 12px; font-size: clamp(12.5px, 0.95vw, 18px); color: var(--text-faint); }
 
 .vdx-observe {
   margin-top: 16px;
-  padding: clamp(12px, 1vw, 20px) clamp(14px, 1.2vw, 24px);
+  padding: clamp(12px, 1.3vw, 26px) clamp(14px, 1.5vw, 30px);
   border-radius: 12px;
   background: var(--panel-2);
   border: 1px solid var(--border-soft);
 }
 .vdx-observe h4 {
   display: flex; align-items: center; gap: 7px;
-  font-size: clamp(15px, 1.1vw, 21px); font-weight: 600; color: var(--text);
+  font-size: clamp(15px, 1.3vw, 25px); font-weight: 600; color: var(--text);
 }
-.vdx-observe h4 i { color: var(--accent); font-size: clamp(17px, 1.25vw, 24px); }
+.vdx-observe h4 i { color: var(--accent); font-size: clamp(17px, 1.5vw, 29px); }
 .vdx-observe ul { margin: 9px 0 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 6px; }
-.vdx-observe li { font-size: clamp(15px, 1.05vw, 20px); line-height: 1.65; color: var(--text-dim); }
+.vdx-observe li { font-size: clamp(15px, 1.25vw, 24px); line-height: 1.65; color: var(--text-dim); }
 
 .vdx-others {
   display: flex; gap: 10px; align-items: flex-start;
@@ -4305,9 +4305,9 @@ th, td { font-size: 14px; }
   border: 1px dashed var(--border);
 }
 .vdx-others i { color: var(--text-faint); font-size: 17px; flex-shrink: 0; margin-top: 2px; }
-.vdx-others b { font-size: clamp(14px, 1vw, 18px); color: var(--text); }
+.vdx-others b { font-size: clamp(14px, 1.15vw, 21px); color: var(--text); }
 .vdx-others ul { margin: 7px 0 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 5px; }
-.vdx-others li { font-size: clamp(14px, 1vw, 18px); line-height: 1.6; color: var(--text-dim); }
+.vdx-others li { font-size: clamp(14px, 1.15vw, 21px); line-height: 1.6; color: var(--text-dim); }
 
 /* ---- ภาพใหญ่เต็มจอ ---- */
 .vdx-lb {
