@@ -5474,21 +5474,23 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
         if stock:
             context += "\n\n" + stock
 
-    # เรามีความรู้ของเราเองสำหรับคำถามนี้ไหม — ใช้ตัดสินทั้งทางค้นเน็ตและทาง CPF ข้างล่าง
-    _own_knowledge = (
+    # ความรู้ตายตัวของเรา — เป็นข้อเท็จจริงที่ไม่เปลี่ยนตามเวลา
+    _own_static = (
         _needs_symptom_info(text)        # อาการโรค — CPF ปฏิเสธเสมอ
         or _needs_vaccine_method(text)   # วิธี/ตำแหน่งฉีดวัคซีน
         or _needs_pig_env_info(text)     # ค่ามาตรฐานสภาพแวดล้อม
         or _needs_pig_breed_info(text)   # รายชื่อสายพันธุ์
         or _is_breed_advice_question(text)  # แนะนำพันธุ์ตามสภาพอากาศ
-        # ค้นเอกสารของฟาร์มเจอ — CPF อ่านเอกสารเราไม่ได้ ตอบเองดีกว่า
-        or bool(docs and docs[0]["score"] >= RAG_MIN_SCORE)
     )
+    # รวมเอกสารในคลังด้วย — ใช้ตอนตัดสินว่าจะให้ CPF ตอบแทนไหม (CPF อ่านเอกสารเราไม่ได้)
+    _own_knowledge = _own_static or bool(docs and docs[0]["score"] >= RAG_MIN_SCORE)
 
     # 0) ถามข่าว/ราคา/การระบาด — ของพวกนี้ไม่มีในฟาร์มและไม่มีในเอกสาร ต้องไปค้นข้างนอก
     #    ผู้ช่วยของ CPF ค้นเน็ตได้ ซึ่งเป็นความสามารถที่ Gemini ในระบบเราไม่มี
     #    จึงส่งไปหา CPF ตั้งแต่แรก ไม่ต้องรอให้ Gemini ล้มก่อน
-    if _needs_web_info(text) and not _own_knowledge:
+    #    ไม่เช็กเอกสารในคลังตรงนี้ เพราะเอกสารเป็นของนิ่ง ตอบเรื่อง "ช่วงนี้" ไม่ได้
+    #    (เคยเจอ: ถาม "โรคระบาดของสุกรในช่วงนี้" แล้วไปเจอเอกสารโรค เลยไม่ยอมค้นเน็ต)
+    if _needs_web_info(text) and not _own_static:
         web_answer = _cpf_answer(text, "", q.history, web=True)
         if web_answer:
             return Answer(answer=web_answer + "\n\n(ข้อมูลจากการค้นอินเทอร์เน็ต ไม่ใช่ข้อมูลในฟาร์ม)")
