@@ -5,6 +5,7 @@ import { speak, isMuted, setMuted, listVoices, getSavedVoiceURI, setSavedVoiceUR
 import { createRecognizer, pickBestTranscript } from '../utils/speech.js'
 import { parseNavCommand, navReply } from '../utils/voiceNav.js'
 import { matchSymptoms } from '../data/symptomIndex.js'
+import { matchVisual } from '../data/visualAnswers.js'
 import { findDisease } from '../data/diseases.js'
 import { stripMarkdown } from '../utils/answerFormat.js'
 
@@ -78,6 +79,8 @@ export function VoiceAIProvider({ children }) {
     const t = q.replace(/\s+/g, '')
     const wantsPage = OPEN_PAGE_WORDS.some((w) => t.includes(w))
     const sym = wantsPage ? null : matchSymptoms(q)
+    // หัวข้อที่ฟาร์มทำรูปไว้แล้ว (วิธีฉีดวัคซีน · สายพันธุ์) ให้ขึ้นรูปต่อท้ายคำตอบ
+    const vis = (wantsPage || sym) ? null : matchVisual(q)
 
     // คำสั่งเปิดหน้า ทำในเบราว์เซอร์เลย ไม่ต้องส่งให้เซิร์ฟเวอร์
     // เปิดได้ทันที และไม่เปลืองโควตา AI กับคำสั่งที่ไม่ต้องคิด
@@ -106,7 +109,7 @@ export function VoiceAIProvider({ children }) {
     setMessages((prev) => [...prev, { role: 'user', text: q }])
     try {
       const d = await askAI(q, history)
-      setMessages((prev) => [...prev, { role: 'model', text: d.answer, cards: sym || undefined }])
+      setMessages((prev) => [...prev, { role: 'model', text: d.answer, cards: sym || undefined, visual: vis || undefined }])
       // บอกด้วยเสียงว่ามีรูปให้ดู ผู้ใช้ที่ไม่ได้มองจอจะได้รู้ว่าต้องเลื่อนลง
       // ตัดสัญลักษณ์ Markdown ออกก่อน ไม่งั้นเสียงจะอ่านว่า "ดอกจันดอกจัน"
       const spoken = stripMarkdown(d.answer)
@@ -122,7 +125,8 @@ export function VoiceAIProvider({ children }) {
             : 'ขออภัยครับ ตอนนี้เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้งนะครับ'
       setMessages((prev) => [
         ...prev,
-        { role: 'model', text, cards: err?.status === 401 ? undefined : sym || undefined },
+        { role: 'model', text, cards: err?.status === 401 ? undefined : sym || undefined,
+          visual: err?.status === 401 ? undefined : vis || undefined },
       ])
       if (sym && err?.status !== 401) speak(text)
     } finally {

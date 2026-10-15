@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useVoiceAI } from '../context/VoiceAI.jsx'
 import VoiceDiseaseCards from './VoiceDiseaseCards.jsx'
 import AnswerText from './AnswerText.jsx'
+import VoiceVisuals from './VoiceVisuals.jsx'
 
 /**
  * หน้าแรก — ยกโครงมาจากเว็บ Farmy Voice (พอร์ต 5174) ทั้งดุ้น
@@ -46,7 +47,7 @@ export default function VoiceHero() {
       : null
   const showThread = lastUser != null
   // มีการ์ดโรคเมื่อไหร่ หน้าต้องยืดและเลื่อนได้ ไม่ใช่จอเดียวจบเหมือนตอนปกติ
-  const hasCards = Boolean(lastBot?.cards)
+  const hasCards = Boolean(lastBot?.cards || lastBot?.visual)
 
   return (
     <section className={`vh-hero ${hasCards ? 'has-cards' : ''}`}>
@@ -117,6 +118,7 @@ export default function VoiceHero() {
 
           {/* ถามเรื่องอาการ จะได้การ์ดโรคพร้อมภาพต่อท้ายคำตอบ อยู่ในหน้านี้เลย ไม่เด้งไปหน้าอื่น */}
           {showThread && lastBot?.cards && <VoiceDiseaseCards result={lastBot.cards} />}
+          {showThread && lastBot?.visual && <VoiceVisuals result={lastBot.visual} />}
         </div>
       </div>
 
