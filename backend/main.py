@@ -529,7 +529,8 @@ async def _require_admin_login(request, call_next):
     # ข้อมูลปกติ — คนนอกดูได้ (endpoint เหล่านี้ตรวจ role เองอีกชั้นถ้าต้องแยกคำตอบ เช่น /ask)
     if request.method == "GET" and (path in _GUEST_PATHS or path.startswith(_GUEST_PREFIXES)):
         return await call_next(request)
-    if path == "/ask" and request.method == "POST":
+    # POST ที่คนนอกใช้ได้ — ถาม AI และขอเสียงพูด (ทั้งคู่เป็นของปกติ ไม่ใช่ข้อมูลภายใน)
+    if path in ("/ask", "/tts") and request.method == "POST":
         return await call_next(request)
 
     # ลิงก์ดาวน์โหลดที่แนบ token ชั่วคราวมา (เปิดจาก LINE/มือถือได้โดยไม่ต้องล็อกอิน)
