@@ -4904,17 +4904,21 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
         except Exception:
             pass
 
+    # ค่ามาตรฐานการเลี้ยงสุกร + ผลประเมินค่าปัจจุบัน
+    # อยู่นอก if pig: เพราะเป็นความรู้ทั่วไป คนนอกที่ยังไม่ล็อกอินก็ถามได้
+    # (ข้อมูลภายในอย่างบันทึกหมูป่วย/วัคซีน ยังอยู่ใน if pig: เหมือนเดิม)
+    if _needs_pig_env_info(_ctx_text) or pig:
+        if _needs_pig_env_info(_ctx_text):
+            parts.append(_PIG_ENV_STANDARDS)
+        # ประเมินให้เสร็จจากฝั่งเรา ไม่ปล่อยให้ AI เทียบตัวเลขเอง
+        assess = _assess_heat_stress(cur.get("temperature"), cur.get("humidity"))
+        if assess:
+            parts.append(assess)
+
     if pig:
         parts.append(_PIG_BREEDS_INFO)
         if _needs_vaccine_method(_ctx_text):
             parts.append(_VACCINE_METHOD_INFO)
-        # ถามเรื่องสภาพแวดล้อม -> แนบช่วงที่เหมาะสมไปให้ AI เทียบ
-        if _needs_pig_env_info(_ctx_text):
-            parts.append(_PIG_ENV_STANDARDS)
-        # ประเมินค่าปัจจุบันให้เสร็จจากฝั่งเรา ไม่ปล่อยให้ AI เทียบเลขเอง
-        assess = _assess_heat_stress(cur.get("temperature"), cur.get("humidity"))
-        if assess:
-            parts.append(assess)
         try:
             parts.append(_fmt_pig_health(_recent_pig_health()))
         except Exception:
@@ -5239,7 +5243,8 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
         _is_line_report_command(text) or _is_line_send_command(text)
         or _is_followup_record_command(text) or _is_vaccine_record_command(text)
         or (_needs_pig(text) and not _needs_vaccine_method(text)
-            and not _needs_pig_breed_info(text) and not _needs_symptom_info(text))
+            and not _needs_pig_breed_info(text) and not _needs_symptom_info(text)
+            and not _needs_pig_env_info(text))
     ):
         return Answer(answer="ข้อมูลส่วนนี้เป็นข้อมูลภายในฟาร์มครับ ต้องเข้าสู่ระบบก่อนถึงจะดูหรือบันทึกได้ "
                              "ถามเรื่องสภาพอากาศ พยากรณ์ หรือวิธีฉีดวัคซีนได้เลยครับ")
