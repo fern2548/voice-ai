@@ -4021,6 +4021,13 @@ _BREED_REASONING_WORDS = (
 )
 
 
+def _is_breed_advice_question(text: str) -> bool:
+    """ถามเรื่องสายพันธุ์แบบที่ต้องใช้เหตุผล เช่น พันธุ์ไหนเหมาะกับอากาศร้อน"""
+    t = text.replace(" ", "")
+    return (any(k in t for k in _PIG_BREED_KEYWORDS)
+            and any(w in t for w in _BREED_REASONING_WORDS))
+
+
 def _needs_pig_breed_info(text: str) -> bool:
     """ถามหา 'รายชื่อสายพันธุ์' ตรง ๆ เท่านั้น จึงจะตอบจากข้อมูลตายตัว
 
@@ -5027,6 +5034,21 @@ def _rule_based_answer(text: str) -> str:
     if sym:
         return sym
 
+
+    # "พันธุ์ไหนเหมาะกับอากาศแบบนี้" — ต้องมาก่อนกฎสภาพแวดล้อม
+    # ไม่งั้นคำว่า "เหมาะ" จะทำให้ไปตอบเรื่องอุณหภูมิแทนที่จะตอบเรื่องพันธุ์
+    if _is_breed_advice_question(text):
+        return (
+            "เลือกพันธุ์ตามสภาพอากาศร้อนชื้นของไทย: "
+            "พันธุ์ต่างประเทศอย่างแลนด์เรซกับลาร์จไวต์ให้ลูกดกและโตเร็ว แต่ทนร้อนได้น้อย "
+            "ต้องมีโรงเรือนระบายความร้อนดี · "
+            "ดูร็อกทนร้อนได้ดีกว่าและให้เนื้อแดงมาก · "
+            "พันธุ์พื้นเมือง (ไหหลำ ควาย ราด พวง) ทนร้อนและทนโรคที่สุด แต่โตช้าและให้เนื้อน้อย · "
+            "ที่นิยมจริงในไทยคือลูกผสม ใช้แม่ LY (แลนด์เรซผสมลาร์จไวต์) กับพ่อดูร็อก "
+            "ได้ทั้งลูกดก โตดี และทนร้อนพอสมควร "
+            "แต่เรื่องโรงเรือนกับการระบายความร้อนสำคัญกว่าการเลือกพันธุ์ครับ"
+        )
+
     # วิธี/ตำแหน่งฉีดวัคซีน — ความรู้ตายตัวของเรา ตอบได้เลยไม่ต้องพึ่ง AI
     if _needs_vaccine_method(text):
         return _VACCINE_METHOD_INFO.replace("ความรู้อ้างอิง: ", "").replace("\n", " ") + " ครับ"
@@ -5428,6 +5450,7 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
         or _needs_vaccine_method(text)   # วิธี/ตำแหน่งฉีดวัคซีน
         or _needs_pig_env_info(text)     # ค่ามาตรฐานสภาพแวดล้อม
         or _needs_pig_breed_info(text)   # รายชื่อสายพันธุ์
+        or _is_breed_advice_question(text)  # แนะนำพันธุ์ตามสภาพอากาศ
     )
     if not _own_knowledge:
         cpf_answer = _cpf_answer(text, context, q.history)
