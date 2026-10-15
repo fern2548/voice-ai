@@ -5398,7 +5398,7 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
         or _is_followup_record_command(text) or _is_vaccine_record_command(text)
         or (_needs_pig(text) and not _needs_vaccine_method(text)
             and not _needs_pig_breed_info(text) and not _needs_symptom_info(text)
-            and not _needs_pig_env_info(text))
+            and not _needs_pig_env_info(text) and not _needs_web_info(text))
     ):
         return Answer(answer="ข้อมูลส่วนนี้เป็นข้อมูลภายในฟาร์มครับ ต้องเข้าสู่ระบบก่อนถึงจะดูหรือบันทึกได้ "
                              "ถามเรื่องสภาพอากาศ พยากรณ์ หรือวิธีฉีดวัคซีนได้เลยครับ")
