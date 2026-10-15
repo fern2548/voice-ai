@@ -4344,3 +4344,35 @@ th, td { font-size: 14px; }
 .vdx-lb-cap { margin-top: 12px; text-align: center; color: #fff; }
 .vdx-lb-cap b { display: block; font-size: 17px; font-weight: 600; }
 .vdx-lb-cap span { display: block; margin-top: 4px; font-size: 14px; opacity: 0.72; }
+
+/* ---- คำตอบที่มีหัวข้อ/รายการ (AI บางตัวตอบมาเป็น Markdown) ---- */
+/* คำตอบสั้นยังจัดกึ่งกลางเหมือนเดิม อันนี้ใช้เฉพาะตอนมีโครงสร้าง ต้องชิดซ้ายถึงจะไล่สายตาได้ */
+.vh-a.ans {
+  text-align: start;
+  max-width: min(1000px, 100%);
+  margin-inline: auto;
+}
+.ans-head {
+  margin-top: 18px;
+  font-size: 1.08em;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+.ans-head:first-child { margin-top: 0; }
+.ans-para { margin-top: 10px; }
+.ans-para:first-child { margin-top: 0; }
+.ans-list {
+  margin: 10px 0 0;
+  padding-inline-start: 1.5em;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ans-list.ul { list-style: disc; }
+.ans-list.ol { list-style: decimal; }
+.ans-list li { line-height: 1.6; }
+.ans-list li::marker { color: var(--accent); }
+.ans strong { font-weight: 600; color: var(--text); }
+.ans-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.ans-link:hover { opacity: 0.8; }

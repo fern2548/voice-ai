@@ -6,6 +6,7 @@ import { createRecognizer, pickBestTranscript } from '../utils/speech.js'
 import { parseNavCommand, navReply } from '../utils/voiceNav.js'
 import { matchSymptoms } from '../data/symptomIndex.js'
 import { findDisease } from '../data/diseases.js'
+import { stripMarkdown } from '../utils/answerFormat.js'
 
 // คำที่บอกชัดว่าอยาก "เปิดหน้า" จริง ๆ ไม่ใช่ถามเรื่องอาการ
 // ถ้าไม่มีคำพวกนี้ คำถามที่มีอาการปนอยู่จะตอบเป็นการ์ดในหน้าเดิม ไม่เด้งไปหน้าอื่น
@@ -107,7 +108,9 @@ export function VoiceAIProvider({ children }) {
       const d = await askAI(q, history)
       setMessages((prev) => [...prev, { role: 'model', text: d.answer, cards: sym || undefined }])
       // บอกด้วยเสียงว่ามีรูปให้ดู ผู้ใช้ที่ไม่ได้มองจอจะได้รู้ว่าต้องเลื่อนลง
-      speak(sym ? `${d.answer} ดูภาพอาการของแต่ละโรคได้ด้านล่างครับ` : d.answer)
+      // ตัดสัญลักษณ์ Markdown ออกก่อน ไม่งั้นเสียงจะอ่านว่า "ดอกจันดอกจัน"
+      const spoken = stripMarkdown(d.answer)
+      speak(sym ? `${spoken} ดูภาพอาการของแต่ละโรคได้ด้านล่างครับ` : spoken)
     } catch (err) {
       // แยกให้ตรงสาเหตุ ไม่งั้นผู้ใช้จะนึกว่าเซิร์ฟเวอร์ล่ม ทั้งที่แค่ต้องล็อกอินใหม่
       // ถ้า AI ล่มแต่จับอาการได้ ยังตอบจากคลังคำอาการของฟาร์มเองได้ พร้อมการ์ดรูป

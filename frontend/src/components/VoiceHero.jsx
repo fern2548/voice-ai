@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useVoiceAI } from '../context/VoiceAI.jsx'
 import VoiceDiseaseCards from './VoiceDiseaseCards.jsx'
+import AnswerText from './AnswerText.jsx'
 
 /**
  * หน้าแรก — ยกโครงมาจากเว็บ Farmy Voice (พอร์ต 5174) ทั้งดุ้น
@@ -112,7 +113,7 @@ export default function VoiceHero() {
           {voiceError && <p className="vh-error">{voiceError}</p>}
 
           {showThread && lastUser && <p className="vh-q">“{lastUser.text}”</p>}
-          {showThread && lastBot && <p className="vh-a">{lastBot.text}</p>}
+          {showThread && lastBot && <AnswerText text={lastBot.text} />}
 
           {/* ถามเรื่องอาการ จะได้การ์ดโรคพร้อมภาพต่อท้ายคำตอบ อยู่ในหน้านี้เลย ไม่เด้งไปหน้าอื่น */}
           {showThread && lastBot?.cards && <VoiceDiseaseCards result={lastBot.cards} />}
