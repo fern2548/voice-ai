@@ -5324,8 +5324,16 @@ if os.path.isdir(_WEB_DIST):
         return FileResponse(os.path.join(_WEB_DIST, "index.html"))
 
     # หน้าเว็บต้องเปิดได้โดยไม่ต้องล็อกอิน (หน้าล็อกอินก็อยู่ในนั้น) — เพิ่มเข้า allowlist ของด่านตรวจ
-    # ไฟล์นิ่งของหน้าเว็บ + ของ PWA (manifest, service worker, ไอคอน, ภาพคู่มือ) — เบราว์เซอร์ขอเองโดยไม่มี token
-    _PUBLIC_PREFIXES = _PUBLIC_PREFIXES + ("/assets", "/icons/", "/guide/", "/vaccines/", "/sw.js", "/manifest.webmanifest")
+    # ไฟล์นิ่งของหน้าเว็บ + ของ PWA (manifest, service worker, ไอคอน, ภาพ) — เบราว์เซอร์ขอเองโดยไม่มี token
+    #
+    # อ่านรายชื่อโฟลเดอร์จาก dist เอง ไม่พิมพ์ไว้ตายตัว
+    # เคยพิมพ์ไว้แล้วลืมเติมตอนเพิ่มโฟลเดอร์ใหม่ (breeds, diseases) ทำให้รูปขึ้น 401 หมด
+    _static_dirs = tuple(
+        f"/{d}/" for d in sorted(os.listdir(_WEB_DIST))
+        if os.path.isdir(os.path.join(_WEB_DIST, d))
+    )
+    _PUBLIC_PREFIXES = _PUBLIC_PREFIXES + _static_dirs + ("/assets", "/sw.js", "/manifest.webmanifest")
+    print(f"[info] ไฟล์นิ่งที่เปิดได้โดยไม่ต้องล็อกอิน: {', '.join(_static_dirs) or '(ไม่มีโฟลเดอร์ย่อย)'}")
     _SERVE_WEB = True
     print(f"[info] เสิร์ฟหน้าเว็บจาก {_WEB_DIST}")
 
