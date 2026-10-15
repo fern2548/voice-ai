@@ -5240,8 +5240,22 @@ def _cpf_usable(answer: str) -> Optional[str]:
     return a
 
 
+# คำที่บอกว่าผู้ใช้อยากได้ข้อมูลสดจากข้างนอก ไม่ใช่ข้อมูลในฟาร์ม
+# ไม่ใส่คำว่า "ตอนนี้" กับ "ล่าสุด" เดี่ยว ๆ เพราะใช้ถามค่าเซนเซอร์บ่อยมาก
+# ("อุณหภูมิตอนนี้เท่าไหร่" ต้องไปหาเซนเซอร์ ไม่ใช่ไปค้นเน็ต)
+_WEB_INFO_WORDS = (
+    "ข่าว", "ระบาด", "ราคา", "ประกาศ", "สถานการณ์", "มาตรการ",
+    "ค้นเน็ต", "ค้นหา", "ค้นข่าว", "กฎหมาย", "ตลาด", "ส่งออก", "นำเข้า",
+)
+
+
+def _needs_web_info(text: str) -> bool:
+    return any(w in text.replace(" ", "") for w in _WEB_INFO_WORDS)
+
+
 def _cpf_answer_native(text: str, context: str,
-                       history: Optional[list[ChatTurn]] = None) -> Optional[str]:
+                       history: Optional[list[ChatTurn]] = None,
+                       web: bool = False) -> Optional[str]:
     """คุยกับ CPF ด้วยรูปแบบของเขาเอง — POST {q, level} + X-API-Key
 
     ใช้ตอนรันบน Render ซึ่งไม่มีตัวแปลง (cpf_shim.py) เหมือนในกล่อง
@@ -5258,6 +5272,10 @@ def _cpf_answer_native(text: str, context: str,
         lines = [("ผู้ใช้: " if t.role != "model" else "ผู้ช่วย: ") + t.text for t in turns]
         prev = "บทสนทนาก่อนหน้า:\n" + "\n".join(lines) + "\n\n"
     q = (f"CONTEXT (ข้อมูลจริงจากสถานี):\n{ctx}\n\n" if ctx else "") + prev + f"คำถาม: {text}"
+    if web:
+        # ผู้ช่วยของ CPF จะหาจากเซนเซอร์ก่อนเสมอ ไม่เจอก็บอกว่าไม่มีข้อมูล
+        # ต้องสั่งให้ค้นเน็ตชัด ๆ ถึงจะออกไปหาข้างนอก (ทดสอบแล้ว ต่างกันคนละเรื่อง)
+        q = f"ช่วยค้นข่าวล่าสุดจากอินเทอร์เน็ตให้หน่อย: {text}"
     try:
         resp = httpx.post(
             CPF_ASK_URL,
@@ -5277,7 +5295,8 @@ def _cpf_answer_native(text: str, context: str,
         return None
 
 
-def _cpf_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -> Optional[str]:
+def _cpf_answer(text: str, context: str, history: Optional[list[ChatTurn]],
+                web: bool = False) -> Optional[str]:
     """ลองตอบด้วย AI ของ CPF — คืน None ถ้ายังไม่ได้ตั้งค่า เรียกไม่สำเร็จ หรือ CPF ปฏิเสธ
     ให้ caller ไปใช้ตัวถัดไปต่อ เว็บจะได้ไม่พังเพราะ AI ตัวเดียวล่ม
 
@@ -5286,7 +5305,7 @@ def _cpf_answer(text: str, context: str, history: Optional[list[ChatTurn]]) -> O
     if not CPF_API_KEY:
         return None
     if CPF_ASK_URL:
-        return _cpf_answer_native(text, context, history)
+        return _cpf_answer_native(text, context, history, web)
     if not CPF_API_BASE:
         return None
 
@@ -5455,6 +5474,25 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
         if stock:
             context += "\n\n" + stock
 
+    # เรามีความรู้ของเราเองสำหรับคำถามนี้ไหม — ใช้ตัดสินทั้งทางค้นเน็ตและทาง CPF ข้างล่าง
+    _own_knowledge = (
+        _needs_symptom_info(text)        # อาการโรค — CPF ปฏิเสธเสมอ
+        or _needs_vaccine_method(text)   # วิธี/ตำแหน่งฉีดวัคซีน
+        or _needs_pig_env_info(text)     # ค่ามาตรฐานสภาพแวดล้อม
+        or _needs_pig_breed_info(text)   # รายชื่อสายพันธุ์
+        or _is_breed_advice_question(text)  # แนะนำพันธุ์ตามสภาพอากาศ
+        # ค้นเอกสารของฟาร์มเจอ — CPF อ่านเอกสารเราไม่ได้ ตอบเองดีกว่า
+        or bool(docs and docs[0]["score"] >= RAG_MIN_SCORE)
+    )
+
+    # 0) ถามข่าว/ราคา/การระบาด — ของพวกนี้ไม่มีในฟาร์มและไม่มีในเอกสาร ต้องไปค้นข้างนอก
+    #    ผู้ช่วยของ CPF ค้นเน็ตได้ ซึ่งเป็นความสามารถที่ Gemini ในระบบเราไม่มี
+    #    จึงส่งไปหา CPF ตั้งแต่แรก ไม่ต้องรอให้ Gemini ล้มก่อน
+    if _needs_web_info(text) and not _own_knowledge:
+        web_answer = _cpf_answer(text, "", q.history, web=True)
+        if web_answer:
+            return Answer(answer=web_answer + "\n\n(ข้อมูลจากการค้นอินเทอร์เน็ต ไม่ใช่ข้อมูลในฟาร์ม)")
+
     # 1) Gemini (ถ้าตั้งค่าคีย์ไว้) — ยิงครั้งเดียวต่อคำถาม ไม่ retry เพื่อไม่ให้เปลืองโควตา
     if _llm is not None:
         # ต่อบทสนทนาแบบ multi-turn: เอาประวัติล่าสุดไม่เกิน MAX_HISTORY_TURNS เทิร์น
@@ -5513,15 +5551,6 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
     #    ผู้ช่วยของ CPF รู้แค่เรื่องเซนเซอร์กับพยากรณ์อากาศ ถามเรื่องอื่นมันจะตอบเรื่องเซนเซอร์กลับมา
     #    (เคยถามวิธีฉีดวัคซีน แล้วได้รายงานสถานะเซนเซอร์มาแทน)
     #    คำถามที่เรามีความรู้ของเราเองอยู่แล้ว จึงข้าม CPF ไปใช้ของเราดีกว่า
-    _own_knowledge = (
-        _needs_symptom_info(text)        # อาการโรค — CPF ปฏิเสธเสมอ
-        or _needs_vaccine_method(text)   # วิธี/ตำแหน่งฉีดวัคซีน
-        or _needs_pig_env_info(text)     # ค่ามาตรฐานสภาพแวดล้อม
-        or _needs_pig_breed_info(text)   # รายชื่อสายพันธุ์
-        or _is_breed_advice_question(text)  # แนะนำพันธุ์ตามสภาพอากาศ
-        # ค้นเอกสารของฟาร์มเจอ — CPF อ่านเอกสารเราไม่ได้ ตอบเองดีกว่า
-        or bool(docs and docs[0]["score"] >= RAG_MIN_SCORE)
-    )
     if not _own_knowledge:
         cpf_answer = _cpf_answer(text, context, q.history)
         if cpf_answer:
