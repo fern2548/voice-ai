@@ -20,6 +20,7 @@ import os
 import re
 import secrets
 import threading
+import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -4718,11 +4719,27 @@ def _embed(texts: list[str], task: str) -> list[list[float]]:
         raise HTTPException(status_code=503, detail="ยังไม่ได้ตั้งค่า GEMINI_API_KEY จึงยังใช้คลังความรู้ไม่ได้")
     vecs: list[list[float]] = []
     for i in range(0, len(texts), 50):   # API รับได้ครั้งละไม่เกิน 100
-        resp = _llm.models.embed_content(
-            model=EMBED_MODEL,
-            contents=texts[i:i + 50],
-            config={"task_type": task, "output_dimensionality": EMBED_DIM},
-        )
+        # โควตาฟรีของ Gemini จำกัดจำนวนครั้งต่อนาที อัปโหลดเอกสารยาว ๆ จะโดน 429 กลางคัน
+        # เป็นลิมิตชั่วคราว ไม่ใช่โควตาหมดถาวร จึงรอแล้วลองใหม่ ดีกว่าให้ผู้ใช้อัปใหม่ทั้งไฟล์
+        for attempt in range(5):
+            try:
+                resp = _llm.models.embed_content(
+                    model=EMBED_MODEL,
+                    contents=texts[i:i + 50],
+                    config={"task_type": task, "output_dimensionality": EMBED_DIM},
+                )
+                break
+            except Exception as e:
+                if "429" not in str(e) and "RESOURCE_EXHAUSTED" not in str(e):
+                    raise
+                if attempt == 4:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="โควตาแปลงเอกสารของ Gemini เต็มชั่วคราว รออีกสักครู่แล้วลองใหม่",
+                    )
+                wait = 15 * (attempt + 1)
+                print(f"[info] โควตาเต็มชั่วคราว รอ {wait} วินาทีแล้วลองใหม่ (ครั้งที่ {attempt + 1})")
+                time.sleep(wait)
         vecs.extend([list(e.values) for e in resp.embeddings])
     return vecs
 
