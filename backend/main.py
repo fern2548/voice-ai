@@ -778,6 +778,7 @@ def health():
         "llm_model": GEMINI_MODEL,
         # บอกว่า AI ของ CPF ต่อไว้หรือยัง จะได้ไล่ปัญหาได้โดยไม่ต้องเปิด log
         "cpf_configured": bool((CPF_ASK_URL or CPF_API_BASE) and CPF_API_KEY),
+        "embed_backend": EMBED_BACKEND,
         "lab_configured": bool(LAB_API_KEY),
         # None = ยังไม่เคยพัง (หรือยังไม่มีใครถาม) / มีข้อความ = ครั้งล่าสุดพังเพราะอะไร
         "llm_last_error": _LAST_LLM_ERROR,
@@ -4673,6 +4674,45 @@ def _fmt_stats(s: dict) -> str:
 # เก็บ vector เป็น jsonb ธรรมดา แล้วคำนวณความใกล้ใน Python — ไม่ต้องพึ่ง pgvector
 # ใช้ได้ทั้ง Supabase คลาวด์และ Postgres บนกล่อง เอกสารระดับพันท่อนยังตอบใน ~50ms
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "gemini-embedding-001")
+
+# ---------- ตัวแปลงข้อความเป็นดัชนีค้นหา ----------
+# เลือกได้ 2 แบบผ่าน EMBED_BACKEND
+#   gemini (ค่าเริ่มต้น) — ส่งไปให้ Google แปลง เร็วแต่มีโควตาจำกัด หมดแล้วคลังความรู้ใช้ไม่ได้เลย
+#   local               — รันโมเดลในเครื่องเอง ไม่มีลิมิต ไม่ต้องต่อเน็ต เหมาะกับกล่องที่มีซีพียูเหลือ
+#
+# สองแบบนี้ให้ตัวเลขคนละชุด ใช้ร่วมกันไม่ได้ สลับเมื่อไหร่ต้องแปลงเอกสารใหม่ทั้งหมด
+EMBED_BACKEND = os.environ.get("EMBED_BACKEND", "gemini").strip().lower()
+LOCAL_EMBED_MODEL = os.environ.get("LOCAL_EMBED_MODEL", "intfloat/multilingual-e5-base")
+
+_local_embedder = None
+_local_embed_lock = threading.Lock()
+
+
+def _get_local_embedder():
+    """โหลดโมเดลครั้งแรกที่ใช้ แล้วเก็บไว้ใช้ซ้ำ (โหลดครั้งละ ~10 วินาที)"""
+    global _local_embedder
+    if _local_embedder is None:
+        with _local_embed_lock:
+            if _local_embedder is None:
+                from sentence_transformers import SentenceTransformer
+                print(f"[info] กำลังโหลดตัวแปลงดัชนีในเครื่อง: {LOCAL_EMBED_MODEL}")
+                _local_embedder = SentenceTransformer(LOCAL_EMBED_MODEL, device="cpu")
+                print("[info] โหลดตัวแปลงดัชนีเสร็จแล้ว")
+    return _local_embedder
+
+
+def _embed_local(texts: list[str], task: str) -> list[list[float]]:
+    """แปลงด้วยโมเดลในเครื่อง
+
+    ตระกูล e5 ต้องเติมคำนำหน้าให้ถูก ไม่งั้นความแม่นตกลงอย่างเห็นได้ชัด
+      query:   สำหรับคำถามของผู้ใช้
+      passage: สำหรับเนื้อเอกสาร
+    """
+    prefix = "query: " if task == "RETRIEVAL_QUERY" else "passage: "
+    model = _get_local_embedder()
+    vecs = model.encode([prefix + t for t in texts],
+                        normalize_embeddings=True, batch_size=16, show_progress_bar=False)
+    return [[float(x) for x in v] for v in vecs]
 EMBED_DIM = 768
 RAG_TOP_K = 4           # แนบให้ AI กี่ท่อน
 RAG_MIN_SCORE = 0.70    # ความใกล้ต่ำกว่านี้ถือว่าไม่เกี่ยว ไม่แนบ (วัดจริง: ตรงเรื่อง 0.70-0.81, คนละเรื่อง ≤0.60)
@@ -4719,6 +4759,8 @@ def _embed(texts: list[str], task: str, patient: bool = True) -> list[list[float
     patient=True  ตอนนำเข้าเอกสาร รอโควตาได้ เพราะเป็นงานเบื้องหลัง
     patient=False ตอนผู้ใช้ถาม ต้องล้มเร็ว ไม่งั้นผู้ใช้นั่งรอเป็นนาที
     """
+    if EMBED_BACKEND == "local":
+        return _embed_local(texts, task)
     if _llm is None:
         raise HTTPException(status_code=503, detail="ยังไม่ได้ตั้งค่า GEMINI_API_KEY จึงยังใช้คลังความรู้ไม่ได้")
     vecs: list[list[float]] = []
