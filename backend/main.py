@@ -4713,15 +4713,19 @@ def _rag_chunks(text: str) -> list[str]:
     return [c for c in out if len(c) >= 20]
 
 
-def _embed(texts: list[str], task: str) -> list[list[float]]:
-    """แปลงข้อความเป็น vector — task = RETRIEVAL_DOCUMENT ตอนเก็บ / RETRIEVAL_QUERY ตอนถาม"""
+def _embed(texts: list[str], task: str, patient: bool = True) -> list[list[float]]:
+    """แปลงข้อความเป็น vector — task = RETRIEVAL_DOCUMENT ตอนเก็บ / RETRIEVAL_QUERY ตอนถาม
+
+    patient=True  ตอนนำเข้าเอกสาร รอโควตาได้ เพราะเป็นงานเบื้องหลัง
+    patient=False ตอนผู้ใช้ถาม ต้องล้มเร็ว ไม่งั้นผู้ใช้นั่งรอเป็นนาที
+    """
     if _llm is None:
         raise HTTPException(status_code=503, detail="ยังไม่ได้ตั้งค่า GEMINI_API_KEY จึงยังใช้คลังความรู้ไม่ได้")
     vecs: list[list[float]] = []
     for i in range(0, len(texts), 50):   # API รับได้ครั้งละไม่เกิน 100
         # โควตาฟรีของ Gemini จำกัดจำนวนครั้งต่อนาที อัปโหลดเอกสารยาว ๆ จะโดน 429 กลางคัน
         # เป็นลิมิตชั่วคราว ไม่ใช่โควตาหมดถาวร จึงรอแล้วลองใหม่ ดีกว่าให้ผู้ใช้อัปใหม่ทั้งไฟล์
-        for attempt in range(5):
+        for attempt in range(5 if patient else 1):
             try:
                 resp = _llm.models.embed_content(
                     model=EMBED_MODEL,
@@ -4732,7 +4736,7 @@ def _embed(texts: list[str], task: str) -> list[list[float]]:
             except Exception as e:
                 if "429" not in str(e) and "RESOURCE_EXHAUSTED" not in str(e):
                     raise
-                if attempt == 4:
+                if not patient or attempt == 4:
                     raise HTTPException(
                         status_code=429,
                         detail="โควตาแปลงเอกสารของ Gemini เต็มชั่วคราว รออีกสักครู่แล้วลองใหม่",
@@ -4795,7 +4799,7 @@ def _rag_search(question: str, k: int = RAG_TOP_K) -> list[dict]:
         chunks = _rag_load()
         if not chunks or _llm is None:
             return []
-        q = _unit(_embed([question], "RETRIEVAL_QUERY")[0])
+        q = _unit(_embed([question], "RETRIEVAL_QUERY", patient=False)[0])
         scored = []
         for c in chunks:
             v = c["vec"]
@@ -5473,6 +5477,8 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
         or _needs_pig_env_info(text)     # ค่ามาตรฐานสภาพแวดล้อม
         or _needs_pig_breed_info(text)   # รายชื่อสายพันธุ์
         or _is_breed_advice_question(text)  # แนะนำพันธุ์ตามสภาพอากาศ
+        # ค้นเอกสารของฟาร์มเจอ — CPF อ่านเอกสารเราไม่ได้ ตอบเองดีกว่า
+        or bool(docs and docs[0]["score"] >= RAG_MIN_SCORE)
     )
     if not _own_knowledge:
         cpf_answer = _cpf_answer(text, context, q.history)
