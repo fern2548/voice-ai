@@ -5787,6 +5787,23 @@ if os.path.isdir(_WEB_DIST):
 
     app.mount("/assets", StaticFiles(directory=os.path.join(_WEB_DIST, "assets")), name="assets")
 
+    @app.middleware("http")
+    async def _cache_policy(request, call_next):
+        """บอกเบราว์เซอร์ให้ชัดว่าไฟล์ไหนแคชได้ ไฟล์ไหนต้องถามใหม่ทุกครั้ง
+
+        ถ้าไม่บอก เบราว์เซอร์จะเดาเองจาก Last-Modified แล้วเก็บ index.html ไว้เป็นชั่วโมง
+        ผู้ใช้จึงค้างอยู่กับโค้ดเวอร์ชันเก่าทั้งที่ขึ้นเวอร์ชันใหม่ไปแล้ว (เคยเกิดมาหลายรอบ)
+
+        ไฟล์ใน /assets มีแฮชอยู่ในชื่อ เนื้อหาเปลี่ยนเมื่อไหร่ชื่อเปลี่ยนตาม จึงแคชยาวได้
+        ส่วน index.html ชื่อเดิมตลอด ต้องถามใหม่ทุกครั้งว่าชี้ไป bundle ไหน
+        """
+        resp = await call_next(request)
+        if request.url.path.startswith("/assets/"):
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif resp.headers.get("content-type", "").startswith("text/html"):
+            resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return resp
+
     @app.get("/{path:path}", include_in_schema=False)
     def _spa(path: str):
         """ทุกที่อยู่ที่ไม่ใช่ API ส่งกลับ index.html ให้ React จัดการเอง
