@@ -2067,9 +2067,31 @@ def _task_insert(rows: list[dict]) -> None:
             pass   # ซ้ำ = มีงานนี้อยู่แล้ว ไม่ต้องทำอะไร
 
 
+def _expire_daily_tasks(today: date) -> None:
+    """ลบงานรายวันที่ค้างจากวันก่อนทิ้ง
+
+    งานจากเซนเซอร์กับงานประจำเป็นงาน "ของวันนั้น" ไม่ใช่งานค้าง
+    "ตรวจการระบายอากาศ" ของเมื่อวานไม่มีความหมายแล้ว เพราะค่าวันนี้อ่านใหม่หมด
+    ถ้าไม่ลบ มันจะกองสะสมวันละใบจนท่วมข้อความที่ส่งเข้า LINE
+    (เคยเกิดมาแล้ว — งานเดิมซ้ำ 6 ใบจนงานจริงถูกดันตกไป)
+
+    ลบเฉพาะใบที่ยังไม่มีใครแตะ (pending) — ที่กดรับไว้แล้วหรือบันทึกผลแล้วเก็บไว้เป็นประวัติ
+    ส่วนงานวัคซีน ตรวจอาการ และเคสสัตวแพทย์ ไม่ลบ เพราะนั่นเป็นงานค้างจริงที่ต้องตามต่อ
+    """
+    try:
+        (supabase.table("farm_tasks").delete()
+         .in_("source", ["sensor", "routine"])
+         .eq("status", "pending")
+         .lt("due_date", today.isoformat())
+         .execute())
+    except Exception as e:
+        print(f"[warn] ล้างงานรายวันที่ค้างไม่ได้: {e}")
+
+
 def _sync_auto_tasks() -> None:
     """สร้างงานของวันนี้จากระบบอื่น — เรียกตอนเปิดหน้ารายการงาน"""
     today = datetime.now(BANGKOK).date()
+    _expire_daily_tasks(today)
     rows: list[dict] = []
 
     # 1) วัคซีนตามแผนที่ถึงกำหนด/เลยกำหนด
@@ -3100,46 +3122,61 @@ def cron_vaccine_today_notify(x_cron_key: str = Header(default="")):
         print(f"[warn] อ่านแผนวัคซีนไม่ได้: {e}")
         plan = []
     # 2) นัดเข็มถัดไปที่จดไว้เองตอนบันทึกการฉีดครั้งก่อน
+    #    ต้องแยก "ครบกำหนดวันนี้" ออกจาก "เลยกำหนดมานานแล้ว" ไม่งั้นนัดค้างเก่า
+    #    จะถูกนับเป็นงานของวันนี้ ทำให้ตัวเลขหัวข้อความเกินจริง
     try:
         nexts = _vaccine_due_rows(0)
     except Exception as e:
         print(f"[warn] อ่านนัดวัคซีนไม่ได้: {e}")
         nexts = []
+    iso = today.isoformat()
+    next_today = [r for r in nexts if str(r.get("next_due_date") or "") == iso]
+    next_late = [r for r in nexts if str(r.get("next_due_date") or "") < iso]
 
-    if not plan and not nexts:
-        return {"ok": True, "sent": False, "count": 0}
-
-    late = [r for r in plan if r["status"] == "overdue"]
     now = [r for r in plan if r["status"] == "due"]
-    lines = [f"💉 วันนี้ต้องฉีดวัคซีน {len(now) + len(nexts)} รายการ"
-             + (f" · เลยกำหนดอีก {len(late)}" if late else "")]
+    late = [r for r in plan if r["status"] == "overdue"]
+    if not now and not late and not nexts:
+        return {"ok": True, "sent": False, "count": 0}
 
     def where_of(r):
         return " ".join(x for x in [r.get("barn_no"), r.get("pen_no")] if x)
 
-    if now:
+    def days_late(r):
+        try:
+            return (today - date.fromisoformat(str(r["next_due_date"]))).days
+        except (TypeError, ValueError, KeyError):
+            return None
+
+    today_n = len(now) + len(next_today)
+    late_n = len(late) + len(next_late)
+    head = f"💉 วันนี้ต้องฉีดวัคซีน {today_n} รายการ" if today_n else "💉 วัคซีนที่ยังค้างอยู่"
+    lines = [head + (f" · เลยกำหนดอีก {late_n}" if late_n else "")]
+
+    if now or next_today:
         lines.append("🟠 ฉีดวันนี้")
         for r in now[:8]:
             w = where_of(r)
             lines.append(f"• {r['batch_name']} · {r['vaccine_name']} {r['label']}"
                          + (f" · {r['pig_count']} ตัว" if r.get("pig_count") else "")
                          + (" · " + w if w else ""))
-    if nexts:
-        lines.append("🟠 ถึงนัดเข็มถัดไป")
-        for r in nexts[:5]:
+        for r in next_today[:5]:
             w = where_of(r)
-            lines.append(f"• {r.get('vaccine_name') or 'วัคซีน'}" + (" · " + w if w else ""))
-    if late:
+            lines.append(f"• {r.get('vaccine_name') or 'วัคซีน'} (นัดเข็มถัดไป)" + (" · " + w if w else ""))
+    if late or next_late:
         lines.append("🔴 เลยกำหนดแล้วยังไม่ฉีด")
         for r in late[:6]:
             w = where_of(r)
             lines.append(f"• {r['batch_name']} · {r['vaccine_name']} {r['label']}"
                          f" (เลยมา {-r['days_left']} วัน)" + (" · " + w if w else ""))
+        for r in next_late[:5]:
+            w, d = where_of(r), days_late(r)
+            lines.append(f"• {r.get('vaccine_name') or 'วัคซีน'} (นัดเข็มถัดไป"
+                         + (f" เลยมา {d} วัน" if d else "") + ")" + (" · " + w if w else ""))
     if PUBLIC_SITE_URL:
         lines.append(f"บันทึกการฉีด: {PUBLIC_SITE_URL}/vaccine")
     _send_line_broadcast("\n".join(lines))
-    return {"ok": True, "sent": True, "count": len(now) + len(nexts) + len(late),
-            "due_today": len(now), "overdue": len(late), "next_due": len(nexts)}
+    return {"ok": True, "sent": True, "count": today_n + late_n,
+            "due_today": today_n, "overdue": late_n}
 
 
 @app.get("/vaccine-followup-due")
