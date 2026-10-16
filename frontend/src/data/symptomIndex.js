@@ -146,12 +146,54 @@ const norm = (s) => (s || '').replace(/\s+/g, '').toLowerCase()
  *            cards  = โรคที่มีภาพอาการแล้ว (เอาไปขึ้นการ์ด)
  *            others = โรคที่ยังไม่มีภาพ (เอาไปขึ้นเป็นบรรทัดเตือน)
  */
+// ชื่อโรคที่คนเรียกกันจริง — ถามชื่อโรคมาตรง ๆ ต้องขึ้นเฉพาะโรคนั้น
+// ไม่ใช่ไปจับคำว่า "ไข้" ใน "ไข้หวัดใหญ่" แล้วขึ้นทุกโรคที่มีไข้ (เคยเกิดมาแล้ว)
+// เรียงจากเฉพาะเจาะจงไปกว้าง เพราะ "อหิวาต์แอฟริกา" มีคำว่า "อหิวาต์" อยู่ข้างใน
+const DISEASE_NAMES = [
+  ['asf', ['อหิวาต์แอฟริกา', 'อหิวาตแอฟริกา', 'แอฟริกันสไวน์', 'asf']],
+  ['csf', ['อหิวาต์สุกร', 'อหิวาตสุกร', 'อหิวาต์หมู', 'อหิวาต์', 'csf']],
+  ['fmd', ['ปากและเท้าเปื่อย', 'ปากเท้าเปื่อย', 'ปากเปื่อยเท้าเปื่อย', 'fmd']],
+  ['si', ['ไข้หวัดใหญ่', 'หวัดใหญ่', 'swineinfluenza', 'swineflu']],
+  ['prrs', ['พีอาร์อาร์เอส', 'พีอาร์อาร์', 'prrs']],
+  ['ped', ['ท้องร่วงติดต่อ', 'ped']],
+  ['app', ['ปอดอักเสบติดต่อ', 'app']],
+]
+
+/** ผู้ใช้เอ่ยชื่อโรคไหนมาบ้าง — คืนรายการ id ตามลำดับที่พบ */
+function namedDiseases(t) {
+  const out = []
+  let rest = t
+  for (const [id, names] of DISEASE_NAMES) {
+    const hit = names.find((n) => rest.includes(n))
+    if (!hit) continue
+    out.push(id)
+    // ตัดชื่อที่เจอออก กัน "อหิวาต์แอฟริกา" ไปโดนนับเป็น "อหิวาต์สุกร" ซ้ำอีกรอบ
+    rest = rest.split(hit).join(' ')
+  }
+  return out
+}
+
 export function matchSymptoms(text) {
   const t = norm(text)
   if (!t) return null
 
   const hasDiseaseCue = DISEASE_CUES.some((c) => t.includes(c))
   if (!hasDiseaseCue && DATA_QUERY_CUES.some((c) => t.includes(c))) return null
+
+  // เอ่ยชื่อโรคมาตรง ๆ = รู้อยู่แล้วว่าถามโรคไหน ขึ้นเฉพาะโรคนั้น ไม่ต้องเดาจากอาการ
+  const named = namedDiseases(t)
+  if (named.length) {
+    // labels ว่างไว้ เพราะผู้ใช้ไม่ได้พูดอาการมา จะขึ้นว่า "อาการที่ตรงกัน" ไม่ได้
+    // signs ว่างไว้ การ์ดจะขึ้นภาพอาการของโรคนั้นเรียงตามลำดับเดิมครบทุกจุด
+    const pick = named.map((id) => ({ id, score: 99, labels: [], signs: [] }))
+    return {
+      broad: false,
+      named: true,
+      hits: [],
+      cards: pick.filter((f) => OBSERVE_MORE[f.id]),
+      others: pick.filter((f) => NO_IMAGE_NOTE[f.id]),
+    }
+  }
 
   const found = []
   const words = new Set()       // คำอาการที่ผู้ใช้พูดจริง ๆ ใช้ตอนพูดตอบกลับ
@@ -191,6 +233,7 @@ export function matchSymptoms(text) {
   const hits = all.filter((w, i) => !all.slice(0, i).some((long) => long.includes(w)))
   return {
     broad,
+    named: false,
     hits,
     cards: strong.filter((f) => OBSERVE_MORE[f.id]).slice(0, 3),
     others: strong.filter((f) => NO_IMAGE_NOTE[f.id]).slice(0, 3),

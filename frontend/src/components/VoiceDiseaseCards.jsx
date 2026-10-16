@@ -60,9 +60,11 @@ export default function VoiceDiseaseCards({ result }) {
       <div className="vdx-warn">
         <i className="ti ti-alert-triangle" aria-hidden="true" />
         <span>
-          {result.broad
-            ? 'อาการนี้พบได้ในหลายโรค ลองเทียบภาพอาการจุดอื่นด้านล่างกับที่เห็นจริงในคอก '
-            : 'อาการที่บอกมาเข้าได้กับโรคด้านล่าง '}
+          {result.named
+            ? 'ภาพอาการและจุดที่ต้องสังเกตของโรคนี้อยู่ด้านล่าง '
+            : result.broad
+              ? 'อาการนี้พบได้ในหลายโรค ลองเทียบภาพอาการจุดอื่นด้านล่างกับที่เห็นจริงในคอก '
+              : 'อาการที่บอกมาเข้าได้กับโรคด้านล่าง '}
           <b>เป็นการตั้งข้อสังเกตเท่านั้น</b>{' '}
           การยืนยันโรคต้องให้สัตวแพทย์ตรวจและเก็บตัวอย่างส่งตรวจ
         </span>
@@ -134,7 +136,9 @@ export default function VoiceDiseaseCards({ result }) {
         <div className="vdx-others">
           <i className="ti ti-info-circle" aria-hidden="true" />
           <div>
-            <b>โรคอื่นที่อาการใกล้เคียง (ยังไม่มีภาพในระบบ)</b>
+            <b>{result.named
+              ? 'โรคนี้ยังไม่มีภาพอาการในระบบ'
+              : 'โรคอื่นที่อาการใกล้เคียง (ยังไม่มีภาพในระบบ)'}</b>
             <ul>
               {result.others.map((o) => {
                 const d = findDisease(o.id)
