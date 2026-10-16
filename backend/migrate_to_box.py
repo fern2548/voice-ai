@@ -69,20 +69,27 @@ def main() -> None:
     for t in TABLES:
         rows: list[dict] = []
         start = 0
+        ok = True
         while True:
             try:
                 page = sb.table(t).select("*").range(start, start + PAGE - 1).execute().data or []
             except Exception as e:
                 print(f"-- ข้าม {t}: {e}", file=sys.stderr)
-                page = []
+                ok = False
                 break
             rows.extend(page)
             if len(page) < PAGE:
                 break
             start += PAGE
 
+        # อ่านจากคลาวด์ไม่ได้ = ตารางนั้นไม่มีบนคลาวด์ (เช่นตารางใหม่ที่สร้างในกล่องแล้ว)
+        # ห้ามแตะของในกล่องเด็ดขาด ไม่งั้นข้อมูลที่มีอยู่แล้วจะโดนลบทิ้งฟรี ๆ
+        if not ok:
+            print(f"\n-- {t}: อ่านจากคลาวด์ไม่ได้ ข้ามไป ไม่แตะของเดิมในกล่อง")
+            continue
+
         print(f"\n-- {t}: {len(rows)} แถว")
-        print(f"-- (ล้างของเดิมในกล่องก่อน รันไฟล์นี้ซ้ำจะได้ไม่เกิดข้อมูลซ้ำ)")
+        print("-- (ล้างของเดิมในกล่องก่อน รันไฟล์นี้ซ้ำจะได้ไม่เกิดข้อมูลซ้ำ)")
         print(f"delete from {t};")
         if not rows:
             continue
