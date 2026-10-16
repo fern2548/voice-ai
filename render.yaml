@@ -14,8 +14,12 @@ services:
     staticPublishPath: dist
     envVars:
       # ที่อยู่ของ backend ที่เว็บจะเรียกข้อมูล
+      #
+      # ชี้มาที่กล่อง เพราะข้อมูลฟาร์มทั้งหมดย้ายมาอยู่ในฐานข้อมูลของกล่องแล้ว
+      # ถ้ายังชี้ไป voice-ai-q94g.onrender.com เว็บนี้จะอ่าน Supabase คลาวด์ซึ่งหยุดอัปเดตไปแล้ว
+      # แล้วจะกลายเป็นว่ามีข้อมูลสองชุดไม่ตรงกัน ใครบันทึกผ่านเว็บนี้ข้อมูลจะไม่ถึงกล่อง
       - key: VITE_API_BASE
-        value: https://voice-ai-q94g.onrender.com
+        value: https://fern.plotnexuslab.com
     headers:
       # ไฟล์ใน assets มีรหัสเวอร์ชันอยู่ในชื่อไฟล์อยู่แล้ว เก็บยาวได้ไม่มีปัญหา
       - path: /assets/*
