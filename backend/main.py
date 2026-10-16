@@ -5516,15 +5516,23 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
     if not text:
         return Answer(answer="ถามเรื่องสภาพอากาศได้เลยครับ เช่น อุณหภูมิ ความชื้น หรือพยากรณ์ล่วงหน้า")
 
-    # คนนอก (ไม่ได้ล็อกอิน) ถามได้เฉพาะข้อมูลปกติ: อากาศ พยากรณ์ เซนเซอร์ วิธีฉีดวัคซีน
-    # ข้อมูลภายในฟาร์ม (หมูป่วย บันทึกวัคซีน เอกสารของฟาร์ม) และคำสั่งบันทึก/ส่ง LINE ต้องเป็นคนใน
+    # ค้นคลังเอกสารก่อน เพราะต้องใช้ผลตัดสินว่าคนนอกถามได้ไหม
+    # เอกสารในคลังเป็นมาตรฐานราชการสาธารณะ (GAP กรมปศุสัตว์ มาตรฐานสินค้าเกษตร)
+    # ถือเป็น "ข้อมูลปกติ" ตามนโยบาย จึงเปิดให้คนนอกถามได้
+    # วันไหนเริ่มมี SOP ภายในของฟาร์มเข้ามา ต้องกลับมาแยกเป็นรายเอกสารก่อน
+    docs = _rag_search(text)
+    _doc_answer = bool(docs and docs[0]["score"] >= RAG_MIN_SCORE)
+
+    # คนนอก (ไม่ได้ล็อกอิน) ถามได้เฉพาะข้อมูลปกติ: อากาศ พยากรณ์ เซนเซอร์ วิธีฉีดวัคซีน เอกสารมาตรฐาน
+    # ข้อมูลภายในฟาร์ม (หมูป่วย บันทึกวัคซีน) และคำสั่งบันทึก/ส่ง LINE ต้องเป็นคนใน
     guest = _role_of(x_admin_token) == "guest"
     if guest and (
         _is_line_report_command(text) or _is_line_send_command(text)
         or _is_followup_record_command(text) or _is_vaccine_record_command(text)
         or (_needs_pig(text) and not _needs_vaccine_method(text)
             and not _needs_pig_breed_info(text) and not _needs_symptom_info(text)
-            and not _needs_pig_env_info(text) and not _needs_web_info(text))
+            and not _needs_pig_env_info(text) and not _needs_web_info(text)
+            and not _doc_answer)
     ):
         return Answer(answer="ข้อมูลส่วนนี้เป็นข้อมูลภายในฟาร์มครับ ต้องเข้าสู่ระบบก่อนถึงจะดูหรือบันทึกได้ "
                              "ถามเรื่องสภาพอากาศ พยากรณ์ หรือวิธีฉีดวัคซีนได้เลยครับ")
@@ -5572,8 +5580,6 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
     if _needs_pig_breed_info(text):
         return Answer(answer=_PIG_BREEDS_INFO.replace("ความรู้อ้างอิง: ", "") + " ครับ")
 
-    # ค้นคลังความรู้ (เอกสารของฟาร์ม) ทุกคำถาม — ไม่เจอก็ได้ลิสต์ว่าง ไม่มีผลอะไร
-    docs = [] if guest else _rag_search(text)
     # คำถามเชิงประวัติ ("เดือนนี้กี่ครั้ง" "ช่วงไหนสูงสุด" "เคยมีคล้ายกันไหม")
     # คำนวณคำตอบจากฐานข้อมูลก่อน แล้วค่อยให้ LLM เรียบเรียง — ห้ามให้ LLM นับเอง
     history_facts = ""
