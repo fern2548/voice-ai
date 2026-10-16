@@ -66,6 +66,7 @@ def main() -> None:
     print("-- สร้างอัตโนมัติด้วย backend/migrate_to_box.py")
     print("begin;")
     total = 0
+    has_id: list[str] = []   # ตารางที่มีคอลัมน์ id เท่านั้นที่ต้องขยับตัวนับ
     for t in TABLES:
         rows: list[dict] = []
         start = 0
@@ -94,6 +95,8 @@ def main() -> None:
         if not rows:
             continue
         cols = list(rows[0].keys())
+        if "id" in cols:
+            has_id.append(t)
         collist = ", ".join(f'"{c}"' for c in cols)
         for r in rows:
             vals = ", ".join(q(r.get(c)) for c in cols)
@@ -102,8 +105,9 @@ def main() -> None:
         total += len(rows)
 
     # ตัวนับเลขอัตโนมัติต้องขยับตามของที่เพิ่งใส่ ไม่งั้นแถวใหม่จะชน id เดิม
+    # เฉพาะตารางที่มีคอลัมน์ id จริง — บางตาราง (vaccine_schedule) ใช้ชื่อวัคซีนเป็นคีย์ ไม่มี id
     print("\n-- ขยับตัวนับ id ให้เลยของที่ย้ายมา")
-    for t in TABLES:
+    for t in has_id:
         print(
             f"select setval(pg_get_serial_sequence('{t}', 'id'), "
             f"coalesce((select max(id) from {t}), 1), true) "
