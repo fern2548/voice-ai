@@ -5039,8 +5039,17 @@ _LINE_SEND_VERBS = ("ส่ง",)
 _LINE_WORDS = ("ไลน์", "line", "LINE", "กลุ่ม")
 
 
+# พูดว่า "ส่งงานวันนี้ให้หน่อย" โดยไม่เอ่ยคำว่าไลน์ ก็ยังหมายถึงส่งเข้ากลุ่ม
+# เพราะในระบบนี้ไม่มีช่องทางส่งอื่นเลย ต้องมีคำว่า "ส่ง" คู่กับชื่อสิ่งที่จะส่งเท่านั้น
+# จะได้ไม่ไปจับประโยคอย่าง "ส่งหมูไปโรงฆ่าเมื่อไหร่"
+_LINE_SEND_TARGETS = ("งาน", "สรุป", "วัคซีน", "รายงาน", "สถานะ")
+
+
 def _is_line_send_command(text: str) -> bool:
-    return any(v in text for v in _LINE_SEND_VERBS) and any(w in text for w in _LINE_WORDS)
+    if not any(v in text for v in _LINE_SEND_VERBS):
+        return False
+    return (any(w in text for w in _LINE_WORDS)
+            or any(w in text.replace(" ", "") for w in _LINE_SEND_TARGETS))
 
 
 def _build_farm_summary_for_line() -> str:
@@ -5322,7 +5331,24 @@ def _embed_local(texts: list[str], task: str) -> list[list[float]]:
     return [[float(x) for x in v] for v in vecs]
 EMBED_DIM = 768
 RAG_TOP_K = 4           # แนบให้ AI กี่ท่อน
-RAG_MIN_SCORE = 0.70    # ความใกล้ต่ำกว่านี้ถือว่าไม่เกี่ยว ไม่แนบ (วัดจริง: ตรงเรื่อง 0.70-0.81, คนละเรื่อง ≤0.60)
+# โมเดลฝังความหมายที่ใช้อยู่ (multilingual-e5) ให้คะแนนพื้นสูงมาก อะไรก็ได้ 0.80 ขึ้น
+# วัดจริงบนคลังของเรา: คำถามที่เอกสารตอบได้ 0.88-0.90 · คำถามคนละเรื่อง 0.80-0.82
+#   "สวัสดีครับ"            -> 0.818 (ไปเจอหน้าปกเอกสาร)
+#   "สรุปงานวันนี้"          -> 0.807 (ไปเจอหน้ารายชื่อคณะผู้จัดทำ)
+#   "การจัดการน้ำเสีย…"      -> 0.890 (เจอข้อกำหนดจริง)
+# ตั้งไว้ที่ 0.70 เท่ากับรับทุกอย่าง เอกสารเลยแย่งตอบคำถามที่ไม่เกี่ยวกับเอกสารเลย
+RAG_MIN_SCORE = 0.85
+
+# ท่อนที่เป็นเลขหน้า หัวบท หรือรายชื่อคณะผู้จัดทำ ไม่มีเนื้อหาให้ตอบ
+# แต่พอสั้นมากกลับได้คะแนนความใกล้สูงกับทุกคำถาม จึงต้องคัดทิ้งตั้งแต่ตอนค้น
+# วัดจริง: 61 จาก 757 ท่อนในคลัง มีอักษรไทยไม่ถึง 80 ตัว และแทบทั้งหมดเป็นหัวข้อ/เลขหน้า
+RAG_MIN_THAI_CHARS = 80
+_TH_CHAR_RE = re.compile(r"[\u0e01-\u0e5b]")
+
+
+def _chunk_has_content(text: str) -> bool:
+    """ท่อนนี้มีเนื้อหาพอจะเอาไปตอบไหม หรือเป็นแค่หัวบท/เลขหน้า"""
+    return len(_TH_CHAR_RE.findall(text or "")) >= RAG_MIN_THAI_CHARS
 RAG_CHUNK_CHARS = 900   # ขนาดท่อนโดยประมาณ — เล็กพอให้ค้นแม่น ใหญ่พอให้ความหมายครบ
 # ใครเพิ่ม/ลบเอกสารได้ — เอกสารในนี้กำหนดว่า AI จะตอบอะไร จึงให้เฉพาะผู้ดูแลระบบ
 # ผู้ใช้ทั่วไปเห็นรายการ ค้นได้ แต่แก้ไม่ได้ (ค่าเริ่มต้น = บัญชี admin; ใส่หลายคนคั่นด้วย ,)
@@ -5451,6 +5477,8 @@ def _rag_search(question: str, k: int = RAG_TOP_K) -> list[dict]:
         q = _unit(_embed([question], "RETRIEVAL_QUERY", patient=False)[0])
         scored = []
         for c in chunks:
+            if not _chunk_has_content(c["content"]):
+                continue
             v = c["vec"]
             score = sum(a * b for a, b in zip(q, v))
             if score >= RAG_MIN_SCORE:
@@ -5463,6 +5491,32 @@ def _rag_search(question: str, k: int = RAG_TOP_K) -> list[dict]:
         return []
 
 
+def _doc_excerpt_answer(hit: dict) -> str:
+    """ด่านสุดท้ายจริง ๆ: AI ทุกตัวล่ม แต่ค้นเอกสารเจอ — ยกใจความมาให้สั้น ๆ
+
+    ของเดิมตัดมา 400 ตัวอักษรดิบ ๆ ได้ทั้งขึ้นต้นกลางประโยคและลากหัวตารางมาด้วย
+    (เคยเจอ: ถามสรุปงานวันนี้ แล้วได้รายชื่อคณะผู้จัดทำคู่มือผสมเทียมมาทั้งหน้า)
+    ตรงนี้ไม่มี AI ให้เรียบเรียงแล้ว ทำได้แค่เก็บเฉพาะประโยคแรก ๆ ที่อ่านรู้เรื่อง
+    และบอกให้ชัดว่าเป็นข้อความคัดมาจากเอกสาร ไม่ใช่คำตอบที่เรียบเรียงแล้ว
+    """
+    text = re.sub(r"\s+", " ", hit.get("content") or "").strip()
+    out = ""
+    for part in re.split(r"(?<=[.。!?])\s+|\s{2,}", text):
+        part = part.strip()
+        if not part:
+            continue
+        out = (out + " " + part).strip()
+        if len(out) >= 220:
+            break
+    if not out:
+        out = text[:220]
+    if len(out) > 300:
+        out = out[:300].rsplit(" ", 1)[0] + "…"
+    return (f"ยังไม่มีคำตอบที่เรียบเรียงไว้ครับ แต่ค้นในคลังเอกสารเจอเรื่องใกล้เคียง "
+            f"จากเอกสาร \"{hit['title']}\":\n{out}\n"
+            f"(เป็นข้อความคัดมาจากเอกสารตรง ๆ ถ้าต้องการคำอธิบาย ลองถามใหม่อีกครั้งครับ)")
+
+
 def _fmt_docs(hits: list[dict]) -> str:
     lines = [f"[{h['title']}] {h['content']}" for h in hits]
     return "เอกสารของฟาร์ม (ค้นมาให้ตามคำถาม ใช้ตอบก่อนความรู้ทั่วไปถ้าเกี่ยวข้อง):\n" + "\n---\n".join(lines)
@@ -5472,6 +5526,8 @@ def _knowledge_add(title: str, text: str, source: str) -> dict:
     title = (title or "").strip()[:200] or "ไม่มีชื่อ"
     text = (text or "").strip()
     chunks = _rag_chunks(text)
+    # ตัดหัวบท เลขหน้า และหน้ารายชื่อทิ้งตั้งแต่ตอนนำเข้า จะได้ไม่เปลืองที่และไม่มากวนผลค้น
+    chunks = [c for c in chunks if _chunk_has_content(c)]
     if not chunks:
         raise HTTPException(status_code=400, detail="เอกสารสั้นเกินไปหรือไม่มีข้อความ")
     if len(chunks) > 400:
@@ -5739,6 +5795,14 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
         plan = _fmt_batch_plan()
         if plan:
             parts.append(plan)
+        # รายการงานของวันนี้ — ไม่แนบ Gemini จะเดาเอาเองเวลาถูกถามว่าวันนี้ต้องทำอะไร
+        if _needs_task_info(_ctx_text):
+            try:
+                tasks = _task_answer(_ctx_text)
+                if tasks:
+                    parts.append("งานของวันนี้จากตารางงานจริง:\n" + tasks)
+            except Exception:
+                pass
 
     # เซนเซอร์ภายนอก — แนบเฉพาะชุดที่คำถามพูดถึง ดึงสดตอนถาม
     for src in (lab or []):
@@ -5790,6 +5854,43 @@ def _build_context(detailed: bool = False, stats_days: Optional[int] = None, pig
     return "\n\n".join(parts)
 
 
+# ---------- ถามถึงงานของวันนี้ ----------
+# ต้องตอบจากตารางงานจริง ไม่ปล่อยให้ AI เดา และไม่ปล่อยให้เอกสารในคลังมาแย่งตอบ
+# (เคยเจอ: ถาม "สรุปงานวันนี้" แล้วได้รายชื่อคณะผู้จัดทำคู่มือผสมเทียมมาทั้งหน้า)
+_TASK_ASK_WORDS = ("งานวันนี้", "งานที่ต้องทำ", "สรุปงาน", "มีงานอะไร", "งานอะไรบ้าง",
+                   "ต้องทำอะไรบ้าง", "งานค้าง", "งานประจำวัน")
+
+
+def _needs_task_info(text: str) -> bool:
+    return any(w in text.replace(" ", "") for w in _TASK_ASK_WORDS)
+
+
+def _task_answer(text: str):
+    """สรุปงานของวันนี้ให้ฟังสั้น ๆ — ใครรับผิดชอบ เหลืออะไร"""
+    if not _needs_task_info(text):
+        return None
+    try:
+        data = list_tasks()
+    except Exception as e:
+        print(f"[warn] อ่านรายการงานไม่ได้: {e}")
+        return None
+    rows, c = data["rows"], data["counts"]
+    if not rows:
+        return "วันนี้ยังไม่มีงานในระบบครับ"
+    left = [x for x in rows if x["status"] in ("pending", "doing")]
+    msg = [f"งานวันนี้มี {c['total']} รายการ เสร็จแล้ว {c['done']} เหลืออีก {len(left)} รายการครับ"]
+    for x in left[:6]:
+        who = x.get("assignee_name") or x.get("assignee")
+        bits = " · ".join(y for y in [x.get("due_time"), who] if y)
+        late = " (ค้างจากเมื่อวาน)" if x["overdue"] else ""
+        msg.append(f"- {x['title']}{late}" + (f" · {bits}" if bits else ""))
+    if len(left) > 6:
+        msg.append(f"…และอีก {len(left) - 6} รายการ")
+    if c.get("issue"):
+        msg.append(f"มี {c['issue']} งานที่บันทึกว่าพบปัญหา")
+    return "\n".join(msg)
+
+
 def _rule_based_answer(text: str) -> str:
     """คำตอบสำรองเมื่อยังไม่ได้ตั้งค่า LLM — ฉลาดขึ้นด้วยการอ้างอิงพยากรณ์/แนวโน้ม/สถิติย้อนหลัง/หมู"""
     # ถามภาพรวมของเซนเซอร์ที่อื่น -> สรุปทุกค่า
@@ -5811,6 +5912,11 @@ def _rule_based_answer(text: str) -> str:
             return _fmt_lab(d).replace("\n", " ") + " ครับ"
 
     # ถามว่าอาการแบบนี้คือโรคอะไร -> ตอบเรื่องโรค ไม่ใช่ไปดึงจำนวนหมูป่วยรายวันมาตอบ
+    # งานวันนี้ต้องมาก่อนทุกกฎ คำว่า "งาน" ไม่ชนกับกฎอื่น และเป็นคำถามที่ตอบตรง ๆ ได้
+    tasks = _task_answer(text)
+    if tasks:
+        return tasks
+
     sym = _symptom_answer(text)
     if sym:
         return sym
@@ -6215,7 +6321,8 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
 
     # ความรู้ตายตัวของเรา — เป็นข้อเท็จจริงที่ไม่เปลี่ยนตามเวลา
     _own_static = (
-        _needs_symptom_info(text)        # อาการโรค — CPF ปฏิเสธเสมอ
+        _needs_task_info(text)           # งานวันนี้ — อยู่ในฐานข้อมูลเรา ไม่มีใครตอบแทนได้
+        or _needs_symptom_info(text)     # อาการโรค — CPF ปฏิเสธเสมอ
         or _needs_vaccine_method(text)   # วิธี/ตำแหน่งฉีดวัคซีน
         or _needs_pig_env_info(text)     # ค่ามาตรฐานสภาพแวดล้อม
         or _needs_pig_breed_info(text)   # รายชื่อสายพันธุ์
@@ -6310,8 +6417,8 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
     # (เคยเจอ: ถามอาการโรคไข้หวัดใหญ่สุกร แล้วได้ท่อนรายงานชันสูตรมาแทนคำตอบ)
     if _own_static:
         return Answer(answer=_rule_based_answer(text))
-    if docs and docs[0]["score"] >= 0.75:
-        return Answer(answer=f"จากเอกสาร {docs[0]['title']}: {docs[0]['content'][:400]}")
+    if docs:
+        return Answer(answer=_doc_excerpt_answer(docs[0]))
     return Answer(answer=_rule_based_answer(text))
 
 
