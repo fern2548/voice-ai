@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { claimTask, createTask, deleteTask, getTasks, postponeTask, recordTaskResult } from '../api.js'
 import { useAdminAuth } from '../context/AdminAuth.jsx'
 import AdminGate from '../components/AdminGate.jsx'
+import RoutineManager from '../components/RoutineManager.jsx'
+import DailySummaryCard from '../components/DailySummaryCard.jsx'
 
 // งานที่ต้องทำวันนี้ — รวมงานจากทุกระบบไว้หน้าเดียว
 // เปิดมาต้องรู้ทันที: เหลืออะไร อันไหนด่วน และกดตรงไหนเมื่อทำเสร็จ
@@ -50,6 +52,7 @@ export default function TasksPage() {
   const [open, setOpen] = useState(null)         // งานที่กำลังบันทึกผล
   const [writing, setWriting] = useState(false)
   const [msg, setMsg] = useState('')
+  const [panel, setPanel] = useState('')        // '' | 'routines' | 'summary'
   const refresh = () => setTick((t) => t + 1)
   const flash = (t) => { setMsg(t); setTimeout(() => setMsg(''), 4000) }
 
@@ -109,7 +112,19 @@ export default function TasksPage() {
         {[['open', `ยังไม่เสร็จ (${c.open ?? 0})`], ['all', `ทั้งหมด (${c.total ?? 0})`], ['mine', 'ของฉัน']].map(([id, label]) => (
           <button key={id} type="button" className={`chip ${filter === id ? 'chip-on' : ''}`} onClick={() => setFilter(id)}>{label}</button>
         ))}
+        {/* สองแผงนี้เปิดทีละอัน ไม่งั้นต้องเลื่อนผ่านของยาว ๆ กว่าจะถึงรายการงาน */}
+        <button type="button" className={`chip ${panel === 'summary' ? 'chip-on' : ''}`}
+          onClick={() => setPanel(panel === 'summary' ? '' : 'summary')}>
+          <i className="ti ti-report" aria-hidden="true" /> สรุปวันนี้
+        </button>
+        <button type="button" className={`chip ${panel === 'routines' ? 'chip-on' : ''}`}
+          onClick={() => setPanel(panel === 'routines' ? '' : 'routines')}>
+          <i className="ti ti-repeat" aria-hidden="true" /> งานประจำ
+        </button>
       </div>
+
+      {panel === 'summary' && <DailySummaryCard />}
+      {panel === 'routines' && <AdminGate><RoutineManager /></AdminGate>}
 
       {msg && <div className="tk-msg">{msg}</div>}
       {writing && <AdminGate><NewTask onDone={(t) => { setWriting(false); flash(`เพิ่มงาน "${t}" แล้ว`); refresh() }} /></AdminGate>}

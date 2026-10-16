@@ -2143,6 +2143,12 @@ def _sync_auto_tasks() -> None:
     except Exception as e:
         print(f"[warn] สร้างงานจากเซนเซอร์ไม่ได้: {e}")
 
+    # 5) งานประจำของวันนี้ (ให้อาหาร ตรวจน้ำ เดินดูหมูป่วย ฯลฯ)
+    try:
+        _sync_routine_tasks()
+    except Exception as e:
+        print(f"[warn] สร้างงานประจำไม่ได้: {e}")
+
     if rows:
         _task_insert(rows)
 
@@ -2267,26 +2273,395 @@ def delete_task(task_id: int):
     return {"ok": True}
 
 
+# ---------- งานประจำ: แม่แบบงานที่ต้องทำซ้ำทุกวัน ----------
+# farm_tasks เก็บงานครั้งเดียว แต่งานอย่าง "ให้อาหารเช้า" ต้องโผล่ใหม่ทุกวัน
+# จึงเก็บเป็นแม่แบบไว้ใน farm_routines แล้วให้ระบบสร้างงานของวันนั้นลง farm_tasks เอง
+# (ตาราง: backend/daily_tables.sql)
+class FarmRoutine(BaseModel):
+    title: str
+    detail: Optional[str] = None
+    barn_no: Optional[str] = None
+    pen_no: Optional[str] = None
+    weekdays: list[int] = []          # 0=อาทิตย์ … 6=เสาร์ · ว่าง = ทุกวัน
+    due_time: Optional[str] = None
+    priority: str = "normal"
+    assignee: Optional[str] = None
+    active: bool = True
+    sort_order: int = 0
+
+
+def _routine_rows() -> list[dict]:
+    try:
+        return (supabase.table("farm_routines").select("*")
+                .order("sort_order").order("due_time").order("id").execute().data or [])
+    except Exception as e:
+        print(f"[warn] อ่านตาราง farm_routines ไม่ได้ (รัน backend/daily_tables.sql หรือยัง): {e}")
+        return []
+
+
+def _routine_due_today(r: dict, today: date) -> bool:
+    """ว่าง = ทุกวัน · ไม่ว่างก็ดูว่าวันนี้อยู่ในรายการไหม
+
+    เก็บแบบ อาทิตย์=0 ให้ตรงกับที่คนไทยนับปฏิทิน ส่วน Python นับจันทร์=0 จึงต้องแปลง
+    """
+    days = r.get("weekdays") or []
+    return (not days) or (((today.weekday() + 1) % 7) in days)
+
+
+def _sync_routine_tasks() -> int:
+    """สร้างงานประจำของวันนี้ลง farm_tasks — source_key กันสร้างซ้ำ เรียกกี่รอบก็ได้"""
+    today = datetime.now(BANGKOK).date()
+    rows = []
+    for r in _routine_rows():
+        if not r.get("active", True) or not _routine_due_today(r, today):
+            continue
+        rows.append({
+            "title": r["title"], "detail": r.get("detail"),
+            "source": "routine", "source_key": f"routine:{r['id']}:{today.isoformat()}",
+            "barn_no": r.get("barn_no"), "pen_no": r.get("pen_no"),
+            "due_date": today.isoformat(), "due_time": r.get("due_time"),
+            "priority": r.get("priority") or "normal",
+            "assignee": r.get("assignee"), "assignee_name": r.get("assignee_name"),
+            "ref_type": "routine", "ref_id": r["id"],
+        })
+    if rows:
+        _task_insert(rows)
+    return len(rows)
+
+
+@app.get("/farm-routines")
+def list_routines():
+    today = datetime.now(BANGKOK).date()
+    rows = _routine_rows()
+    for r in rows:
+        r["due_today"] = bool(r.get("active", True)) and _routine_due_today(r, today)
+    return {"rows": rows}
+
+
+@app.post("/farm-routines", dependencies=[Depends(verify_admin_token)])
+def create_routine(r: FarmRoutine):
+    row = r.model_dump(mode="json")
+    row["weekdays"] = sorted({int(d) for d in (row.get("weekdays") or []) if 0 <= int(d) <= 6})
+    row["assignee_name"] = _display_name(row["assignee"]) if row.get("assignee") else None
+    return supabase.table("farm_routines").insert(row).execute().data[0]
+
+
+@app.put("/farm-routines/{routine_id}", dependencies=[Depends(verify_admin_token)])
+def update_routine(routine_id: int, r: FarmRoutine):
+    row = r.model_dump(mode="json")
+    row["weekdays"] = sorted({int(d) for d in (row.get("weekdays") or []) if 0 <= int(d) <= 6})
+    row["assignee_name"] = _display_name(row["assignee"]) if row.get("assignee") else None
+    res = supabase.table("farm_routines").update(row).eq("id", routine_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ไม่พบงานประจำนี้")
+    return res.data[0]
+
+
+@app.delete("/farm-routines/{routine_id}", dependencies=[Depends(verify_admin_token)])
+def delete_routine(routine_id: int):
+    supabase.table("farm_routines").delete().eq("id", routine_id).execute()
+    return {"ok": True}
+
+
+def _task_bullet(t: dict) -> str:
+    mark = "🔴" if t["overdue"] else ("🟠" if t["priority"] == "urgent" else "•")
+    bits = [x for x in [t.get("due_time"),
+                        " ".join(x for x in [t.get("barn_no"), t.get("pen_no")] if x)] if x]
+    late = " (ค้างจากเมื่อวาน)" if t["overdue"] else ""
+    return f"{mark} {t['title']}{late}" + (" · " + " · ".join(bits) if bits else "")
+
+
 @app.post("/cron/task-notify")
 def cron_task_notify(x_cron_key: str = Header(default="")):
-    """LINE ทุกเช้า: งานของวันนี้ + งานที่ค้างข้ามวัน"""
+    """LINE ทุกเช้า: มอบหมายงานของวันนี้ แยกตามคนรับผิดชอบ + งานที่ค้างข้ามวัน
+
+    ส่งเป็น broadcast เข้ากลุ่ม ทุกคนจึงเห็นงานของกันและกัน — ตั้งใจให้เป็นแบบนั้น
+    เพราะงานฟาร์มต้องรู้ว่าใครคุมอะไรอยู่ และงานไหนที่ยังไม่มีใครรับ
+    """
     if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
         raise HTTPException(status_code=401, detail="unauthorized")
     data = list_tasks()
     rows = [t for t in data["rows"] if t["status"] in ("pending", "doing")]
     if not rows:
         return {"ok": True, "sent": False, "count": 0}
-    lines = [f"📋 งานวันนี้ {len(rows)} รายการ"]
-    for t in rows[:10]:
-        mark = "🔴" if t["overdue"] else ("🟠" if t["priority"] == "urgent" else "•")
-        where = " ".join(x for x in [t.get("barn_no"), t.get("pen_no")] if x)
-        lines.append(f"{mark} {t['title']}{' · ' + where if where else ''}")
-    if len(rows) > 10:
-        lines.append(f"…และอีก {len(rows) - 10} รายการ")
+
+    # จัดกลุ่มตามคนรับผิดชอบ คนงานจะได้กวาดตาหาชื่อตัวเองเจอทันที
+    groups: dict[str, list[dict]] = {}
+    for t in rows:
+        groups.setdefault(t.get("assignee_name") or t.get("assignee") or "", []).append(t)
+
+    today = datetime.now(BANGKOK).date()
+    lines = [f"📋 งานวันนี้ {today.strftime('%d/%m')} · {len(rows)} รายการ"]
+    shown = 0
+    # คนที่มีชื่อขึ้นก่อน ปิดท้ายด้วยงานที่ยังไม่มีคนรับ จะได้เห็นชัดว่ายังขาดคน
+    for who in sorted(k for k in groups if k) + ([""] if "" in groups else []):
+        items = groups[who]
+        lines.append(f"👤 {who} · {len(items)} งาน" if who else f"🙋 ยังไม่มีคนรับ · {len(items)} งาน")
+        for t in items:
+            if shown >= 14:
+                break
+            lines.append("  " + _task_bullet(t))
+            shown += 1
+    if len(rows) > shown:
+        lines.append(f"…และอีก {len(rows) - shown} รายการ")
     if PUBLIC_SITE_URL:
-        lines.append(f"ดูงานทั้งหมด: {PUBLIC_SITE_URL}/tasks")
+        lines.append(f"กดรับงาน/บันทึกผล: {PUBLIC_SITE_URL}/tasks")
     _send_line_broadcast("\n".join(lines))
-    return {"ok": True, "sent": True, "count": len(rows)}
+    return {"ok": True, "sent": True, "count": len(rows),
+            "people": len([k for k in groups if k])}
+
+
+# ---------- บันทึกการผสมพันธุ์ ----------
+# ย้ายจาก localStorage ของเบราว์เซอร์มาเก็บในฐานข้อมูล ด้วยสองเหตุผล
+#   1. สรุปฟาร์มรายวันต้องรายงานเรื่องผสมพันธุ์ด้วย แต่เซิร์ฟเวอร์มองไม่เห็นข้อมูลในเบราว์เซอร์
+#   2. ของเดิมหายทันทีถ้าล้างเบราว์เซอร์ เปลี่ยนเครื่อง หรือเปิดคนละคน
+DAYS_RETURN_HEAT = 21     # กลับเป็นสัดถ้าผสมไม่ติด
+DAYS_GESTATION = 114      # ระยะตั้งท้อง
+
+
+class BreedingEntry(BaseModel):
+    dam_no: str
+    dam_breed: Optional[str] = None
+    dam_line: Optional[str] = None
+    sire_no: Optional[str] = None
+    sire_breed: Optional[str] = None
+    sire_line: Optional[str] = None
+    round: int = 1
+    mate_date: date
+    result: str = "wait"              # wait = รอดูผล · pregnant = ติด · failed = ไม่ติด
+    farrow_date: Optional[date] = None
+    piglet_count: Optional[int] = None
+    note: Optional[str] = None
+
+
+def _decorate_breeding(r: dict) -> dict:
+    """เติมวันกลับสัดกับกำหนดคลอด — คำนวณสดทุกครั้ง ไม่เก็บลงฐานข้อมูล
+    เก็บไว้จะเพี้ยนทันทีที่มีคนแก้วันผสมทีหลัง"""
+    try:
+        m = date.fromisoformat(str(r["mate_date"]))
+    except (TypeError, ValueError, KeyError):
+        return r
+    r["return_heat_date"] = (m + timedelta(days=DAYS_RETURN_HEAT)).isoformat()
+    r["due_farrow_date"] = (m + timedelta(days=DAYS_GESTATION)).isoformat()
+    return r
+
+
+@app.get("/breeding-log")
+def list_breeding(limit: int = 200):
+    try:
+        rows = (supabase.table("breeding_log").select("*")
+                .order("mate_date", desc=True).order("id", desc=True)
+                .limit(max(1, min(500, limit))).execute().data or [])
+    except Exception as e:
+        # ยังไม่ได้รัน backend/daily_tables.sql — บอกหน้าเว็บให้ใช้ของในเครื่องไปก่อน
+        print(f"[warn] อ่านตาราง breeding_log ไม่ได้: {e}")
+        return {"rows": [], "no_table": True}
+    return {"rows": [_decorate_breeding(r) for r in rows], "no_table": False,
+            "days_return_heat": DAYS_RETURN_HEAT, "days_gestation": DAYS_GESTATION}
+
+
+@app.post("/breeding-log", dependencies=[Depends(verify_admin_token)])
+def create_breeding(b: BreedingEntry, x_admin_token: str = Header(default="")):
+    row = b.model_dump(mode="json")
+    row["by_user"] = _session_username(x_admin_token)
+    return _decorate_breeding(supabase.table("breeding_log").insert(row).execute().data[0])
+
+
+@app.put("/breeding-log/{entry_id}", dependencies=[Depends(verify_admin_token)])
+def update_breeding(entry_id: int, b: BreedingEntry):
+    row = b.model_dump(mode="json")
+    row["updated_at"] = datetime.now(BANGKOK).isoformat()
+    res = supabase.table("breeding_log").update(row).eq("id", entry_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ไม่พบบันทึกนี้")
+    return _decorate_breeding(res.data[0])
+
+
+@app.delete("/breeding-log/{entry_id}", dependencies=[Depends(verify_admin_token)])
+def delete_breeding(entry_id: int):
+    supabase.table("breeding_log").delete().eq("id", entry_id).execute()
+    return {"ok": True}
+
+
+# ---------- สรุปฟาร์มประจำวัน ----------
+# ตอบคำถาม "วันนี้ทำอะไรไปแล้วบ้าง" จากสิ่งที่ถูกบันทึกไว้จริงในวันนั้น
+# ต่างจาก _build_farm_summary_for_line() ที่ตอบว่า "ตอนนี้ฟาร์มเป็นยังไง"
+# ทุกก้อนหุ้ม try ไว้แยกกัน ตารางไหนอ่านไม่ได้ก็ข้ามก้อนนั้น ไม่ทำให้ทั้งสรุปพัง
+
+
+def _day_bounds(d: date) -> tuple[str, str]:
+    """ช่วงเวลาของวันนั้นตามเวลาไทย ใช้กรองคอลัมน์ created_at ที่เป็น timestamptz"""
+    start = datetime(d.year, d.month, d.day, tzinfo=BANGKOK)
+    return start.isoformat(), (start + timedelta(days=1)).isoformat()
+
+
+def _rows_on_day(table: str, column: str, lo: str, hi: str) -> list[dict]:
+    return (supabase.table(table).select("*")
+            .gte(column, lo).lt(column, hi).execute().data or [])
+
+
+def _daily_summary(day: Optional[date] = None) -> dict:
+    today = day or datetime.now(BANGKOK).date()
+    iso = today.isoformat()
+    lo, hi = _day_bounds(today)
+    out: dict = {"date": iso, "sections": [], "total_records": 0}
+
+    def add(icon: str, title: str, lines: list[str], count: int) -> None:
+        if count:
+            out["sections"].append({"icon": icon, "title": title, "lines": lines, "count": count})
+            out["total_records"] += count
+
+    # 1) งานที่มอบหมาย — ทำไปแล้วกี่งาน ใครทำ และอะไรที่ยังค้าง
+    try:
+        # sync=False: สรุปมีหน้าที่รายงานอย่างเดียว ไม่ใช่ไปสร้างงานใหม่ตอนปิดวัน
+        data = list_tasks(day=iso, sync=False)
+        c, rows = data["counts"], data["rows"]
+        lines = []
+        for t in [x for x in rows if x["status"] == "done"][:8]:
+            lines.append(f"✅ {t['title']} · {t.get('done_by') or t.get('assignee_name') or 'ไม่ระบุคน'}")
+        for t in [x for x in rows if x["status"] == "issue"][:5]:
+            lines.append(f"⚠️ {t['title']} · พบปัญหา: {(t.get('result_note') or '-')[:60]}")
+        left = [x for x in rows if x["status"] in ("pending", "doing")]
+        if left:
+            lines.append(f"⏳ ยังไม่เสร็จ {len(left)} งาน: " + ", ".join(x["title"] for x in left[:4]))
+        add("📋", f"งาน เสร็จ {c['done']}/{c['total']}", lines, c["total"])
+    except Exception as e:
+        print(f"[warn] สรุปงานไม่ได้: {e}")
+
+    # 2) ฉีดวัคซีน
+    try:
+        rows = supabase.table("vaccine_log").select("*").eq("log_date", iso).execute().data or []
+        lines = []
+        for r in rows[:8]:
+            where = " ".join(x for x in [r.get("barn_no"), r.get("pen_no")] if x)
+            lines.append(f"• {r.get('vaccine_name') or 'วัคซีน'}"
+                         + (f" · {r['pig_count']} ตัว" if r.get("pig_count") else "")
+                         + (" · " + where if where else "")
+                         + (f" · โดย {r['injector']}" if r.get("injector") else ""))
+        add("💉", f"ฉีดวัคซีน {len(rows)} รายการ", lines, len(rows))
+    except Exception as e:
+        print(f"[warn] สรุปวัคซีนไม่ได้: {e}")
+
+    # 3) ผสมพันธุ์
+    try:
+        rows = supabase.table("breeding_log").select("*").eq("mate_date", iso).execute().data or []
+        lines = []
+        for r in rows[:8]:
+            d = _decorate_breeding(dict(r))
+            lines.append(f"• แม่ {r['dam_no']}"
+                         + (f" × พ่อ {r['sire_no']}" if r.get("sire_no") else "")
+                         + f" · ครั้งที่ {r.get('round') or 1}"
+                         + f" · กำหนดคลอด {d.get('due_farrow_date') or '-'}")
+        add("🐖", f"ผสมพันธุ์ {len(rows)} ครั้ง", lines, len(rows))
+    except Exception as e:
+        print(f"[warn] สรุปผสมพันธุ์ไม่ได้: {e}")
+
+    # 4) บันทึกหมูป่วย
+    try:
+        rows = supabase.table("pig_health_log").select("*").eq("log_date", iso).execute().data or []
+        lines = []
+        for r in rows[:5]:
+            total = f" จาก {r['total_count']} ตัว" if r.get("total_count") is not None else ""
+            lines.append(f"• ป่วย {r['sick_count']} ตัว{total}"
+                         + (f" · {r['note']}" if r.get("note") else ""))
+        add("🩺", f"บันทึกสุขภาพหมู {len(rows)} ครั้ง", lines, len(rows))
+    except Exception as e:
+        print(f"[warn] สรุปสุขภาพหมูไม่ได้: {e}")
+
+    # 5) ตรวจอาการหลังฉีดวัคซีน
+    try:
+        rows = supabase.table("vaccine_followup").select("*").eq("check_date", iso).execute().data or []
+        lines = []
+        for r in rows[:5]:
+            lines.append(f"• วันที่ {r.get('days_after')} หลังฉีด · {r.get('severity') or 'ปกติ'}"
+                         + (f" · มีอาการ {r['affected_count']} ตัว" if r.get("affected_count") else ""))
+        add("🔍", f"ตรวจอาการหลังฉีด {len(rows)} รายการ", lines, len(rows))
+    except Exception as e:
+        print(f"[warn] สรุปการตรวจอาการไม่ได้: {e}")
+
+    # 6) คลังวัคซีนเคลื่อนไหว
+    try:
+        rows = _rows_on_day("vaccine_stock_moves", "created_at", lo, hi)
+        names = {}
+        try:
+            names = {p["id"]: p.get("name") for p in
+                     (supabase.table("vaccine_products").select("id,name").execute().data or [])}
+        except Exception:
+            pass
+        label = {"receive": "รับเข้า", "use": "เบิกใช้", "adjust": "ปรับยอด", "expired": "หมดอายุ/ทิ้ง"}
+        lines = []
+        for r in rows[:6]:
+            lines.append(f"• {label.get(r.get('reason'), r.get('reason') or '-')}"
+                         f" {r.get('doses')} โดส · {names.get(r.get('product_id')) or 'ไม่ระบุชนิด'}")
+        add("📦", f"คลังวัคซีนเคลื่อนไหว {len(rows)} รายการ", lines, len(rows))
+    except Exception as e:
+        print(f"[warn] สรุปคลังวัคซีนไม่ได้: {e}")
+
+    # 7) ชุดหมูที่เพิ่มเข้ามาใหม่
+    try:
+        rows = _rows_on_day("pig_batches", "created_at", lo, hi)
+        lines = [f"• {r.get('name')}" + (f" · {r['pig_count']} ตัว" if r.get("pig_count") else "")
+                 for r in rows[:5]]
+        add("🆕", f"ชุดหมูใหม่ {len(rows)} ชุด", lines, len(rows))
+    except Exception as e:
+        print(f"[warn] สรุปชุดหมูไม่ได้: {e}")
+
+    # 8) เคสที่ส่งปรึกษาสัตวแพทย์
+    try:
+        rows = _rows_on_day("vet_posts", "created_at", lo, hi)
+        st = {"waiting": "รอสัตวแพทย์", "claimed": "มีหมอรับแล้ว", "done": "ปิดเคสแล้ว"}
+        lines = [f"• {r.get('title')} · {st.get(r.get('status'), r.get('status') or '-')}"
+                 for r in rows[:5]]
+        add("👨‍⚕️", f"ส่งปรึกษาสัตวแพทย์ {len(rows)} เคส", lines, len(rows))
+    except Exception as e:
+        print(f"[warn] สรุปเคสสัตวแพทย์ไม่ได้: {e}")
+
+    return out
+
+
+def _format_daily_summary(sm: dict) -> str:
+    """เรียงสรุปเป็นข้อความสำหรับ LINE"""
+    try:
+        d = date.fromisoformat(sm["date"]).strftime("%d/%m/%Y")
+    except ValueError:
+        d = sm["date"]
+    lines = [f"📊 สรุปฟาร์มวันนี้ {d}"]
+    if not sm["sections"]:
+        lines.append("วันนี้ยังไม่มีการบันทึกอะไรเข้าระบบเลย")
+    for sec in sm["sections"]:
+        lines.append("")
+        lines.append(f"{sec['icon']} {sec['title']}")
+        lines.extend(sec["lines"])
+    if PUBLIC_SITE_URL:
+        lines.append("")
+        lines.append(f"ดูรายละเอียด: {PUBLIC_SITE_URL}/tasks")
+    return "\n".join(lines)
+
+
+@app.get("/daily-summary")
+def daily_summary(day: Optional[str] = None):
+    """สรุปว่าวันนี้ (หรือวันที่ระบุ) มีอะไรถูกบันทึกเข้าระบบบ้าง"""
+    d = None
+    if day:
+        try:
+            d = date.fromisoformat(day)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)")
+    sm = _daily_summary(d)
+    sm["text"] = _format_daily_summary(sm)
+    return sm
+
+
+@app.post("/cron/daily-summary-notify")
+def cron_daily_summary_notify(x_cron_key: str = Header(default="")):
+    """LINE ตอนเย็น: สรุปทุกอย่างที่บันทึกไว้วันนี้ — ส่งทุกวัน แม้วันที่ไม่มีใครบันทึกอะไร
+    เพราะข้อความ "วันนี้ยังไม่มีการบันทึกอะไรเลย" ก็เป็นข้อมูลที่เจ้าของฟาร์มต้องรู้"""
+    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    sm = _daily_summary()
+    _send_line_broadcast(_format_daily_summary(sm))
+    return {"ok": True, "sent": True, "sections": len(sm["sections"]),
+            "records": sm["total_records"]}
 
 
 # ---------- ชุมชนปรึกษาสัตวแพทย์ ----------
@@ -2705,6 +3080,66 @@ def cron_batch_plan_notify(x_cron_key: str = Header(default="")):
         lines.append(f"ดูแผน: {PUBLIC_SITE_URL}/vaccine-plan")
     _send_line_broadcast("\n".join(lines))
     return {"ok": True, "sent": True, "count": len(rows)}
+
+
+@app.post("/cron/vaccine-today-notify")
+def cron_vaccine_today_notify(x_cron_key: str = Header(default="")):
+    """LINE: เฉพาะ "วันที่มีฉีดจริง" — เข็มที่ถึงกำหนดวันนี้ หรือเลยกำหนดแล้วยังไม่ได้ฉีด
+
+    ต่างจาก /cron/batch-plan-notify ที่เตือนล่วงหน้า 7/3/1 วันด้วย
+    ฟาร์มขอให้ส่งเฉพาะวันที่ต้องลงมือฉีด วันไหนไม่มีอะไรต้องฉีดจะเงียบ ไม่ส่งอะไรเลย
+    """
+    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    today = datetime.now(BANGKOK).date()
+
+    # 1) แผนวัคซีนตามอายุของแต่ละชุดหมู (window 0 = เอาเฉพาะที่ถึงกำหนดวันนี้กับที่เลยมาแล้ว)
+    try:
+        plan = [r for r in _batch_plan_rows(0) if r["status"] in ("due", "overdue")]
+    except Exception as e:
+        print(f"[warn] อ่านแผนวัคซีนไม่ได้: {e}")
+        plan = []
+    # 2) นัดเข็มถัดไปที่จดไว้เองตอนบันทึกการฉีดครั้งก่อน
+    try:
+        nexts = _vaccine_due_rows(0)
+    except Exception as e:
+        print(f"[warn] อ่านนัดวัคซีนไม่ได้: {e}")
+        nexts = []
+
+    if not plan and not nexts:
+        return {"ok": True, "sent": False, "count": 0}
+
+    late = [r for r in plan if r["status"] == "overdue"]
+    now = [r for r in plan if r["status"] == "due"]
+    lines = [f"💉 วันนี้ต้องฉีดวัคซีน {len(now) + len(nexts)} รายการ"
+             + (f" · เลยกำหนดอีก {len(late)}" if late else "")]
+
+    def where_of(r):
+        return " ".join(x for x in [r.get("barn_no"), r.get("pen_no")] if x)
+
+    if now:
+        lines.append("🟠 ฉีดวันนี้")
+        for r in now[:8]:
+            w = where_of(r)
+            lines.append(f"• {r['batch_name']} · {r['vaccine_name']} {r['label']}"
+                         + (f" · {r['pig_count']} ตัว" if r.get("pig_count") else "")
+                         + (" · " + w if w else ""))
+    if nexts:
+        lines.append("🟠 ถึงนัดเข็มถัดไป")
+        for r in nexts[:5]:
+            w = where_of(r)
+            lines.append(f"• {r.get('vaccine_name') or 'วัคซีน'}" + (" · " + w if w else ""))
+    if late:
+        lines.append("🔴 เลยกำหนดแล้วยังไม่ฉีด")
+        for r in late[:6]:
+            w = where_of(r)
+            lines.append(f"• {r['batch_name']} · {r['vaccine_name']} {r['label']}"
+                         f" (เลยมา {-r['days_left']} วัน)" + (" · " + w if w else ""))
+    if PUBLIC_SITE_URL:
+        lines.append(f"บันทึกการฉีด: {PUBLIC_SITE_URL}/vaccine")
+    _send_line_broadcast("\n".join(lines))
+    return {"ok": True, "sent": True, "count": len(now) + len(nexts) + len(late),
+            "due_today": len(now), "overdue": len(late), "next_due": len(nexts)}
 
 
 @app.get("/vaccine-followup-due")

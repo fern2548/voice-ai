@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BREEDS } from '../data/breeding.js'
+import { deleteBreeding, getBreeding, saveBreeding, updateBreeding } from '../api.js'
 
 // ตารางบันทึกการผสมพันธุ์ — ทำตามแบบฟอร์มกระดาษที่ฟาร์มใช้อยู่
 // ต่างกันตรงที่ช่อง "กำหนดกลับสัด" และ "วันกำหนดคลอด" ระบบคำนวณให้เอง
 // ไม่ต้องนั่งนับปฏิทิน และเตือนให้เมื่อใกล้ถึงกำหนด
+//
+// เก็บบนเซิร์ฟเวอร์ เพื่อให้สรุปฟาร์มรายวันรายงานเรื่องผสมพันธุ์ได้
+// และข้อมูลไม่หายเวลาล้างเบราว์เซอร์หรือเปลี่ยนเครื่อง
+// ถ้ายังไม่ได้สร้างตาราง (ยังไม่ได้รัน backend/daily_tables.sql) จะถอยไปเก็บในเครื่องเหมือนเดิม
 
 const LS = 'farmy.breeding.log'
+const LS_MOVED = 'farmy.breeding.moved'   // ย้ายของเก่าขึ้นเซิร์ฟเวอร์ไปแล้วหรือยัง
 const DAYS_RETURN = 21     // กลับเป็นสัดถ้าผสมไม่ติด
 const DAYS_FARROW = 114    // ระยะตั้งท้อง
 
@@ -70,6 +76,34 @@ const daysLeft = (iso) => {
   return Math.round((d - new Date(new Date().toDateString())) / 86400000)
 }
 
+// หน้าเว็บใช้ชื่อฟิลด์แบบ damNo ส่วนฐานข้อมูลใช้ dam_no — แปลงตรงนี้ที่เดียว
+const toApi = (f) => ({
+  dam_no: (f.damNo || '').trim(),
+  dam_breed: f.damBreed || null,
+  dam_line: f.damLine || null,
+  sire_no: f.sireNo || null,
+  sire_breed: f.sireBreed || null,
+  sire_line: f.sireLine || null,
+  round: Number(f.round) || 1,
+  mate_date: f.mateDate,
+  result: f.result || 'wait',
+  farrow_date: f.farrowDate || null,
+  piglet_count: f.pigletCount === '' || f.pigletCount == null ? null : Number(f.pigletCount),
+  note: f.note || null,
+})
+
+const fromApi = (r) => ({
+  id: r.id,
+  damNo: r.dam_no || '', damBreed: r.dam_breed || '', damLine: r.dam_line || '',
+  sireNo: r.sire_no || '', sireBreed: r.sire_breed || '', sireLine: r.sire_line || '',
+  round: String(r.round ?? 1),
+  mateDate: r.mate_date || '',
+  result: r.result || 'wait',
+  farrowDate: r.farrow_date || '',
+  pigletCount: r.piglet_count == null ? '' : String(r.piglet_count),
+  note: r.note || '',
+})
+
 const read = () => {
   try {
     const v = localStorage.getItem(LS)
@@ -90,10 +124,54 @@ export default function BreedingLog() {
   const [form, setForm] = useState(EMPTY)
   const [editId, setEditId] = useState(null)
   const [err, setErr] = useState('')
+  // server = เก็บบนเซิร์ฟเวอร์ · local = ยังไม่ได้สร้างตาราง ใช้ของในเครื่องไปก่อน
+  const [mode, setMode] = useState('loading')
+
+  const reload = async () => {
+    const d = await getBreeding()
+    setRows((d.rows || []).map(fromApi))
+    return d
+  }
 
   useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const d = await getBreeding()
+        if (!alive) return
+        if (d.no_table) { setMode('local'); setRows(read()); return }
+
+        // ย้ายของเก่าที่ค้างอยู่ในเครื่องขึ้นเซิร์ฟเวอร์ให้ครั้งเดียว
+        // ทำเฉพาะตอนบนเซิร์ฟเวอร์ยังว่าง จะได้ไม่ไปซ้ำกับที่คนอื่นลงไว้แล้ว
+        const old = read()
+        let moved = false
+        try { moved = localStorage.getItem(LS_MOVED) === '1' } catch { /* ไม่เป็นไร */ }
+        if (old.length && !moved && !(d.rows || []).length) {
+          for (const r of old) {
+            try { await saveBreeding(toApi(r)) } catch { /* ข้ามตัวที่ย้ายไม่ได้ */ }
+          }
+          try { localStorage.setItem(LS_MOVED, '1') } catch { /* ไม่เป็นไร */ }
+          if (!alive) return
+          setMode('server')
+          await reload()
+          return
+        }
+        setMode('server')
+        setRows((d.rows || []).map(fromApi))
+      } catch {
+        // เซิร์ฟเวอร์ล่มหรือยังไม่ได้ล็อกอิน — ยังจดต่อในเครื่องได้ ไม่ให้งานสะดุด
+        if (alive) { setMode('local'); setRows(read()) }
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  // โหมดในเครื่องเท่านั้นที่เขียนทับ localStorage
+  // โหมดเซิร์ฟเวอร์ต้องไม่เขียน จะได้เหลือของเดิมไว้เป็นสำเนาสำรอง
+  useEffect(() => {
+    if (mode !== 'local') return
     try { localStorage.setItem(LS, JSON.stringify(rows)) } catch { /* ไม่เป็นไร */ }
-  }, [rows])
+  }, [rows, mode])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const setVal = (k) => (v) => setForm((f) => ({ ...f, [k]: v }))
@@ -101,10 +179,19 @@ export default function BreedingLog() {
   const startAdd = () => { setForm({ ...EMPTY, mateDate: todayStr() }); setEditId(null); setErr(''); setOpen(true) }
   const startEdit = (r) => { setForm({ ...r }); setEditId(r.id); setErr(''); setOpen(true) }
 
-  const save = () => {
+  const save = async () => {
     if (!form.damNo.trim()) { setErr('ใส่เบอร์แม่สุกรก่อน'); return }
     if (!form.mateDate) { setErr('ใส่วันที่ผสมก่อน'); return }
-    if (editId) {
+    if (mode === 'server') {
+      try {
+        if (editId) await updateBreeding(editId, toApi(form))
+        else await saveBreeding(toApi(form))
+        await reload()
+      } catch (e) {
+        setErr(e?.detail || 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง')
+        return
+      }
+    } else if (editId) {
       setRows((rs) => rs.map((r) => (r.id === editId ? { ...form, id: editId } : r)))
     } else {
       setRows((rs) => [...rs, { ...form, id: Date.now().toString(36) }])
@@ -112,8 +199,12 @@ export default function BreedingLog() {
     setOpen(false); setEditId(null); setErr('')
   }
 
-  const remove = (id) => {
+  const remove = async (id) => {
     if (!window.confirm('ลบรายการนี้ออกจากตาราง?')) return
+    if (mode === 'server') {
+      try { await deleteBreeding(id); await reload() } catch { setErr('ลบไม่สำเร็จ ลองใหม่อีกครั้ง') }
+      return
+    }
     setRows((rs) => rs.filter((r) => r.id !== id))
   }
 
@@ -174,6 +265,7 @@ export default function BreedingLog() {
           <small>
             {rows.length ? `มี ${rows.length} รายการ` : 'ยังไม่มีรายการ'} ·
             ช่องกำหนดกลับสัดและกำหนดคลอด ระบบคำนวณให้เอง
+            {mode === 'local' && ' · เก็บไว้ในเครื่องนี้เท่านั้น (ยังไม่ได้เชื่อมฐานข้อมูล)'}
           </small>
         </div>
         <div className="bl-top-btns">

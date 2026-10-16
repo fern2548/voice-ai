@@ -39,6 +39,21 @@ async function post(url, body) {
   return res.json()
 }
 
+async function put(url, body) {
+  const res = await fetch(apiUrl(url), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+    body: JSON.stringify(body),
+  })
+  checkAuth(res)
+  if (!res.ok) {
+    const err = httpError(url, res)
+    try { err.detail = (await res.json()).detail || '' } catch { /* ไม่ใช่ JSON */ }
+    throw err
+  }
+  return res.json()
+}
+
 async function del(url) {
   const res = await fetch(apiUrl(url), { method: 'DELETE', headers: adminHeaders() })
   checkAuth(res)
@@ -114,6 +129,21 @@ export const claimTask = (id) => post(`/farm-tasks/${id}/claim`, {})
 export const recordTaskResult = (id, r) => post(`/farm-tasks/${id}/result`, r)
 export const postponeTask = (id, due_date, reason) => post(`/farm-tasks/${id}/postpone`, { due_date, reason })
 export const deleteTask = (id) => del(`/farm-tasks/${id}`)
+
+// งานประจำ — แม่แบบงานที่ระบบสร้างให้เองทุกวัน
+export const getRoutines = () => get('/farm-routines')
+export const saveRoutine = (r) => post('/farm-routines', r)
+export const updateRoutine = (id, r) => put(`/farm-routines/${id}`, r)
+export const deleteRoutine = (id) => del(`/farm-routines/${id}`)
+
+// บันทึกการผสมพันธุ์ (ย้ายจาก localStorage มาเก็บบนเซิร์ฟเวอร์)
+export const getBreeding = () => get('/breeding-log')
+export const saveBreeding = (b) => post('/breeding-log', b)
+export const updateBreeding = (id, b) => put(`/breeding-log/${id}`, b)
+export const deleteBreeding = (id) => del(`/breeding-log/${id}`)
+
+// สรุปว่าวันนี้มีอะไรถูกบันทึกเข้าระบบบ้าง
+export const getDailySummary = (day) => get(`/daily-summary${day ? `?day=${day}` : ''}`)
 
 // ชุมชนปรึกษาสัตวแพทย์
 export const getVetPosts = ({ status, page = 0, pageSize = 20 } = {}) =>

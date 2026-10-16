@@ -1,0 +1,29 @@
+# สรุปฟาร์มวันนี้เข้ากลุ่ม LINE ทุกเย็น
+#
+# รวมทุกอย่างที่ถูกบันทึกเข้าระบบในวันนั้น: งานที่คนงานทำเสร็จ การฉีดวัคซีน
+# การผสมพันธุ์ บันทึกสุขภาพหมู คลังวัคซีน ชุดหมูใหม่ และเคสที่ส่งปรึกษาสัตวแพทย์
+#
+# ส่งทุกวันแม้ไม่มีใครบันทึกอะไรเลย เพราะข้อความ "วันนี้ยังไม่มีการบันทึกอะไร"
+# ก็เป็นข้อมูลที่เจ้าของฟาร์มต้องรู้
+name: สรุปฟาร์มประจำวัน
+
+on:
+  schedule:
+    # 11:30 UTC = 18:30 น. ตามเวลาไทย — หลังเลิกงาน คนงานบันทึกผลเสร็จแล้ว
+    - cron: '30 11 * * *'
+  workflow_dispatch:
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ปลุกเซิร์ฟเวอร์ให้ตื่นก่อน
+        run: |
+          curl -sS --max-time 90 --retry 3 --retry-delay 15 --retry-all-errors \
+            "${{ secrets.API_BASE }}/health" > /dev/null
+
+      - name: ส่งสรุปฟาร์มวันนี้เข้า LINE
+        run: |
+          curl -sS --fail-with-body --max-time 90 \
+            -X POST "${{ secrets.API_BASE }}/cron/daily-summary-notify" \
+            -H "X-Cron-Key: ${{ secrets.CRON_KEY }}"

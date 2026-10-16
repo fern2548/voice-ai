@@ -3157,6 +3157,51 @@ th, td { font-size: 14px; }
 .tk-msg { padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--accent-2); font-size: 14px; font-weight: 600; }
 /* การ์ดงาน */
 .tk-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---- สรุปฟาร์มวันนี้ (สิ่งเดียวกับที่ส่งเข้า LINE ตอนเย็น) ---- */
+.ds { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 15px 17px; display: flex; flex-direction: column; gap: 12px; }
+.ds-top b { font-size: 16px; }
+.ds-top small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-dim); }
+.ds-sec { border-top: 1px solid var(--border); padding-top: 10px; }
+.ds-sec-head { display: flex; align-items: center; gap: 7px; font-size: 14px; }
+.ds-sec-head b { font-weight: 700; }
+.ds-lines { margin: 6px 0 0; padding-left: 22px; display: flex; flex-direction: column; gap: 3px; }
+.ds-lines li { font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+
+/* ---- งานประจำ ---- */
+.rt { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 15px 17px; display: flex; flex-direction: column; gap: 12px; }
+.rt-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rt-top b { font-size: 16px; }
+.rt-top small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-dim); max-width: 60ch; }
+.rt-form { background: var(--panel-2); border-radius: 12px; padding: 14px;
+  display: flex; flex-direction: column; gap: 12px; }
+.rt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.rt-f { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-dim); }
+.rt-f.wide { grid-column: 1 / -1; }
+.rt-days { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
+.rt-day-btns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rt-day-btns small { color: var(--text-faint); }
+.rt-form-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.rt-err { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--danger, #e5484d); }
+
+.rt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rt-item { display: flex; align-items: center; gap: 8px; background: var(--panel-2);
+  border-radius: 11px; padding: 8px 10px; }
+/* ปิดไว้ชั่วคราว ยังอยู่ในรายการแต่ต้องดูออกทันทีว่าไม่ทำงาน */
+.rt-item.off { opacity: .5; }
+.rt-item-body { flex: 1; min-width: 0; }
+.rt-item-body b { display: block; font-size: 14px; }
+.rt-item-body small { display: block; font-size: 11.5px; color: var(--text-faint); margin-top: 1px; }
+.rt-power { background: none; border: 0; padding: 0; cursor: pointer; flex: none;
+  width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%;
+  font-size: 22px; color: var(--accent); }
+.rt-item.off .rt-power { color: var(--text-faint); }
+.rt-ico { background: none; border: 0; cursor: pointer; flex: none; font-size: 17px;
+  width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; color: var(--text-faint); }
+.rt-ico:hover { background: var(--panel); color: var(--text); }
+.rt-ico.danger:hover { color: var(--danger, #e5484d); }
 .tk-card { --c: var(--accent); background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: 0 14px 14px 0; padding: 14px 16px; }
 .tk-card.amber { --c: var(--warn); } .tk-card.red { --c: var(--danger); } .tk-card.blue { --c: #6aa9ff; }
 .tk-card.overdue { background: color-mix(in srgb, var(--danger) 7%, var(--panel)); }
