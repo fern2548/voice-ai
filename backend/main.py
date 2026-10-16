@@ -2393,19 +2393,19 @@ def _task_bullet(t: dict) -> str:
     return f"{mark} {t['title']}{late}" + (" · " + " · ".join(bits) if bits else "")
 
 
-@app.post("/cron/task-notify")
-def cron_task_notify(x_cron_key: str = Header(default="")):
-    """LINE ทุกเช้า: มอบหมายงานของวันนี้ แยกตามคนรับผิดชอบ + งานที่ค้างข้ามวัน
+def _build_task_assign_message() -> Optional[dict]:
+    """ข้อความมอบหมายงานของวันนี้ แยกตามคนรับผิดชอบ — คืน None ถ้าไม่มีงานค้างเลย
 
     ส่งเป็น broadcast เข้ากลุ่ม ทุกคนจึงเห็นงานของกันและกัน — ตั้งใจให้เป็นแบบนั้น
     เพราะงานฟาร์มต้องรู้ว่าใครคุมอะไรอยู่ และงานไหนที่ยังไม่มีใครรับ
+
+    แยกจากตัว endpoint เพื่อให้คำสั่งเสียงเรียกใช้ได้ด้วย
+    จะได้ไม่มีข้อความสองชุดที่ต้องมาคอยดูแลให้ตรงกัน
     """
-    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
-        raise HTTPException(status_code=401, detail="unauthorized")
     data = list_tasks()
     rows = [t for t in data["rows"] if t["status"] in ("pending", "doing")]
     if not rows:
-        return {"ok": True, "sent": False, "count": 0}
+        return None
 
     # จัดกลุ่มตามคนรับผิดชอบ คนงานจะได้กวาดตาหาชื่อตัวเองเจอทันที
     groups: dict[str, list[dict]] = {}
@@ -2428,9 +2428,20 @@ def cron_task_notify(x_cron_key: str = Header(default="")):
         lines.append(f"…และอีก {len(rows) - shown} รายการ")
     if PUBLIC_SITE_URL:
         lines.append(f"กดรับงาน/บันทึกผล: {PUBLIC_SITE_URL}/tasks")
-    _send_line_broadcast("\n".join(lines))
-    return {"ok": True, "sent": True, "count": len(rows),
+    return {"text": "\n".join(lines), "count": len(rows),
             "people": len([k for k in groups if k])}
+
+
+@app.post("/cron/task-notify")
+def cron_task_notify(x_cron_key: str = Header(default="")):
+    """LINE ทุกเช้า: มอบหมายงานของวันนี้ แยกตามคนรับผิดชอบ + งานที่ค้างข้ามวัน"""
+    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    m = _build_task_assign_message()
+    if not m:
+        return {"ok": True, "sent": False, "count": 0}
+    _send_line_broadcast(m["text"])
+    return {"ok": True, "sent": True, "count": m["count"], "people": m["people"]}
 
 
 # ---------- บันทึกการผสมพันธุ์ ----------
@@ -3104,15 +3115,12 @@ def cron_batch_plan_notify(x_cron_key: str = Header(default="")):
     return {"ok": True, "sent": True, "count": len(rows)}
 
 
-@app.post("/cron/vaccine-today-notify")
-def cron_vaccine_today_notify(x_cron_key: str = Header(default="")):
-    """LINE: เฉพาะ "วันที่มีฉีดจริง" — เข็มที่ถึงกำหนดวันนี้ หรือเลยกำหนดแล้วยังไม่ได้ฉีด
+def _build_vaccine_today_message() -> Optional[dict]:
+    """ข้อความวัคซีนที่ต้องลงมือฉีด — คืน None ถ้าวันนี้ไม่มีอะไรต้องฉีดและไม่มีของค้าง
 
     ต่างจาก /cron/batch-plan-notify ที่เตือนล่วงหน้า 7/3/1 วันด้วย
     ฟาร์มขอให้ส่งเฉพาะวันที่ต้องลงมือฉีด วันไหนไม่มีอะไรต้องฉีดจะเงียบ ไม่ส่งอะไรเลย
     """
-    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
-        raise HTTPException(status_code=401, detail="unauthorized")
     today = datetime.now(BANGKOK).date()
 
     # 1) แผนวัคซีนตามอายุของแต่ละชุดหมู (window 0 = เอาเฉพาะที่ถึงกำหนดวันนี้กับที่เลยมาแล้ว)
@@ -3136,7 +3144,7 @@ def cron_vaccine_today_notify(x_cron_key: str = Header(default="")):
     now = [r for r in plan if r["status"] == "due"]
     late = [r for r in plan if r["status"] == "overdue"]
     if not now and not late and not nexts:
-        return {"ok": True, "sent": False, "count": 0}
+        return None
 
     def where_of(r):
         return " ".join(x for x in [r.get("barn_no"), r.get("pen_no")] if x)
@@ -3174,9 +3182,21 @@ def cron_vaccine_today_notify(x_cron_key: str = Header(default="")):
                          + (f" เลยมา {d} วัน" if d else "") + ")" + (" · " + w if w else ""))
     if PUBLIC_SITE_URL:
         lines.append(f"บันทึกการฉีด: {PUBLIC_SITE_URL}/vaccine")
-    _send_line_broadcast("\n".join(lines))
-    return {"ok": True, "sent": True, "count": today_n + late_n,
+    return {"text": "\n".join(lines), "count": today_n + late_n,
             "due_today": today_n, "overdue": late_n}
+
+
+@app.post("/cron/vaccine-today-notify")
+def cron_vaccine_today_notify(x_cron_key: str = Header(default="")):
+    """LINE: เฉพาะวันที่มีของต้องฉีดจริง วันไหนไม่มีจะเงียบ"""
+    if not CRON_KEY or not hmac.compare_digest(x_cron_key, CRON_KEY):
+        raise HTTPException(status_code=401, detail="unauthorized")
+    m = _build_vaccine_today_message()
+    if not m:
+        return {"ok": True, "sent": False, "count": 0}
+    _send_line_broadcast(m["text"])
+    return {"ok": True, "sent": True, "count": m["count"],
+            "due_today": m["due_today"], "overdue": m["overdue"]}
 
 
 @app.get("/vaccine-followup-due")
@@ -5014,7 +5034,9 @@ def _record_vaccine_from_voice(text: str) -> str:
 
 # ---------- คำสั่งด้วยเสียง: ส่งสรุปฟาร์มไป LINE ----------
 _LINE_SEND_VERBS = ("ส่ง",)
-_LINE_WORDS = ("ไลน์", "line", "LINE")
+# "กลุ่ม" นับด้วย เพราะในฟาร์มนี้ "ส่งเข้ากลุ่ม" หมายถึงกลุ่ม LINE อยู่แล้ว ไม่มีช่องทางอื่น
+# ส่วนคำกริยาคงไว้แค่ "ส่ง" คำอย่าง "แจ้ง" กว้างไป เผลอยิงข้อความเข้ากลุ่มจริงจะกวนคนทั้งฟาร์ม
+_LINE_WORDS = ("ไลน์", "line", "LINE", "กลุ่ม")
 
 
 def _is_line_send_command(text: str) -> bool:
@@ -5087,13 +5109,58 @@ def _send_line_vaccine_report() -> str:
     return "ส่งรายงานวัคซีนเข้า LINE แล้วครับ (ทั้งรูปและไฟล์ PDF)" if ok else "ส่ง LINE ไม่สำเร็จครับ ลองใหม่อีกครั้ง"
 
 
-def _send_line_summary_from_voice() -> str:
-    """สร้างสรุปฟาร์มจากข้อมูลจริงแล้วส่งเข้า LINE คืนข้อความยืนยันให้พูดกลับ"""
+# พูดว่าจะให้ส่ง "อะไร" เข้า LINE — ไม่ระบุ = สรุปฟาร์มวันนี้
+_LINE_WANT_TASK = ("งาน", "มอบหมาย", "คนงาน", "ลูกน้อง", "ที่ต้องทำ")
+_LINE_WANT_VACCINE = ("วัคซีน", "ฉีด")
+_LINE_WANT_STATUS = ("สถานะ", "อากาศ", "สภาพ")
+_LINE_FAIL = "ส่ง LINE ไม่สำเร็จครับ ลองใหม่อีกครั้ง"
+
+
+def _send_line_summary_from_voice(text: str = "") -> str:
+    """สั่งด้วยเสียงให้ส่งเข้า LINE ทันที ไม่ต้องกดยืนยันอะไร
+
+    ใช้ตัวสร้างข้อความชุดเดียวกับที่ส่งอัตโนมัติทุกเช้า/เย็น
+    สิ่งที่กลุ่มได้รับตอนสั่งเองจึงหน้าตาเหมือนกันเป๊ะ ไม่ต้องมานั่งดูแลข้อความสองชุด
+
+    เลือกชุดตามคำที่พูด:
+      "ส่งงานวันนี้เข้าไลน์"   -> มอบหมายงาน แยกตามคนรับผิดชอบ
+      "ส่งวัคซีนเข้าไลน์"      -> วัคซีนที่ต้องฉีด/ค้างอยู่
+      "ส่งสถานะฟาร์มเข้าไลน์"  -> อากาศ + หมูป่วยล่าสุด + วัคซีนใกล้ครบกำหนด
+      "ส่งสรุปเข้าไลน์"        -> สรุปทุกอย่างที่บันทึกไว้วันนี้ (ค่าเริ่มต้น)
+    """
     if not LINE_CHANNEL_ACCESS_TOKEN:
         return "ยังไม่ได้ตั้งค่า LINE ครับ ต้องใส่ LINE_CHANNEL_ACCESS_TOKEN ในระบบก่อน"
-    summary = _build_farm_summary_for_line()
-    ok = _send_line_broadcast(summary)
-    return "ส่งสรุปฟาร์มเข้า LINE แล้วครับ" if ok else "ส่ง LINE ไม่สำเร็จครับ ลองใหม่อีกครั้ง"
+    t = (text or "").replace(" ", "")
+
+    if any(w in t for w in _LINE_WANT_TASK):
+        m = _build_task_assign_message()
+        if not m:
+            return "วันนี้ไม่มีงานค้างเลยครับ เลยไม่ได้ส่งอะไรเข้า LINE"
+        if not _send_line_broadcast(m["text"]):
+            return _LINE_FAIL
+        who = f" แบ่งให้ {m['people']} คน" if m["people"] else " ยังไม่มีคนรับสักงาน"
+        return f"ส่งงานวันนี้ {m['count']} รายการเข้า LINE แล้วครับ{who}"
+
+    if any(w in t for w in _LINE_WANT_VACCINE):
+        m = _build_vaccine_today_message()
+        if not m:
+            return "วันนี้ไม่มีวัคซีนที่ต้องฉีดและไม่มีของค้างครับ เลยไม่ได้ส่งอะไรเข้า LINE"
+        if not _send_line_broadcast(m["text"]):
+            return _LINE_FAIL
+        late = f" และค้างอยู่ {m['overdue']} รายการ" if m["overdue"] else ""
+        return f"ส่งรายการวัคซีนเข้า LINE แล้วครับ วันนี้ต้องฉีด {m['due_today']} รายการ{late}"
+
+    if any(w in t for w in _LINE_WANT_STATUS):
+        if not _send_line_broadcast(_build_farm_summary_for_line()):
+            return _LINE_FAIL
+        return "ส่งสถานะฟาร์มเข้า LINE แล้วครับ"
+
+    sm = _daily_summary()
+    if not _send_line_broadcast(_format_daily_summary(sm)):
+        return _LINE_FAIL
+    if not sm["total_records"]:
+        return "ส่งสรุปฟาร์มวันนี้เข้า LINE แล้วครับ แต่วันนี้ยังไม่มีการบันทึกอะไรเข้าระบบเลย"
+    return f"ส่งสรุปฟาร์มวันนี้เข้า LINE แล้วครับ วันนี้บันทึกไว้ {sm['total_records']} รายการ"
 
 
 def _recent_pig_health(limit: int = 14) -> list[dict]:
@@ -6088,7 +6155,7 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
     # คำสั่งส่งสรุปฟาร์มเข้า LINE ด้วยเสียง -> สร้างสรุปจากข้อมูลจริง + ส่งตรง ไม่ผ่าน AI
     if _is_line_send_command(text):
         try:
-            return Answer(answer=_send_line_summary_from_voice())
+            return Answer(answer=_send_line_summary_from_voice(text))
         except Exception as e:
             print(f"[warn] ส่ง LINE ไม่สำเร็จ: {e}")
             return Answer(answer="ขออภัยครับ ส่งสรุปเข้า LINE ไม่สำเร็จ ลองใหม่อีกครั้งนะครับ")
