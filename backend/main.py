@@ -5865,8 +5865,21 @@ def _needs_task_info(text: str) -> bool:
     return any(w in text.replace(" ", "") for w in _TASK_ASK_WORDS)
 
 
+def _task_line(t: dict) -> str:
+    """หนึ่งบรรทัดในรายการงาน — ขึ้นต้นด้วยเวลาเสมอถ้ามี สายตาจะได้ไล่คอลัมน์เดียวกัน"""
+    who = t.get("assignee_name") or t.get("assignee")
+    where = " ".join(x for x in [t.get("barn_no"), t.get("pen_no")] if x)
+    head = f"{t['due_time']} " if t.get("due_time") else ""
+    tail = " · ".join(x for x in [where, who] if x)
+    return f"- {head}{t['title']}" + (f" · {tail}" if tail else "")
+
+
 def _task_answer(text: str):
-    """สรุปงานของวันนี้ให้ฟังสั้น ๆ — ใครรับผิดชอบ เหลืออะไร"""
+    """สรุปงานของวันนี้ — แยกงานค้างออกจากงานวันนี้ แล้วเรียงตามเวลา
+
+    แสดงครบทุกรายการ ไม่ตัดจบด้วย "และอีก N รายการ"
+    คนอ่านกำลังจะเอาไปลงมือทำ ตัดทิ้งไปครึ่งหนึ่งก็ใช้วางแผนทั้งวันไม่ได้
+    """
     if not _needs_task_info(text):
         return None
     try:
@@ -5877,17 +5890,30 @@ def _task_answer(text: str):
     rows, c = data["rows"], data["counts"]
     if not rows:
         return "วันนี้ยังไม่มีงานในระบบครับ"
+
     left = [x for x in rows if x["status"] in ("pending", "doing")]
-    msg = [f"งานวันนี้มี {c['total']} รายการ เสร็จแล้ว {c['done']} เหลืออีก {len(left)} รายการครับ"]
-    for x in left[:6]:
-        who = x.get("assignee_name") or x.get("assignee")
-        bits = " · ".join(y for y in [x.get("due_time"), who] if y)
-        late = " (ค้างจากเมื่อวาน)" if x["overdue"] else ""
-        msg.append(f"- {x['title']}{late}" + (f" · {bits}" if bits else ""))
-    if len(left) > 6:
-        msg.append(f"…และอีก {len(left) - 6} รายการ")
+    if not left:
+        return f"งานวันนี้เสร็จครบทั้ง {c['total']} รายการแล้วครับ"
+
+    # เรียงตามเวลา งานที่ไม่ได้กำหนดเวลาไว้ไปต่อท้าย (ทำเมื่อไหร่ก็ได้ในวัน)
+    def by_time(t):
+        return (0, t["due_time"]) if t.get("due_time") else (1, "")
+
+    late = sorted([x for x in left if x["overdue"]], key=by_time)
+    today_rows = sorted([x for x in left if not x["overdue"]], key=by_time)
+
+    msg = [f"งานวันนี้ {c['total']} รายการ · เสร็จแล้ว {c['done']} · เหลืออีก {len(left)}"]
+    if late:
+        msg.append("")
+        msg.append(f"### ค้างจากเมื่อวาน ({len(late)})")
+        msg.extend(_task_line(t) for t in late)
+    if today_rows:
+        msg.append("")
+        msg.append(f"### ของวันนี้ ({len(today_rows)})")
+        msg.extend(_task_line(t) for t in today_rows)
     if c.get("issue"):
-        msg.append(f"มี {c['issue']} งานที่บันทึกว่าพบปัญหา")
+        msg.append("")
+        msg.append(f"มี {c['issue']} งานที่บันทึกไว้ว่าพบปัญหา รอคนไปตามต่อ")
     return "\n".join(msg)
 
 
