@@ -41,7 +41,7 @@ export default function PigHealthLog() {
         total_count: totalCount === '' ? null : Number(totalCount),
         note: note.trim() || null,
       })
-      setSaveMsg('บันทึกแล้วครับ')
+      setSaveMsg('บันทึกแล้วค่ะ')
       setNote('')
       setRefreshTick((t) => t + 1)
     } catch {

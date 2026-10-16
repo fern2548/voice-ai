@@ -39,7 +39,7 @@ export default function AdminUsersPanel() {
     setPwMsg('')
     try {
       await changeAdminPassword(currentPw, newPw)
-      setPwMsg('เปลี่ยนรหัสผ่านแล้วครับ')
+      setPwMsg('เปลี่ยนรหัสผ่านแล้วค่ะ')
       setCurrentPw('')
       setNewPw('')
     } catch {
@@ -55,7 +55,7 @@ export default function AdminUsersPanel() {
     setUserMsg('')
     try {
       await createAdminUser(newUser.trim(), newUserPw)
-      setUserMsg('เพิ่มผู้ใช้แล้วครับ')
+      setUserMsg('เพิ่มผู้ใช้แล้วค่ะ')
       setNewUser('')
       setNewUserPw('')
       loadUsers()

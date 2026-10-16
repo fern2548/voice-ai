@@ -3538,7 +3538,7 @@ def _build_vaccine_report_messages() -> list[dict]:
     if not PUBLIC_REPORT_KEY:
         return [{
             "type": "text",
-            "text": "ยังตั้งค่า PUBLIC_REPORT_KEY ไม่ครบ จึงยังสร้างลิงก์รายงานไม่ได้ครับ",
+            "text": "ยังตั้งค่า PUBLIC_REPORT_KEY ไม่ครบ จึงยังสร้างลิงก์รายงานไม่ได้ค่ะ",
         }]
 
     base = f"{PUBLIC_BASE_URL}/r/{PUBLIC_REPORT_KEY}"
@@ -3603,7 +3603,7 @@ async def line_webhook(request: Request):
                 _line_reply(reply_token, [{"type": "text", "text": answer}])
         except Exception as e:
             print(f"[warn] ตอบ LINE webhook ไม่สำเร็จ: {e}")
-            _line_reply(reply_token, [{"type": "text", "text": "ขออภัยครับ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้งนะครับ"}])
+            _line_reply(reply_token, [{"type": "text", "text": "ขออภัยค่ะ ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้งนะค่ะ"}])
 
     return {"ok": True}
 
@@ -3612,7 +3612,7 @@ async def line_webhook(request: Request):
 def line_send_vaccine_report():
     """ปุ่มบนเว็บ: ส่งรายงานวัคซีน (รูป + ลิงก์ PDF) เข้า LINE ทันที"""
     msg = _send_line_vaccine_report()
-    ok = "แล้วครับ" in msg
+    ok = "แล้วค่ะ" in msg
     return {"ok": ok, "message": msg}
 
 
@@ -3959,7 +3959,8 @@ SYSTEM_PROMPT = (
     "- ตอบเฉพาะสิ่งที่ถูกถามเท่านั้น ห้ามพูดถึงสภาพอากาศถ้าคำถามไม่ได้เกี่ยวกับสภาพอากาศ\n"
     "  (เช่น ถ้าถามเรื่องสายพันธุ์หมู ให้ตอบเรื่องสายพันธุ์หมูอย่างเดียว ไม่ต้องพ่วงตัวเลขอากาศมาด้วย)\n"
     "- ใช้ตัวเลขจาก CONTEXT เป็นข้อมูลอ้างอิงหลักเฉพาะตอนคำถามเกี่ยวข้องกับตัวเลขนั้นจริง ๆ\n"
-    "- ตอบเป็นภาษาไทย สุภาพ กระชับ ลงท้ายด้วย 'ครับ'\n"
+    "- ตอบเป็นภาษาไทย สุภาพ กระชับ ลงท้ายด้วย 'ค่ะ' (ประโยคคำถามใช้ 'คะ')\n"
+    "  ผู้ช่วยเป็นผู้หญิง ให้ตรงกับเสียงที่ใช้อ่านคำตอบ ห้ามใช้ 'ครับ' หรือ 'ผม'\n"
     "- อ้างอิงตัวเลขจริงพร้อมหน่วยเมื่อเกี่ยวข้อง\n"
     "- ถ้าถามพยากรณ์/แนวโน้มอากาศ ให้ดูตารางพยากรณ์และประวัติย้อนหลัง แล้วสรุปทิศทาง (สูงขึ้น/ลดลง/ทรงตัว)\n"
     "- ถ้าถามเชิงประวัติ/สถิติอากาศ (เช่น สัปดาห์นี้ร้อนสุดกี่องศา, เดือนนี้ฝนตกกี่ครั้ง) ให้ดูจากสถิติย้อนหลังใน CONTEXT\n"
@@ -4770,14 +4771,14 @@ def _symptom_answer(text: str):
     signs = " ".join(dict.fromkeys(h[3] for h in hits if h[3]))
     names = " · ".join(dict.fromkeys(h[0] for h in hits))
     if signs:
-        msg = f"อาการ {signs} เข้าได้กับ {names} ครับ"
+        msg = f"อาการ {signs} เข้าได้กับ {names} ค่ะ"
     else:
         # ถามชื่อโรคมาตรง ๆ ให้บอกอาการเด่นของโรคนั้นไปเลย
-        msg = f"{names} มีอาการเด่นคือ {_DISEASE_SIGNS.get(hits[0][0], '')}".rstrip() + "ครับ"
+        msg = f"{names} มีอาการเด่นคือ {_DISEASE_SIGNS.get(hits[0][0], '')}".rstrip() + "ค่ะ"
     msg += f" สิ่งที่ควรดูเพิ่ม: {hits[0][2]}"
     if any(h[0] in _NOTIFIABLE for h in hits):
         msg += " โรคกลุ่มนี้เป็นโรคระบาดสัตว์ตามกฎหมาย สงสัยเมื่อไหร่ต้องแจ้งสัตวแพทย์และปศุสัตว์ในพื้นที่ทันที"
-    msg += " ทั้งหมดนี้เป็นการตั้งข้อสังเกตเท่านั้น การยืนยันโรคต้องให้สัตวแพทย์ตรวจและเก็บตัวอย่างส่งตรวจครับ"
+    msg += " ทั้งหมดนี้เป็นการตั้งข้อสังเกตเท่านั้น การยืนยันโรคต้องให้สัตวแพทย์ตรวจและเก็บตัวอย่างส่งตรวจค่ะ"
     return msg
 
 
@@ -4801,7 +4802,7 @@ def _add_batch_from_voice(text: str) -> str:
     today = datetime.now(BANGKOK).date()
     m = _AGE_RE.search(text)
     if not m:
-        return "บอกอายุด้วยครับ เช่น เพิ่มชุดหมู อายุ 3 สัปดาห์ 40 ตัว โรงเรือน 2"
+        return "บอกอายุด้วยค่ะ เช่น เพิ่มชุดหมู อายุ 3 สัปดาห์ 40 ตัว โรงเรือน 2"
     n, unit = int(m.group(1)), m.group(2)
     days = n * (30 if unit == "เดือน" else 7 if unit in ("สัปดาห์", "อาทิตย์") else 1)
     birth = today - timedelta(days=days)
@@ -4826,7 +4827,7 @@ def _add_batch_from_voice(text: str) -> str:
         when = "วันนี้" if r["days_left"] == 0 else (f"อีก {r['days_left']} วัน" if r["days_left"] > 0 else f"เลยมาแล้ว {-r['days_left']} วัน")
         tail = f" เข็มถัดไป {r['vaccine_name']} {r['label']} {when}"
     where = " ".join(x for x in [row["barn_no"], row["pen_no"]] if x)
-    return f"เพิ่มชุด {name} อายุ {n} {unit} {row['pig_count'] or ''} ตัว{(' ' + where) if where else ''} แล้วครับ สร้างแผนวัคซีนให้แล้ว{tail}"
+    return f"เพิ่มชุด {name} อายุ {n} {unit} {row['pig_count'] or ''} ตัว{(' ' + where) if where else ''} แล้วค่ะ สร้างแผนวัคซีนให้แล้ว{tail}"
 
 
 _VACCINE_RECORD_VERBS = ("บันทึก", "จด")
@@ -4961,15 +4962,15 @@ def _record_followup_from_voice(text: str) -> str:
     if not target:
         hits = [r for r in due]
         if not hits:
-            return "ยังไม่มีรายการฉีดวัคซีนที่ต้องตรวจอาการครับ ถ้าต้องการบันทึกย้อนหลัง เพิ่มจากหน้าวัคซีนได้ครับ"
+            return "ยังไม่มีรายการฉีดวัคซีนที่ต้องตรวจอาการค่ะ ถ้าต้องการบันทึกย้อนหลัง เพิ่มจากหน้าวัคซีนได้ค่ะ"
         if len({h["vaccine_log_id"] for h in hits}) > 1:
             names = ", ".join(sorted({f"{h.get('vaccine_name') or 'วัคซีน'} {h.get('barn_no') or ''}".strip() for h in hits})[:3])
-            return f"ตอนนี้มีหลายรายการที่ต้องตรวจ ({names}) ช่วยบอกโรงเรือนหรือชื่อวัคซีนด้วยครับ"
+            return f"ตอนนี้มีหลายรายการที่ต้องตรวจ ({names}) ช่วยบอกโรงเรือนหรือชื่อวัคซีนด้วยค่ะ"
         target = hits[0]
 
     symptoms = _parse_followup_symptoms(text)
     if not symptoms:
-        return "ยังไม่ได้ยินอาการครับ ลองพูดใหม่ เช่น บันทึกอาการหลังฉีด โรงเรือน 2 บวมเล็กน้อย 3 ตัว"
+        return "ยังไม่ได้ยินอาการค่ะ ลองพูดใหม่ เช่น บันทึกอาการหลังฉีด โรงเรือน 2 บวมเล็กน้อย 3 ตัว"
 
     data = {
         "vaccine_log_id": target["vaccine_log_id"],
@@ -4984,10 +4985,10 @@ def _record_followup_from_voice(text: str) -> str:
     where = target.get("barn_no") or "ไม่ระบุโรงเรือน"
     reply = (
         f"บันทึกอาการหลังฉีด {target.get('vaccine_name') or 'วัคซีน'} ที่{where} "
-        f"วันที่ {target['days_after']} หลังฉีดแล้วครับ: {_fmt_followup(data)}"
+        f"วันที่ {target['days_after']} หลังฉีดแล้วค่ะ: {_fmt_followup(data)}"
     )
     if data["severity"] == "ต้องดูแล":
-        reply += " อาการค่อนข้างหนัก แนะนำให้ติดต่อสัตวแพทย์ครับ"
+        reply += " อาการค่อนข้างหนัก แนะนำให้ติดต่อสัตวแพทย์ค่ะ"
     return reply
 
 
@@ -5026,9 +5027,9 @@ def _record_vaccine_from_voice(text: str) -> str:
     supabase.table("vaccine_log").insert(data).execute()
     what = vaccine_name or "วัคซีน"
     when = log_date.strftime("%d/%m/%Y")
-    msg = f"บันทึกแล้วครับ ฉีด{what} วันที่ {when}"
+    msg = f"บันทึกแล้วค่ะ ฉีด{what} วันที่ {when}"
     if next_due:
-        msg += f" นัดฉีดครั้งถัดไปวันที่ {next_due.strftime('%d/%m/%Y')} ครับ"
+        msg += f" นัดฉีดครั้งถัดไปวันที่ {next_due.strftime('%d/%m/%Y')} ค่ะ"
     return msg
 
 
@@ -5046,10 +5047,18 @@ _LINE_SEND_TARGETS = ("งาน", "สรุป", "วัคซีน", "รา
 
 
 def _is_line_send_command(text: str) -> bool:
-    if not any(v in text for v in _LINE_SEND_VERBS):
-        return False
-    return (any(w in text for w in _LINE_WORDS)
-            or any(w in text.replace(" ", "") for w in _LINE_SEND_TARGETS))
+    """สั่งให้ส่งอะไรเข้ากลุ่มหรือเปล่า
+
+    นับเป็นคำสั่งส่งเมื่อ "รู้ว่าจะส่งอะไร" คู่กับ "รู้ว่าจะส่งไปไหน หรือมีคำว่าส่ง"
+      "ส่งงานวันนี้ให้หน่อย"      -> มีคำว่าส่ง + รู้ว่าส่งอะไร
+      "สรุปงานวันนี้ผ่านไลน์"      -> ไม่มีคำว่าส่ง แต่บอกช่องทางมาชัด
+    ต้องมีอย่างน้อยสองอย่างเสมอ จะได้ไม่ไปจับ "ไลน์คืออะไร" หรือ "สรุปงานวันนี้" เฉย ๆ
+    """
+    t = text.replace(" ", "")
+    verb = any(v in text for v in _LINE_SEND_VERBS)
+    channel = any(w in text for w in _LINE_WORDS)
+    target = any(w in t for w in _LINE_SEND_TARGETS)
+    return (verb or channel) and (target or (verb and channel))
 
 
 def _build_farm_summary_for_line() -> str:
@@ -5108,21 +5117,21 @@ def _send_line_vaccine_report() -> str:
       2) ลิงก์ PDF ฉบับเต็ม — เผื่อต้องการไฟล์จริงไปพิมพ์/ส่งต่อ
     """
     if not LINE_CHANNEL_ACCESS_TOKEN:
-        return "ยังไม่ได้ตั้งค่า LINE ครับ ต้องใส่ LINE_CHANNEL_ACCESS_TOKEN ในระบบก่อน"
+        return "ยังไม่ได้ตั้งค่า LINE ค่ะ ต้องใส่ LINE_CHANNEL_ACCESS_TOKEN ในระบบก่อน"
     if not PUBLIC_BASE_URL:
-        return "ยังส่งรายงานไม่ได้ครับ เพราะระบบยังรันอยู่แค่ในเครื่อง (localhost) ต้องมี URL สาธารณะก่อน"
+        return "ยังส่งรายงานไม่ได้ค่ะ เพราะระบบยังรันอยู่แค่ในเครื่อง (localhost) ต้องมี URL สาธารณะก่อน"
 
     # ใช้ตัวสร้างข้อความตัวเดียวกับที่ตอบริชเมนู จะได้ไม่ต้องดูแลโค้ดสองที่
     # (และได้ลิงก์ถาวรเหมือนกัน ไม่ใช่ token ที่หมดอายุแล้วรูปไม่ขึ้น)
     ok = _send_line_messages(_build_vaccine_report_messages())
-    return "ส่งรายงานวัคซีนเข้า LINE แล้วครับ (ทั้งรูปและไฟล์ PDF)" if ok else "ส่ง LINE ไม่สำเร็จครับ ลองใหม่อีกครั้ง"
+    return "ส่งรายงานวัคซีนเข้า LINE แล้วค่ะ (ทั้งรูปและไฟล์ PDF)" if ok else "ส่ง LINE ไม่สำเร็จค่ะ ลองใหม่อีกครั้ง"
 
 
 # พูดว่าจะให้ส่ง "อะไร" เข้า LINE — ไม่ระบุ = สรุปฟาร์มวันนี้
 _LINE_WANT_TASK = ("งาน", "มอบหมาย", "คนงาน", "ลูกน้อง", "ที่ต้องทำ")
 _LINE_WANT_VACCINE = ("วัคซีน", "ฉีด")
 _LINE_WANT_STATUS = ("สถานะ", "อากาศ", "สภาพ")
-_LINE_FAIL = "ส่ง LINE ไม่สำเร็จครับ ลองใหม่อีกครั้ง"
+_LINE_FAIL = "ส่ง LINE ไม่สำเร็จค่ะ ลองใหม่อีกครั้ง"
 
 
 def _send_line_summary_from_voice(text: str = "") -> str:
@@ -5138,38 +5147,38 @@ def _send_line_summary_from_voice(text: str = "") -> str:
       "ส่งสรุปเข้าไลน์"        -> สรุปทุกอย่างที่บันทึกไว้วันนี้ (ค่าเริ่มต้น)
     """
     if not LINE_CHANNEL_ACCESS_TOKEN:
-        return "ยังไม่ได้ตั้งค่า LINE ครับ ต้องใส่ LINE_CHANNEL_ACCESS_TOKEN ในระบบก่อน"
+        return "ยังไม่ได้ตั้งค่า LINE ค่ะ ต้องใส่ LINE_CHANNEL_ACCESS_TOKEN ในระบบก่อน"
     t = (text or "").replace(" ", "")
 
     if any(w in t for w in _LINE_WANT_TASK):
         m = _build_task_assign_message()
         if not m:
-            return "วันนี้ไม่มีงานค้างเลยครับ เลยไม่ได้ส่งอะไรเข้า LINE"
+            return "วันนี้ไม่มีงานค้างเลยค่ะ เลยไม่ได้ส่งอะไรเข้า LINE"
         if not _send_line_broadcast(m["text"]):
             return _LINE_FAIL
         who = f" แบ่งให้ {m['people']} คน" if m["people"] else " ยังไม่มีคนรับสักงาน"
-        return f"ส่งงานวันนี้ {m['count']} รายการเข้า LINE แล้วครับ{who}"
+        return f"ส่งงานวันนี้ {m['count']} รายการเข้า LINE แล้วค่ะ{who}"
 
     if any(w in t for w in _LINE_WANT_VACCINE):
         m = _build_vaccine_today_message()
         if not m:
-            return "วันนี้ไม่มีวัคซีนที่ต้องฉีดและไม่มีของค้างครับ เลยไม่ได้ส่งอะไรเข้า LINE"
+            return "วันนี้ไม่มีวัคซีนที่ต้องฉีดและไม่มีของค้างค่ะ เลยไม่ได้ส่งอะไรเข้า LINE"
         if not _send_line_broadcast(m["text"]):
             return _LINE_FAIL
         late = f" และค้างอยู่ {m['overdue']} รายการ" if m["overdue"] else ""
-        return f"ส่งรายการวัคซีนเข้า LINE แล้วครับ วันนี้ต้องฉีด {m['due_today']} รายการ{late}"
+        return f"ส่งรายการวัคซีนเข้า LINE แล้วค่ะ วันนี้ต้องฉีด {m['due_today']} รายการ{late}"
 
     if any(w in t for w in _LINE_WANT_STATUS):
         if not _send_line_broadcast(_build_farm_summary_for_line()):
             return _LINE_FAIL
-        return "ส่งสถานะฟาร์มเข้า LINE แล้วครับ"
+        return "ส่งสถานะฟาร์มเข้า LINE แล้วค่ะ"
 
     sm = _daily_summary()
     if not _send_line_broadcast(_format_daily_summary(sm)):
         return _LINE_FAIL
     if not sm["total_records"]:
-        return "ส่งสรุปฟาร์มวันนี้เข้า LINE แล้วครับ แต่วันนี้ยังไม่มีการบันทึกอะไรเข้าระบบเลย"
-    return f"ส่งสรุปฟาร์มวันนี้เข้า LINE แล้วครับ วันนี้บันทึกไว้ {sm['total_records']} รายการ"
+        return "ส่งสรุปฟาร์มวันนี้เข้า LINE แล้วค่ะ แต่วันนี้ยังไม่มีการบันทึกอะไรเข้าระบบเลย"
+    return f"ส่งสรุปฟาร์มวันนี้เข้า LINE แล้วค่ะ วันนี้บันทึกไว้ {sm['total_records']} รายการ"
 
 
 def _recent_pig_health(limit: int = 14) -> list[dict]:
@@ -5333,7 +5342,7 @@ EMBED_DIM = 768
 RAG_TOP_K = 4           # แนบให้ AI กี่ท่อน
 # โมเดลฝังความหมายที่ใช้อยู่ (multilingual-e5) ให้คะแนนพื้นสูงมาก อะไรก็ได้ 0.80 ขึ้น
 # วัดจริงบนคลังของเรา: คำถามที่เอกสารตอบได้ 0.88-0.90 · คำถามคนละเรื่อง 0.80-0.82
-#   "สวัสดีครับ"            -> 0.818 (ไปเจอหน้าปกเอกสาร)
+#   "สวัสดีค่ะ"            -> 0.818 (ไปเจอหน้าปกเอกสาร)
 #   "สรุปงานวันนี้"          -> 0.807 (ไปเจอหน้ารายชื่อคณะผู้จัดทำ)
 #   "การจัดการน้ำเสีย…"      -> 0.890 (เจอข้อกำหนดจริง)
 # ตั้งไว้ที่ 0.70 เท่ากับรับทุกอย่าง เอกสารเลยแย่งตอบคำถามที่ไม่เกี่ยวกับเอกสารเลย
@@ -5512,9 +5521,9 @@ def _doc_excerpt_answer(hit: dict) -> str:
         out = text[:220]
     if len(out) > 300:
         out = out[:300].rsplit(" ", 1)[0] + "…"
-    return (f"ยังไม่มีคำตอบที่เรียบเรียงไว้ครับ แต่ค้นในคลังเอกสารเจอเรื่องใกล้เคียง "
+    return (f"ยังไม่มีคำตอบที่เรียบเรียงไว้ค่ะ แต่ค้นในคลังเอกสารเจอเรื่องใกล้เคียง "
             f"จากเอกสาร \"{hit['title']}\":\n{out}\n"
-            f"(เป็นข้อความคัดมาจากเอกสารตรง ๆ ถ้าต้องการคำอธิบาย ลองถามใหม่อีกครั้งครับ)")
+            f"(เป็นข้อความคัดมาจากเอกสารตรง ๆ ถ้าต้องการคำอธิบาย ลองถามใหม่อีกครั้งค่ะ)")
 
 
 def _fmt_docs(hits: list[dict]) -> str:
@@ -5889,11 +5898,11 @@ def _task_answer(text: str):
         return None
     rows, c = data["rows"], data["counts"]
     if not rows:
-        return "วันนี้ยังไม่มีงานในระบบครับ"
+        return "วันนี้ยังไม่มีงานในระบบค่ะ"
 
     left = [x for x in rows if x["status"] in ("pending", "doing")]
     if not left:
-        return f"งานวันนี้เสร็จครบทั้ง {c['total']} รายการแล้วครับ"
+        return f"งานวันนี้เสร็จครบทั้ง {c['total']} รายการแล้วค่ะ"
 
     # เรียงตามเวลา งานที่ไม่ได้กำหนดเวลาไว้ไปต่อท้าย (ทำเมื่อไหร่ก็ได้ในวัน)
     def by_time(t):
@@ -5923,19 +5932,19 @@ def _rule_based_answer(text: str) -> str:
     for src, hours in _needs_lab_summary(text):
         d = _lab_summary(src, hours, _lab_resolve_location(src, text))
         if d:
-            return _fmt_lab_summary(d).replace("\n", " ") + " ครับ"
+            return _fmt_lab_summary(d).replace("\n", " ") + " ค่ะ"
 
     # ถามย้อนหลังของเซนเซอร์ที่อื่น -> สรุปสถิติให้ตรง ๆ
     for src, measure, _label, hours in _needs_lab_series(text):
         d = _lab_series(src, measure, hours, _lab_resolve_location(src, text))
         if d:
-            return _fmt_lab_series(d).replace("\n", " ") + " ครับ"
+            return _fmt_lab_series(d).replace("\n", " ") + " ค่ะ"
 
     # ถามถึงเซนเซอร์ที่อื่น -> อ่านค่าสดมาบอกตรง ๆ (แบบไม่มี AI เรียบเรียง)
     for src in _needs_lab(text):
         d = _lab_latest(src, _lab_resolve_location(src, text))
         if d:
-            return _fmt_lab(d).replace("\n", " ") + " ครับ"
+            return _fmt_lab(d).replace("\n", " ") + " ค่ะ"
 
     # ถามว่าอาการแบบนี้คือโรคอะไร -> ตอบเรื่องโรค ไม่ใช่ไปดึงจำนวนหมูป่วยรายวันมาตอบ
     # งานวันนี้ต้องมาก่อนทุกกฎ คำว่า "งาน" ไม่ชนกับกฎอื่น และเป็นคำถามที่ตอบตรง ๆ ได้
@@ -5959,12 +5968,12 @@ def _rule_based_answer(text: str) -> str:
             "พันธุ์พื้นเมือง (ไหหลำ ควาย ราด พวง) ทนร้อนและทนโรคที่สุด แต่โตช้าและให้เนื้อน้อย · "
             "ที่นิยมจริงในไทยคือลูกผสม ใช้แม่ LY (แลนด์เรซผสมลาร์จไวต์) กับพ่อดูร็อก "
             "ได้ทั้งลูกดก โตดี และทนร้อนพอสมควร "
-            "แต่เรื่องโรงเรือนกับการระบายความร้อนสำคัญกว่าการเลือกพันธุ์ครับ"
+            "แต่เรื่องโรงเรือนกับการระบายความร้อนสำคัญกว่าการเลือกพันธุ์ค่ะ"
         )
 
     # วิธี/ตำแหน่งฉีดวัคซีน — ความรู้ตายตัวของเรา ตอบได้เลยไม่ต้องพึ่ง AI
     if _needs_vaccine_method(text):
-        return _VACCINE_METHOD_INFO.replace("ความรู้อ้างอิง: ", "").replace("\n", " ") + " ครับ"
+        return _VACCINE_METHOD_INFO.replace("ความรู้อ้างอิง: ", "").replace("\n", " ") + " ค่ะ"
 
     # ค่ามาตรฐานสภาพแวดล้อม — ตอบจากตารางของเรา พร้อมประเมินค่าปัจจุบันให้ด้วย
     if _needs_pig_env_info(text):
@@ -5977,18 +5986,18 @@ def _rule_based_answer(text: str) -> str:
         if any(k in t for k in ("น้ำกิน", "กินน้ำ", "น้ำดื่ม", "จุกน้ำ")):
             return ("น้ำกินต่อตัวต่อวัน: ลูกหย่านม 1.5-2 ลิตร · สุกรรุ่น 4-6 ลิตร · สุกรขุน 6-10 ลิตร · "
                     "แม่อุ้มท้อง 12-20 ลิตร · แม่เลี้ยงลูก 20-35 ลิตร "
-                    "อากาศร้อนให้เพิ่มขึ้นจากนี้ และตรวจว่าจุกน้ำไหลดีทุกจุดครับ")
+                    "อากาศร้อนให้เพิ่มขึ้นจากนี้ และตรวจว่าจุกน้ำไหลดีทุกจุดค่ะ")
         if any(k in t for k in ("แอมโมเนีย", "nh3", "คาร์บอนไดออกไซด์", "co2", "กลิ่น")):
             return ("แอมโมเนียในเล้าไม่ควรเกิน 25 ppm (ที่ดีคือต่ำกว่า 10 ppm) "
                     "คาร์บอนไดออกไซด์ไม่ควรเกิน 3000 ppm "
-                    "ถ้าเกินให้เพิ่มการระบายอากาศและเก็บมูลให้ถี่ขึ้นครับ")
+                    "ถ้าเกินให้เพิ่มการระบายอากาศและเก็บมูลให้ถี่ขึ้นค่ะ")
         if any(k in t for k in ("ลูกหมู", "ลูกสุกร", "หย่านม", "ลูกดูด", "อนุบาล", "แรกเกิด", "กก")):
             return ("อุณหภูมิที่เหมาะกับลูกสุกร: แรกเกิดถึง 7 วันใต้กก 32-34 องศา · ดูดนม 8-21 วัน 28-32 องศา · "
                     "หย่านม 5-10 กก 28-30 องศา · อนุบาล 10-25 กก 24-28 องศา "
-                    "ลูกสุกรกลัวลมโกรก ควรคุมความเร็วลมไม่เกิน 0.2 เมตรต่อวินาทีครับ")
+                    "ลูกสุกรกลัวลมโกรก ควรคุมความเร็วลมไม่เกิน 0.2 เมตรต่อวินาทีค่ะ")
         base = ("ช่วงที่เหมาะกับสุกรรุ่น-ขุนคือ 18-22 องศา ความชื้น 60-70% "
                 "ลูกสุกรต้องอุ่นกว่านี้มาก (28-34 องศาตามอายุ)")
-        return (assess + " " + base + " ครับ") if assess else (base + " ครับ")
+        return (assess + " " + base + " ค่ะ") if assess else (base + " ค่ะ")
 
     w = read_sensor()
 
@@ -6006,7 +6015,7 @@ def _rule_based_answer(text: str) -> str:
                         msg += f" (เพิ่มขึ้น {diff} ตัวจากวันก่อนหน้า)"
                     elif diff < 0:
                         msg += f" (ลดลง {-diff} ตัวจากวันก่อนหน้า)"
-                return msg + " ครับ"
+                return msg + " ค่ะ"
         except Exception:
             pass
 
@@ -6019,7 +6028,7 @@ def _rule_based_answer(text: str) -> str:
                 return (
                     f"ย้อนหลัง {stats_days} วัน อุณหภูมิเฉลี่ย {t['avg']:.1f}°C "
                     f"(ต่ำสุด {t['min']:.1f}, สูงสุด {t['max']:.1f}) "
-                    f"ฝนตกรวม {s['rainfall']['sum']:.1f} mm ครับ"
+                    f"ฝนตกรวม {s['rainfall']['sum']:.1f} mm ค่ะ"
                 )
         except Exception:
             pass
@@ -6033,24 +6042,24 @@ def _rule_based_answer(text: str) -> str:
                 rain = "มีโอกาสฝนตก" if (nxt["rainfall"] or 0) > 0 else "ยังไม่มีฝน"
                 return (
                     f"ช่วง {nxt['hour']} คาดว่าอุณหภูมิจะ{trend} อยู่ที่ราว {nxt['temperature']}°C "
-                    f"ความชื้น {nxt['humidity']}% และ{rain}ครับ"
+                    f"ความชื้น {nxt['humidity']}% และ{rain}ค่ะ"
                 )
         except Exception:
             pass
 
     if "อุณหภูมิ" in text or "ร้อน" in text or "หนาว" in text:
         note = " อากาศค่อนข้างร้อน" if (w.temperature or 0) >= 35 else ""
-        return f"ตอนนี้อุณหภูมิ {w.temperature}°C ครับ{note}"
+        return f"ตอนนี้อุณหภูมิ {w.temperature}°C ค่ะ{note}"
     if "ฝน" in text:
-        return "ตอนนี้มีฝนตกครับ" if (w.rainfall or 0) > 0 else "ตอนนี้ยังไม่มีฝนครับ"
+        return "ตอนนี้มีฝนตกค่ะ" if (w.rainfall or 0) > 0 else "ตอนนี้ยังไม่มีฝนค่ะ"
     if "ชื้น" in text:
-        return f"ความชื้นอยู่ที่ {w.humidity}% ครับ"
+        return f"ความชื้นอยู่ที่ {w.humidity}% ค่ะ"
     if "ลม" in text:
-        return f"ความเร็วลมอยู่ที่ {w.windspeed} m/s ครับ"
+        return f"ความเร็วลมอยู่ที่ {w.windspeed} m/s ค่ะ"
     if "แสง" in text or "สว่าง" in text:
-        return f"ความเข้มแสงอยู่ที่ {w.light} lux ครับ"
+        return f"ความเข้มแสงอยู่ที่ {w.light} lux ค่ะ"
 
-    return "ขณะนี้ " + _fmt_weather(w) + " ครับ"
+    return "ขณะนี้ " + _fmt_weather(w) + " ค่ะ"
 
 
 MAX_HISTORY_TURNS = 3  # เก็บแชทย้อนหลังกี่เทิร์นล่าสุด (ประหยัด token/TPM)
@@ -6126,7 +6135,7 @@ def _cpf_answer_native(text: str, context: str,
     """
     ctx = (context or "")[:2000]
     # API ของ CPF ไม่มีช่องส่งประวัติบทสนทนา แต่ผู้ช่วยตัวนี้ชอบถามกลับเป็นเมนู
-    # ("ต้องการดูจุดใดครับ 1. ... 2. ...") ถ้าไม่แนบประวัติไป พอผู้ใช้ตอบ "1"
+    # ("ต้องการดูจุดใดคะ 1. ... 2. ...") ถ้าไม่แนบประวัติไป พอผู้ใช้ตอบ "1"
     # มันจะไม่รู้ว่ากำลังคุยเรื่องอะไรอยู่ จึงเอาไปต่อไว้ในข้อความเลย
     prev = ""
     turns = (history or [])[-4:]
@@ -6253,7 +6262,7 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
     """
     text = q.text.strip()
     if not text:
-        return Answer(answer="ถามเรื่องสภาพอากาศได้เลยครับ เช่น อุณหภูมิ ความชื้น หรือพยากรณ์ล่วงหน้า")
+        return Answer(answer="ถามเรื่องสภาพอากาศได้เลยค่ะ เช่น อุณหภูมิ ความชื้น หรือพยากรณ์ล่วงหน้า")
 
     # ค้นคลังเอกสารก่อน เพราะต้องใช้ผลตัดสินว่าคนนอกถามได้ไหม
     # เอกสารในคลังเป็นมาตรฐานราชการสาธารณะ (GAP กรมปศุสัตว์ มาตรฐานสินค้าเกษตร)
@@ -6273,8 +6282,8 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
             and not _needs_pig_env_info(text) and not _needs_web_info(text)
             and not _doc_answer)
     ):
-        return Answer(answer="ข้อมูลส่วนนี้เป็นข้อมูลภายในฟาร์มครับ ต้องเข้าสู่ระบบก่อนถึงจะดูหรือบันทึกได้ "
-                             "ถามเรื่องสภาพอากาศ พยากรณ์ หรือวิธีฉีดวัคซีนได้เลยครับ")
+        return Answer(answer="ข้อมูลส่วนนี้เป็นข้อมูลภายในฟาร์มค่ะ ต้องเข้าสู่ระบบก่อนถึงจะดูหรือบันทึกได้ "
+                             "ถามเรื่องสภาพอากาศ พยากรณ์ หรือวิธีฉีดวัคซีนได้เลยค่ะ")
 
     # คำสั่งส่งรายงาน PDF (ไฟล์) เข้า LINE ด้วยเสียง -> เช็คก่อนคำสั่งส่งสรุปทั่วไป เพราะเจาะจงกว่า
     if _is_line_report_command(text):
@@ -6282,7 +6291,7 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
             return Answer(answer=_send_line_vaccine_report())
         except Exception as e:
             print(f"[warn] ส่งรายงาน LINE ไม่สำเร็จ: {e}")
-            return Answer(answer="ขออภัยครับ ส่งรายงานเข้า LINE ไม่สำเร็จ ลองใหม่อีกครั้งนะครับ")
+            return Answer(answer="ขออภัยค่ะ ส่งรายงานเข้า LINE ไม่สำเร็จ ลองใหม่อีกครั้งนะค่ะ")
 
     # คำสั่งส่งสรุปฟาร์มเข้า LINE ด้วยเสียง -> สร้างสรุปจากข้อมูลจริง + ส่งตรง ไม่ผ่าน AI
     if _is_line_send_command(text):
@@ -6290,7 +6299,7 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
             return Answer(answer=_send_line_summary_from_voice(text))
         except Exception as e:
             print(f"[warn] ส่ง LINE ไม่สำเร็จ: {e}")
-            return Answer(answer="ขออภัยครับ ส่งสรุปเข้า LINE ไม่สำเร็จ ลองใหม่อีกครั้งนะครับ")
+            return Answer(answer="ขออภัยค่ะ ส่งสรุปเข้า LINE ไม่สำเร็จ ลองใหม่อีกครั้งนะค่ะ")
 
     # คำสั่งบันทึกการฉีดวัคซีนด้วยเสียง -> บันทึกลง DB ตรง ๆ ไม่ผ่าน AI เลย (ต้องแม่นยำ ห้ามมั่ว)
     # อาการหลังฉีด -> ต้องเช็คก่อนคำสั่งบันทึกการฉีด เพราะประโยคมีคำว่า "วัคซีน" เหมือนกัน
@@ -6299,25 +6308,25 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
             return Answer(answer=_add_batch_from_voice(text))
         except Exception as e:
             print(f"[warn] เพิ่มชุดหมูไม่สำเร็จ: {e}")
-            return Answer(answer="ขออภัยครับ เพิ่มชุดหมูไม่สำเร็จ ลองพูดใหม่อีกครั้งนะครับ")
+            return Answer(answer="ขออภัยค่ะ เพิ่มชุดหมูไม่สำเร็จ ลองพูดใหม่อีกครั้งนะค่ะ")
 
     if _is_followup_record_command(text):
         try:
             return Answer(answer=_record_followup_from_voice(text))
         except Exception as e:
             print(f"[warn] บันทึกอาการหลังฉีดไม่สำเร็จ: {e}")
-            return Answer(answer="ขออภัยครับ บันทึกอาการไม่สำเร็จ ลองพูดใหม่อีกครั้งนะครับ")
+            return Answer(answer="ขออภัยค่ะ บันทึกอาการไม่สำเร็จ ลองพูดใหม่อีกครั้งนะค่ะ")
 
     if _is_vaccine_record_command(text):
         try:
             return Answer(answer=_record_vaccine_from_voice(text))
         except Exception as e:
             print(f"[warn] บันทึกวัคซีนไม่สำเร็จ: {e}")
-            return Answer(answer="ขออภัยครับ บันทึกไม่สำเร็จ ลองพูดใหม่อีกครั้งนะครับ")
+            return Answer(answer="ขออภัยค่ะ บันทึกไม่สำเร็จ ลองพูดใหม่อีกครั้งนะค่ะ")
 
     # ข้อมูลสายพันธุ์หมูตายตัว ไม่ผ่าน AI เลย กันมั่ว/หลุดประเด็นจากโมเดลเล็ก
     if _needs_pig_breed_info(text):
-        return Answer(answer=_PIG_BREEDS_INFO.replace("ความรู้อ้างอิง: ", "") + " ครับ")
+        return Answer(answer=_PIG_BREEDS_INFO.replace("ความรู้อ้างอิง: ", "") + " ค่ะ")
 
     # คำถามเชิงประวัติ ("เดือนนี้กี่ครั้ง" "ช่วงไหนสูงสุด" "เคยมีคล้ายกันไหม")
     # คำนวณคำตอบจากฐานข้อมูลก่อน แล้วค่อยให้ LLM เรียบเรียง — ห้ามให้ LLM นับเอง

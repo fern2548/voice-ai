@@ -11,7 +11,7 @@ function speak(text) {
 
 export default function ChatBox() {
   const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('สวัสดีครับ! ถามเรื่องสภาพอากาศได้เลยครับ')
+  const [answer, setAnswer] = useState('สวัสดีค่ะ! ถามเรื่องสภาพอากาศได้เลยค่ะ')
   const [listening, setListening] = useState(false)
 
   const ask = async (text) => {

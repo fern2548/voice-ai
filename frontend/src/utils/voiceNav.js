@@ -228,11 +228,11 @@ export function navReply(nav) {
     rainfall: 'ปริมาณฝน', light: 'ความเข้มแสง',
   }[nav.metric]
   if (nav.path === '/history' && metricLabel) {
-    return `เปิดกราฟ${metricLabel}ให้แล้วครับ`
+    return `เปิดกราฟ${metricLabel}ให้แล้วค่ะ`
   }
   if (nav.path === '/sensors') {
     const where = { soil: 'ดินแสลงพัน', pig: 'เล้าหมูกำแพงเพชร', weather: 'เสาอากาศแสลงพัน' }[nav.source] || 'กราฟข้อมูล'
-    return `เปิดกราฟ${where}ให้แล้วครับ`
+    return `เปิดกราฟ${where}ให้แล้วค่ะ`
   }
-  return `เปิดหน้า${nav.label}ให้แล้วครับ`
+  return `เปิดหน้า${nav.label}ให้แล้วค่ะ`
 }

@@ -93,7 +93,7 @@ export default function VaccineLog() {
         next_due_date: form.nextDueDate || null,
         note: form.note.trim() || null,
       })
-      setSaveMsg('บันทึกแล้วครับ')
+      setSaveMsg('บันทึกแล้วค่ะ')
       setForm({ ...EMPTY_FORM, logDate: form.logDate })
       setRefreshTick((t) => t + 1)
     } catch {

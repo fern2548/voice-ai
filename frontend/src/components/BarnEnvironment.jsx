@@ -61,8 +61,8 @@ export default function BarnEnvironment() {
   const summary = !weather
     ? 'กำลังโหลดข้อมูลเซนเซอร์…'
     : issues.length === 0
-      ? 'ตอนนี้ทุกค่าอยู่ในช่วงที่แนะนำ สภาพแวดล้อมในโรงเรือนปกติดีครับ'
-      : `ตอนนี้${joinTh(issues.map(sayOf))} แนะนำให้ตรวจสอบ${joinTh([...new Set(issues.map((c) => c.info?.fix).filter(Boolean))])}ครับ`
+      ? 'ตอนนี้ทุกค่าอยู่ในช่วงที่แนะนำ สภาพแวดล้อมในโรงเรือนปกติดีค่ะ'
+      : `ตอนนี้${joinTh(issues.map(sayOf))} แนะนำให้ตรวจสอบ${joinTh([...new Set(issues.map((c) => c.info?.fix).filter(Boolean))])}ค่ะ`
 
   const readingDate = parseReadingTime(weather?.reading_time)
   const when = readingDate

@@ -83,7 +83,7 @@ export default function VoiceAIPanel() {
           ref={inputRef}
           className="voice-inputbar-input"
           type="text"
-          placeholder="พูดหรือพิมพ์คำสั่งได้เลยครับ"
+          placeholder="พูดหรือพิมพ์คำสั่งได้เลยค่ะ"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && ask()}
