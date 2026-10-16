@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import SectionNav from '../components/SectionNav.jsx'
 import {
-  BARN_STEPS, COMPONENTS, DISINFECTANTS, GOLDEN_RULE, MIX_RULES, ROUTINE,
+  BARN_DAYS, BARN_STEPS, COMPONENTS, DISINFECTANTS, GOLDEN_RULE, MIX_RULES, ROUTINE,
   SOURCE_NOTE, VEHICLE_RISK, VEHICLE_STEPS,
 } from '../data/biosecurity.js'
 
 // หน้า "ทำความสะอาดโรงเรือน" — ขั้นตอนล้างจริงที่ติ๊กตามได้หน้าคอก
 // ไม่ใช่แค่อ่าน แต่ใช้เป็นใบงาน: ติ๊กไปทีละขั้น ระบบจำไว้ให้ และคำนวณวันลงหมูรุ่นใหม่
+//
+// ใช้จริงคือยืนถือมือถืออยู่หน้าโรงเรือน จึงต้องเห็น "ตอนนี้ทำขั้นไหน" ได้ในจอเดียว
+// รายละเอียดของขั้นอื่นจึงพับไว้ กางเฉพาะขั้นที่กำลังทำ ไม่ต้องเลื่อนผ่านของที่ทำไปแล้ว
 
 const SECTIONS = [
   { id: 'cl-barn', label: 'ล้างโรงเรือน', icon: 'ti-building-warehouse' },
@@ -50,6 +53,8 @@ export default function CleaningPage() {
   const [outDate, setOutDate] = useState(() => readStr(LS_OUT, todayStr()))
   const [restDays, setRestDays] = useState(() => Number(readStr(LS_REST, '7')) || 7)
   const [openPart, setOpenPart] = useState(null)
+  // undefined = ตามขั้นที่กำลังทำอยู่ · null = พับหมด · 'bN' = ผู้ใช้กางขั้นนั้นเอง
+  const [openStep, setOpenStep] = useState(undefined)
 
   useEffect(() => { save(LS_DONE, done) }, [done])
   useEffect(() => { save(LS_OUT, outDate) }, [outDate])
@@ -59,6 +64,19 @@ export default function CleaningPage() {
   const barnDone = BARN_STEPS.filter((s) => done[s.id]).length
   const vehDone = VEHICLE_STEPS.filter((s) => done[s.id]).length
   const pct = Math.round((barnDone / BARN_STEPS.length) * 100)
+
+  // ขั้นที่ต้องทำต่อไป = ขั้นแรกที่ยังไม่ติ๊ก (ข้ามขั้นได้ ไม่บังคับทำเรียง)
+  const current = BARN_STEPS.find((s) => !done[s.id]) || null
+  const openId = openStep === undefined ? current?.id : openStep
+  // ติ๊กเสร็จแล้วให้เด้งไปกางขั้นถัดไปเอง ผู้ใช้จะได้ไม่ต้องกดกางเองทุกขั้น
+  const tickBarn = (id) => { toggle(id); setOpenStep(undefined) }
+
+  const barnDays = BARN_DAYS
+    .map((d) => {
+      const steps = BARN_STEPS.filter((s) => s.day === d.day)
+      return { ...d, steps, hit: steps.filter((s) => done[s.id]).length }
+    })
+    .filter((d) => d.steps.length)
 
   const resetBarn = () => {
     setDone((d) => {
@@ -105,29 +123,62 @@ export default function CleaningPage() {
             )}
           </div>
           <div className="cl-bar"><span style={{ width: `${pct}%` }} /></div>
-          {barnDone === BARN_STEPS.length && (
+          {current ? (
+            // บอกตรง ๆ ว่าตอนนี้ต้องทำอะไร จะได้ไม่ต้องไล่อ่านว่าค้างไว้ตรงไหน
+            <div className="cl-next">
+              <i className="ti ti-player-play" aria-hidden="true" />
+              <span>ขั้นต่อไป <b>{current.n}. {current.title}</b></span>
+            </div>
+          ) : (
             <div className="cl-done-all"><i className="ti ti-circle-check" aria-hidden="true" /> ครบทุกขั้นแล้ว พร้อมลงหมูรุ่นใหม่</div>
           )}
         </div>
 
-        <ol className="cl-steps">
-          {BARN_STEPS.map((s) => (
-            <li key={s.id} className={`cl-step ${done[s.id] ? 'on' : ''}`}>
-              <button type="button" className="cl-check" onClick={() => toggle(s.id)}
-                aria-pressed={!!done[s.id]} aria-label={`ทำขั้นที่ ${s.n} แล้ว`}>
-                <i className={`ti ${done[s.id] ? 'ti-circle-check-filled' : 'ti-circle'}`} aria-hidden="true" />
-              </button>
-              <div className="cl-step-body">
-                <div className="cl-step-top">
-                  <span className="cl-step-n">{s.n}</span>
-                  <b>{s.title}</b>
-                  <span className="cl-step-time"><i className="ti ti-clock" aria-hidden="true" /> {s.time}</span>
-                </div>
-                <p className="cl-why"><i className="ti ti-bulb" aria-hidden="true" /> {s.why}</p>
-                <ul className="cl-dos">
-                  {s.dos.map((d) => <li key={d}>{d}</li>)}
-                </ul>
+        <ol className="cl-days">
+          {barnDays.map((g) => (
+            <li className={`cl-day ${g.hit === g.steps.length ? 'done' : ''}`} key={g.day}>
+              <div className="cl-day-head">
+                <span className="cl-day-badge">{g.label}</span>
+                <b>{g.title}</b>
+                <span className="cl-day-count">{g.hit}/{g.steps.length}</span>
               </div>
+
+              <ol className="cl-steps">
+                {g.steps.map((s) => {
+                  const isDone = !!done[s.id]
+                  const open = openId === s.id
+                  return (
+                    <li key={s.id} className={`cl-step ${isDone ? 'on' : ''} ${open ? 'open' : ''} ${s.id === current?.id ? 'now' : ''}`}>
+                      <button type="button" className="cl-check" onClick={() => tickBarn(s.id)}
+                        aria-pressed={isDone} aria-label={`ทำขั้นที่ ${s.n} แล้ว`}>
+                        <i className={`ti ${isDone ? 'ti-circle-check-filled' : 'ti-circle'}`} aria-hidden="true" />
+                      </button>
+                      <div className="cl-step-body">
+                        {/* กดที่หัวข้อเพื่อกาง/พับ แยกจากปุ่มติ๊ก กันกดพลาดเป็นติ๊กว่าทำแล้ว */}
+                        <button type="button" className="cl-step-top" aria-expanded={open}
+                          onClick={() => setOpenStep(open ? null : s.id)}>
+                          <span className="cl-step-n">{s.n}</span>
+                          <span className="cl-step-label">
+                            <b>{s.title}</b>
+                            {s.time && (
+                              <span className="cl-step-time"><i className="ti ti-clock" aria-hidden="true" /> {s.time}</span>
+                            )}
+                          </span>
+                          <i className="ti ti-chevron-down cl-step-caret" aria-hidden="true" />
+                        </button>
+                        {open && (
+                          <>
+                            <p className="cl-why"><i className="ti ti-bulb" aria-hidden="true" /> {s.why}</p>
+                            <ul className="cl-dos">
+                              {s.dos.map((d) => <li key={d}>{d}</li>)}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
             </li>
           ))}
         </ol>

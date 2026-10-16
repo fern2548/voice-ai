@@ -3654,7 +3654,9 @@ th, td { font-size: 14px; }
 
 
 /* ---------- ทำความสะอาดโรงเรือน ---------- */
-.cl { display: flex; flex-direction: column; gap: 16px; }
+.cl { display: flex; flex-direction: column; gap: 16px;
+  /* ใบงานติ๊กตาม อ่านทีละบรรทัด จอกว้างแค่ไหนก็ไม่ควรลากยาวกว่านี้ */
+  width: 100%; max-width: 1120px; margin: 0 auto; }
 .cl-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .cl-head-icon { width: 54px; height: 54px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent); display: grid; place-items: center; font-size: 27px; flex: none; }
@@ -3680,24 +3682,49 @@ th, td { font-size: 14px; }
 .cl-reset:hover { color: var(--text); }
 .cl-bar { margin-top: 10px; height: 8px; border-radius: 20px; background: var(--panel-2); overflow: hidden; }
 .cl-bar span { display: block; height: 100%; border-radius: 20px; background: var(--accent); transition: width .25s; }
+.cl-next { margin-top: 10px; display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--text-dim); }
+.cl-next i { color: var(--accent); font-size: 17px; flex: none; }
+.cl-next b { color: var(--text); font-weight: 700; }
 .cl-done-all { margin-top: 10px; display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--accent); }
-/* ขั้นตอนล้างโรงเรือน */
-.cl-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.cl-step { display: flex; gap: 12px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border);
-  border-radius: 14px; padding: 14px 16px; }
+/* ขั้นตอนล้างโรงเรือน — จัดเป็นกลุ่มตามวัน แล้วพับรายละเอียดไว้
+   ของเดิมกาง 10 ขั้นพร้อมกัน มือถือเห็นได้ทีละขั้นเดียว ต้องเลื่อนผ่านของที่ทำไปแล้วทุกครั้ง */
+.cl-days { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.cl-day { display: flex; flex-direction: column; gap: 8px; }
+.cl-day-head { display: flex; align-items: center; gap: 9px; padding: 0 2px; }
+.cl-day-head b { font-size: 14.5px; }
+.cl-day-badge { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 20px; flex: none;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.cl-day-count { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-faint); }
+.cl-day.done .cl-day-head b { color: var(--text-dim); }
+.cl-day.done .cl-day-count { color: var(--accent); }
+
+.cl-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cl-step { display: flex; gap: 10px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 6px 14px 6px 8px; }
+.cl-step.open { padding-bottom: 14px; }
 .cl-step.on { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
 .cl-step.on .cl-step-top b { text-decoration: line-through; color: var(--text-dim); }
+/* ขั้นที่กำลังทำ ต้องหาเจอทันทีที่เปิดหน้ามา */
+.cl-step.now { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+/* ปุ่มติ๊กต้องกดโดนง่าย ใช้งานจริงคือยืนหน้าคอก อาจใส่ถุงมืออยู่ */
 .cl-check { background: none; border: 0; padding: 0; cursor: pointer; color: var(--text-faint); font-size: 26px;
-  line-height: 1; flex: none; margin-top: 2px; }
+  line-height: 1; flex: none; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; }
+.cl-check:hover { background: var(--panel-2); color: var(--text); }
 .cl-step.on .cl-check { color: var(--accent); }
 .cl-step-body { min-width: 0; flex: 1; }
-.cl-step-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cl-step-top { width: 100%; font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 10px 0; display: flex; align-items: center; gap: 8px; }
+/* หัวข้อกับเวลาอยู่กลุ่มเดียวกัน จอกว้างอยู่บรรทัดเดียว จอแคบเวลาค่อยตกลงมา
+   ถ้าปล่อยให้ทั้งแถว wrap เอง เลขขั้นจะไปอยู่คนละบรรทัดกับชื่อขั้นบนมือถือ */
+.cl-step-label { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
 .cl-step-n { width: 22px; height: 22px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--border);
   font-size: 12px; font-weight: 700; display: grid; place-items: center; flex: none; }
 .cl-step.on .cl-step-n { background: var(--accent); border-color: var(--accent); color: #04121a; }
-.cl-step-top b { font-size: 16px; }
+.cl-step-top b { font-size: 15.5px; }
 .cl-step-time { font-size: 11.5px; color: var(--text-faint); display: inline-flex; align-items: center; gap: 4px; }
-.cl-why { margin: 7px 0 0; font-size: 13px; line-height: 1.65; color: var(--text-dim);
+.cl-step-caret { margin-left: auto; font-size: 17px; color: var(--text-faint); flex: none; transition: transform .18s; }
+.cl-step.open .cl-step-caret { transform: rotate(180deg); }
+.cl-why { margin: 2px 0 0; font-size: 13px; line-height: 1.65; color: var(--text-dim);
   display: flex; gap: 6px; align-items: flex-start; }
 .cl-why i { color: var(--warn); font-size: 16px; flex: none; margin-top: 2px; }
 .cl-dos { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
