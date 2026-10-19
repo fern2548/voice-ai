@@ -2269,20 +2269,6 @@ th, td { font-size: 14px; }
 .vh-send:hover { opacity: 0.9; }
 
 /* ---- พื้นที่สถานะ/คำถาม/คำตอบ ---- */
-/* ทางลัดใต้ช่องถามในหน้าแรก — ชิปเล็ก ๆ เรียงกลาง ไม่แย่งความสนใจจากช่องถาม
-   มีเพื่อบอกว่าเว็บนี้ทำอะไรได้บ้าง ไม่ใช่ให้เป็นเมนูหลัก */
-.vh-quick { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
-.vh-quick-item { display: inline-flex; align-items: center; gap: 7px; text-decoration: none;
-  padding: 8px 14px; border-radius: 20px; font-size: 13.5px; color: var(--text-dim);
-  background: var(--panel); border: 1px solid var(--border); transition: all .15s; }
-.vh-quick-item i { font-size: 17px; color: var(--text-faint); }
-.vh-quick-item:hover { color: var(--text); border-color: var(--accent); }
-.vh-quick-item:hover i { color: var(--accent); }
-@media (max-width: 480px) {
-  .vh-quick { gap: 6px; margin-top: 13px; }
-  .vh-quick-item { padding: 7px 11px; font-size: 12.5px; }
-}
-
 .vh-thread {
   margin-top: 32px;
   width: 100%;

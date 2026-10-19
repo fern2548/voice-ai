@@ -48,18 +48,6 @@ export const MENU_GROUPS = [
   },
 ]
 
-/** ทางลัดใต้ช่องถามในหน้าแรก — เปิดเว็บมาครั้งแรกจะได้รู้ว่าทำอะไรได้บ้าง
- *  เอาเฉพาะที่ใช้บ่อยจริง ไม่ใช่ยกเมนูทั้งหมดมาวาง ไม่งั้นหน้าแรกก็รกเหมือนเดิม */
-export const MENU_QUICK = [
-  { to: '/tasks', label: 'งานวันนี้', icon: 'ti-checkbox', internal: true },
-  { to: '/pig-log', label: 'โรงเรือน', icon: 'ti-building-warehouse', internal: true },
-  { to: '/vaccine', label: 'วัคซีน', icon: 'ti-vaccine', internal: true },
-  { to: '/diseases', label: 'อาการของโรค', icon: 'ti-mood-sick' },
-  { to: '/cleaning', label: 'ล้างโรงเรือน', icon: 'ti-spray' },
-  { to: '/feed', label: 'อาหารสัตว์', icon: 'ti-bowl' },
-  { to: '/menu', label: 'ดูทั้งหมด', icon: 'ti-layout-grid' },
-]
-
 /** ท้ายเมนู ของที่นาน ๆ เข้าที */
 export const MENU_BOTTOM = [
   { to: '/settings', label: 'ตั้งค่า', icon: 'ti-settings', internal: true },

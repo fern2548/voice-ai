@@ -3,8 +3,6 @@ import { useVoiceAI } from '../context/VoiceAI.jsx'
 import VoiceDiseaseCards from './VoiceDiseaseCards.jsx'
 import AnswerText from './AnswerText.jsx'
 import VoiceVisuals from './VoiceVisuals.jsx'
-import { MENU_QUICK, visibleItems } from '../data/menu.js'
-import { useAdminAuth } from '../context/AdminAuth.jsx'
 
 /**
  * หน้าแรก — ยกโครงมาจากเว็บ Farmy Voice (พอร์ต 5174) ทั้งดุ้น
@@ -19,9 +17,6 @@ export default function VoiceHero() {
     question, setQuestion, messages, listening, busy,
     ask, startVoice, voiceError,
   } = useVoiceAI()
-  const { isAdmin } = useAdminAuth()
-  // คนนอกไม่ต้องเห็นทางลัดที่กดไปแล้วเจอหน้าให้ล็อกอิน
-  const quickLinks = visibleItems(MENU_QUICK, isAdmin)
 
   // ระหว่างฟังต้องคงปุ่มไมค์ไว้เสมอ ห้ามสลับเป็นปุ่มส่ง
   // ไม่งั้นพอระบบได้ยินคำแรก ปุ่มไมค์จะหายไปกลางคัน แล้วผู้ใช้จะกดหยุดพูดไม่ได้
@@ -112,20 +107,6 @@ export default function VoiceHero() {
             )}
           </div>
         </form>
-
-        {/* ทางลัด — โชว์เฉพาะตอนยังไม่ได้ถามอะไร
-            เปิดเว็บมาครั้งแรกจะได้รู้ว่าทำอะไรได้บ้าง ไม่ใช่เจอแต่ช่องเปล่า ๆ
-            พอถามแล้วซ่อนไป ให้คำตอบกับภาพอาการได้พื้นที่เต็ม */}
-        {!showThread && (
-          <nav className="vh-quick" aria-label="ทางลัด">
-            {quickLinks.map((q) => (
-              <Link key={q.to} to={q.to} className="vh-quick-item">
-                <i className={`ti ${q.icon}`} aria-hidden="true" />
-                <span>{q.label}</span>
-              </Link>
-            ))}
-          </nav>
-        )}
 
         {/* พื้นที่สถานะ + คำถาม + คำตอบ ความสูงคงที่ ไม่ทำให้หน้ากระโดด */}
         <div className="vh-thread">
