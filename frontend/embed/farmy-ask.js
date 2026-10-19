@@ -179,7 +179,9 @@ function renderCards(body, sym) {
       const imgs = el('div', 'imgs')
       for (const s of shown) {
         const img = el('img')
-        img.loading = 'lazy'
+        // ไม่ใช้ loading="lazy" — รูปอยู่ในกล่องที่เลื่อนได้ซ้อนใน Shadow DOM
+        // เบราว์เซอร์มักไม่ถือว่า "เห็นแล้ว" เลยไม่สั่งโหลดสักรูป (ทดสอบแล้วไม่โหลดจริง)
+        // รูปมีไม่เกิน 4 ใบต่อโรค และโหลดเฉพาะตอนถามเรื่องอาการ ยอมโหลดเลยดีกว่ารูปไม่ขึ้น
         img.alt = s.title
         img.src = `${CFG.server}/diseases/${s.id}.webp`
         img.onerror = () => { img.src = `${CFG.server}/diseases/${s.id}.svg`; img.onerror = null }
