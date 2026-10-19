@@ -6507,8 +6507,14 @@ if os.path.isdir(_WEB_DIST):
         ส่วน index.html ชื่อเดิมตลอด ต้องถามใหม่ทุกครั้งว่าชี้ไป bundle ไหน
         """
         resp = await call_next(request)
-        if request.url.path.startswith("/assets/"):
+        p = request.url.path
+        if p.startswith("/assets/"):
             resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif p.startswith("/embed/"):
+            # กล่องที่เอาไปฝังในเว็บคนอื่น ชื่อไฟล์คงที่ไม่มีแฮช
+            # ถ้าปล่อยให้แคช เว็บปลายทางจะค้างอยู่กับเวอร์ชันเก่าตลอดไป
+            # และเราแก้อะไรไม่ได้เลย เพราะเข้าไปสั่งล้างแคชเครื่องเขาไม่ได้
+            resp.headers["Cache-Control"] = "no-cache, must-revalidate"
         elif resp.headers.get("content-type", "").startswith("text/html"):
             resp.headers["Cache-Control"] = "no-cache, must-revalidate"
         return resp
