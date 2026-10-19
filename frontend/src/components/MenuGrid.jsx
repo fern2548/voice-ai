@@ -2,43 +2,11 @@ import { Link } from 'react-router-dom'
 import { useAdminAuth } from '../context/AdminAuth.jsx'
 import usePolling from '../hooks/usePolling.js'
 import { getTasks, getVaccineDue } from '../api.js'
+import { MENU_GROUPS } from '../data/menu.js'
 
 // ตารางทางลัดของหน้า "รวมทุกเมนู" — เปิดหน้าเดียวเห็นทุกอย่างที่ระบบทำได้
-// จัดเป็นกลุ่มตามงานที่ทำ ไม่ได้เรียงยาวเป็นแถวเดียว จะได้กวาดตาหาเจอเร็ว
-// หน้าที่ต้องล็อกอิน (internal) จะไม่ขึ้นให้คนนอกเห็น เพราะกดไปก็เข้าไม่ได้
+// โครงเมนูอยู่ใน data/menu.js ใช้ร่วมกับลิ้นชักเมนูด้านบน แก้ที่เดียวตรงกันทั้งคู่
 
-const GROUPS = [
-  {
-    title: 'ดูแลหมู',
-    items: [
-      { to: '/tasks', label: 'งานวันนี้', icon: 'ti-checkbox', internal: true, badge: 'tasks' },
-      { to: '/pig-log', label: 'โรงเรือน', icon: 'ti-building-warehouse', internal: true },
-      { to: '/vaccine', label: 'วัคซีน', icon: 'ti-vaccine', internal: true, badge: 'due' },
-      { to: '/vaccine-plan', label: 'แผนวัคซีนตามอายุ', icon: 'ti-calendar-stats', internal: true },
-      { to: '/diseases', label: 'อาการของโรค', icon: 'ti-mood-sick' },
-      { to: '/vet', label: 'ปรึกษาสัตวแพทย์', icon: 'ti-message-circle', internal: true },
-    ],
-  },
-  {
-    title: 'จัดการฟาร์ม',
-    items: [
-      { to: '/feed', label: 'อาหารสัตว์', icon: 'ti-bowl' },
-      { to: '/breeding', label: 'การผสมพันธุ์', icon: 'ti-heart-handshake' },
-      { to: '/cleaning', label: 'ทำความสะอาดโรงเรือน', icon: 'ti-spray' },
-      { to: '/checklist', label: 'เช็กลิสต์มาตรฐานฟาร์ม', icon: 'ti-checklist' },
-    ],
-  },
-  {
-    title: 'ข้อมูลและรายงาน',
-    items: [
-      { to: '/forecast', label: 'สภาพอากาศ', icon: 'ti-cloud' },
-      { to: '/sensors', label: 'กราฟข้อมูล', icon: 'ti-chart-line' },
-      { to: '/history', label: 'รายงาน', icon: 'ti-report' },
-      { to: '/vaccine-info', label: 'ข้อมูลวัคซีน', icon: 'ti-file-info' },
-      { to: '/vaccine-guide', label: 'วิธีฉีดวัคซีน', icon: 'ti-needle' },
-    ],
-  },
-]
 
 export default function MenuGrid() {
   const { isAdmin } = useAdminAuth()
@@ -74,7 +42,7 @@ export default function MenuGrid() {
         </div>
       )}
 
-      {GROUPS.map((g) => {
+      {MENU_GROUPS.map((g) => {
         const items = g.items.filter((it) => isAdmin || !it.internal)
         if (!items.length) return null
         return (

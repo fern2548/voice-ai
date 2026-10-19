@@ -29,37 +29,15 @@ import VetCommunityPage from './pages/VetCommunityPage.jsx'
 import VaccinePlanPage from './pages/VaccinePlanPage.jsx'
 
 // internal: true = เฉพาะคนในบริษัท (ต้องล็อกอิน) — คนนอกเห็นแต่เมนูข้อมูลปกติ
-const NAV = [
-  { to: '/overview', label: 'หน้าแรก' },
-  { to: '/menu', label: 'รวมทุกเมนู' },
-  { to: '/features', label: 'ทำอะไรได้บ้าง' },
-  { to: '/tasks', label: 'งานวันนี้', internal: true },
-  { to: '/pig-log', label: 'โรงเรือน', internal: true },
-  { to: '/vaccine', label: 'วัคซีน', internal: true },
-  { to: '/vet', label: 'ปรึกษาสัตวแพทย์', internal: true },
-  { to: '/vaccine-plan', label: 'แผนวัคซีนตามอายุ', internal: true },
-  { to: '/vaccine-info', label: 'ข้อมูลวัคซีน' },
-  { to: '/vaccine-guide', label: 'วิธีฉีดวัคซีน' },
-  { to: '/diseases', label: 'อาการของโรค' },
-  { to: '/feed', label: 'อาหารสัตว์' },
-  { to: '/breeding', label: 'การผสมพันธุ์' },
-  { to: '/cleaning', label: 'ทำความสะอาดโรงเรือน' },
-  { to: '/checklist', label: 'เช็กลิสต์มาตรฐานฟาร์ม' },
-  { to: '/history', label: 'รายงาน' },
-  { to: '/forecast', label: 'สภาพอากาศ · พยากรณ์' },
-  { to: '/sensors', label: 'กราฟข้อมูล' },
-  { to: '/settings', label: 'ตั้งค่า', internal: true },
-]
 
 function AppShell() {
   const location = useLocation()
   const { isAdmin } = useAdminAuth()
-  const nav = isAdmin ? NAV : NAV.filter((n) => !n.internal)
 
   return (
     <VoiceAIProvider>
       <div className="app-root">
-        <StatusBar navItems={nav} currentPath={location.pathname} />
+        <StatusBar currentPath={location.pathname} />
 
         <div className="alert-stack">
           <ConnectionAlert />

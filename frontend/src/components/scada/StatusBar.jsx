@@ -4,6 +4,7 @@ import { useTheme } from '../../theme.jsx'
 import { useLiveData } from '../../context/LiveData.jsx'
 import { useAdminAuth } from '../../context/AdminAuth.jsx'
 import { FarmyLogo } from '../FarmDecor.jsx'
+import { MENU_BOTTOM, MENU_TOP, visibleGroups, visibleItems } from '../../data/menu.js'
 
 function useClock() {
   const [now, setNow] = useState(new Date())
@@ -21,13 +22,23 @@ function useClock() {
  * ไม่ถอด element ออกจาก DOM เพราะถ้าใช้ transition แล้วเบราว์เซอร์หยุด animation
  * (เช่นผู้ใช้สลับไปแท็บอื่น) ฉากหลังใส ๆ จะค้างดักคลิกแทนเนื้อหาข้างหลัง
  */
-export default function StatusBar({ navItems = [], currentPath = '' }) {
+export default function StatusBar({ currentPath = '' }) {
   const { theme, setTheme } = useTheme()
   const now = useClock()
   const { username, logout, isAdmin, role } = useAdminAuth()
   // ใช้ /health เป็นตัวชี้สถานะการเชื่อมต่อ backend + DB
   const { health, healthError } = useLiveData()
   const online = !healthError && health?.db === true
+
+  // ประกอบเมนูเป็นหมวด ๆ แล้วแปะเลขลำดับรวมไว้ ใช้หน่วงเวลาตอนเมนูไถลออกมาทีละบรรทัด
+  let seq = 0
+  const sections = [
+    { title: '', items: visibleItems(MENU_TOP, isAdmin) },
+    ...visibleGroups(isAdmin),
+    { title: '', items: visibleItems(MENU_BOTTOM, isAdmin) },
+  ]
+    .filter((sec) => sec.items.length)
+    .map((sec) => ({ ...sec, items: sec.items.map((it) => ({ ...it, _i: seq++ })) }))
   const [open, setOpen] = useState(false)
 
   // กด Esc ปิดเมนู และล็อกการเลื่อนหน้าไว้ระหว่างเปิด
@@ -92,20 +103,30 @@ export default function StatusBar({ navItems = [], currentPath = '' }) {
       {/* แผงเมนู */}
       <nav className={`menu-panel ${open ? 'on' : ''}`}>
         <div className="menu-inner">
-          <ul className="menu-list">
-            {navItems.map((n, i) => (
-              <li key={n.to} style={{ transitionDelay: open ? `${60 + i * 45}ms` : '0ms' }}>
-                <Link
-                  to={n.to}
-                  tabIndex={open ? 0 : -1}
-                  onClick={() => setOpen(false)}
-                  className={currentPath === n.to ? 'active' : ''}
-                >
-                  {n.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {/* แบ่งหมวดและใส่ไอคอน — ของเดิมเป็นรายการยาว 19 บรรทัดเรียงติดกัน
+              ไม่มีอะไรช่วยให้กวาดตาหาเจอ ต้องไล่อ่านทีละบรรทัดทุกครั้ง */}
+          <div className="menu-secs">
+          {sections.map((sec) => (
+            <div className="menu-sec" key={sec.title || `x${sec.items[0].to}`}>
+              {sec.title && <div className="menu-sec-title">{sec.title}</div>}
+              <ul className="menu-list">
+                {sec.items.map((n) => (
+                  <li key={n.to} style={{ transitionDelay: open ? `${60 + n._i * 30}ms` : '0ms' }}>
+                    <Link
+                      to={n.to}
+                      tabIndex={open ? 0 : -1}
+                      onClick={() => setOpen(false)}
+                      className={currentPath === n.to ? 'active' : ''}
+                    >
+                      <i className={`ti ${n.icon}`} aria-hidden="true" />
+                      <span>{n.label}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          </div>
 
           <div className="menu-foot">
             <div className={`sb-conn ${online ? 'up' : 'down'}`}>
