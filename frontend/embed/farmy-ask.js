@@ -282,14 +282,22 @@ function start() {
         // qa_only = หลังบ้านจะไม่ทำคำสั่งบันทึกข้อมูลหรือส่ง LINE ให้ ถึงจะพิมพ์มาก็ตาม
         body: JSON.stringify({ text: q, qa_only: true }),
       })
-      const d = await r.json()
-      const answer = d.answer || d.detail || 'ขออภัยค่ะ ตอนนี้ตอบไม่ได้'
-      ansEl.textContent = strip(answer)
-      renderCards(ui.body, matchSymptoms(q))
-      speak(answer)
+      // 502/503/504 = เซิร์ฟเวอร์ยังตื่นไม่เต็มที่หรือคนใช้แน่น ไม่ใช่คำถามผิด
+      // บอกให้ชัดว่าให้ลองใหม่ ดีกว่าขึ้น "ตอบไม่ได้" ลอย ๆ แล้วผู้ใช้เลิกถามไปเลย
+      if (r.status === 502 || r.status === 503 || r.status === 504) {
+        ansEl.textContent = 'เซิร์ฟเวอร์กำลังตื่นอยู่ค่ะ รออีกสักครู่แล้วถามใหม่อีกครั้งนะคะ'
+      } else {
+        const d = await r.json().catch(() => ({}))
+        const answer = d.answer || d.detail || 'ขออภัยค่ะ ตอนนี้ตอบไม่ได้ ลองถามใหม่อีกครั้งนะคะ'
+        ansEl.textContent = strip(answer)
+        speak(answer)
+      }
     } catch {
       ansEl.textContent = 'เชื่อมต่อฟาร์มมี่ไม่ได้ค่ะ ลองใหม่อีกครั้ง'
     } finally {
+      // ภาพอาการคำนวณจากคำถามในเครื่อง ไม่ต้องรอเซิร์ฟเวอร์
+      // AI ล่มก็ยังได้ภาพกับสิ่งที่ต้องไปสังเกตติดมือไป ดีกว่าได้แต่ข้อความว่าตอบไม่ได้
+      renderCards(ui.body, matchSymptoms(q))
       busy = false
       ui.send.disabled = false
       ui.body.scrollTop = 0
