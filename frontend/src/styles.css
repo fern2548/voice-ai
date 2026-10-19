@@ -3328,7 +3328,10 @@ th, td { font-size: 14px; }
 @media (max-width: 700px) { .fm-title { font-size: 21px; } .fm-go { margin-left: 0; } }
 
 /* รายชื่อโรคในหน้า "อาการของโรค" */
-.dz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; align-items: start; }
+/* สองโรคต่อแถวเท่านั้น ไม่ให้ไหลเป็น 4 คอลัมน์บนจอกว้าง
+   การ์ดแต่ละใบมีภาพอาการ 4 รูปที่มีตัวหนังสืออยู่ในรูป ย่อลงไปกว่านี้แล้วอ่านไม่ออก
+   ผู้ใช้เลื่อนหาเอาได้ ดีกว่าเห็นครบทั้งหน้าแต่อ่านไม่ออกสักใบ */
+.dz-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
 .dz-card { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px 16px; border-radius: 16px;
   text-decoration: none; color: var(--text); background: var(--panel);
   border: 1px solid var(--border); border-left: 5px solid var(--border);
@@ -3361,8 +3364,14 @@ th, td { font-size: 14px; }
   font-size: 13px; font-weight: 600; color: var(--accent); }
 .dz-go i { font-size: 16px; transition: transform .2s; }
 .dz-card:hover .dz-go i { transform: translateX(3px); }
-@media (max-width: 420px) {
-  .dz-thumbs { gap: 7px; }
+/* จอแคบกว่านี้ สองคอลัมน์จะบีบจนภาพเล็กกว่าตอนเรียงเดี่ยว */
+@media (max-width: 900px) {
+  .dz-grid { grid-template-columns: 1fr; }
+}
+/* บนมือถือ ภาพ 2 รูปต่อแถวเหลือกว้างรูปละ ~127px การ์ดอาการมีตัวหนังสืออยู่ในรูป
+   ขนาดนั้นอ่านไม่ออกเลย เรียงทีละรูปแทน การ์ดยาวขึ้นแต่เลื่อนเอาได้ */
+@media (max-width: 520px) {
+  .dz-thumbs { grid-template-columns: 1fr; gap: 10px; }
 }
 
 .fm-back { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); display: grid; place-items: center; color: var(--text); font-size: 19px; text-decoration: none; flex: none; }
