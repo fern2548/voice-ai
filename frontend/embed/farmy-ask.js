@@ -30,7 +30,9 @@ const CFG = {
 }
 
 const CSS = `
-:host { all: initial; }
+/* all: initial รีเซ็ต display เป็น inline ไปด้วย ต้องตั้งกลับเป็น block
+   ไม่งั้นกล่องกว้าง 0 ทุกอย่างข้างในถูกบีบจนเหลือ 2px รูปไม่โหลดเพราะไม่เคยถูกมองเห็น */
+:host { all: initial; display: block; }
 *, *::before, *::after { box-sizing: border-box; }
 .wrap { font-family: "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, sans-serif; color: #17241d; }
 .fab { position: fixed; bottom: 22px; ${CFG.position}: 22px; width: 58px; height: 58px; border-radius: 50%;
@@ -43,6 +45,7 @@ const CSS = `
   display: none; flex-direction: column; overflow: hidden; }
 .panel.on { display: flex; }
 /* โหมดฝังในกล่องของหน้าปลายทาง ไม่ลอยอยู่มุมจอ */
+.inline { height: 100%; }
 .inline .panel { position: static; width: 100%; max-height: none; height: 100%; box-shadow: none;
   display: flex; bottom: auto; }
 .inline .fab { display: none; }
@@ -122,7 +125,6 @@ const strip = (t) => (t || '')
 
 function build() {
   const host = el('div')
-  host.style.all = 'initial'
   const root = host.attachShadow({ mode: 'open' })
   root.appendChild(el('style', null, CSS))
 
@@ -209,6 +211,8 @@ function start() {
   if (target) {
     ui.wrap.classList.add('inline')
     ui.panel.classList.add('on')
+    // โหมดฝัง ต้องกินพื้นที่ของกล่องปลายทางให้เต็ม ไม่งั้นความสูงเป็น 0
+    ui.host.style.cssText = 'display:block;width:100%;height:100%'
     target.appendChild(ui.host)
   } else {
     document.body.appendChild(ui.host)
