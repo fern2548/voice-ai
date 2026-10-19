@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>กล่องถามฟาร์มมี่ — วิธีเอาไปฝัง</title>
+<link rel="stylesheet" href="/vendor/fonts/font.css" />
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: "IBM Plex Sans Thai", system-ui, sans-serif; line-height: 1.8;
+    max-width: 880px; margin: 0 auto; padding: 36px 20px 120px; color: #17241d; background: #fbfdfc; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .lead { color: #5d6d65; margin: 0 0 28px; }
+  h2 { font-size: 17px; margin: 30px 0 8px; }
+  pre { background: #11201a; color: #d6f0e2; padding: 14px 16px; border-radius: 10px;
+    overflow-x: auto; font-size: 13px; line-height: 1.6; }
+  code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e3e8e5; vertical-align: top; }
+  th { color: #5d6d65; font-weight: 600; }
+  .box { border: 1px dashed #c9d5ce; border-radius: 12px; padding: 14px; margin-top: 10px;
+    background: #fff; min-height: 420px; }
+  .note { background: #fff6e8; border: 1px solid #f3dfbe; border-radius: 10px; padding: 12px 14px;
+    font-size: 14px; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0f1512; color: #e7efe9; }
+    .lead, th { color: #9fb0a7; }
+    .box { background: #141a17; border-color: #2a332e; }
+    th, td { border-color: #2a332e; }
+    .note { background: #2a2113; border-color: #4a3a1c; color: #e7d6b4; }
+  }
+</style>
+</head>
+<body>
+
+<h1>กล่องถามฟาร์มมี่</h1>
+<p class="lead">เอาไปฝังในแดชบอร์ดอื่นได้ด้วยโค้ดบรรทัดเดียว ถาม-ตอบอย่างเดียว ไม่แก้ไขข้อมูลฟาร์ม</p>
+
+<h2>วิธีใช้</h2>
+<p>วางบรรทัดนี้ก่อนปิด <code>&lt;/body&gt;</code> ของหน้าปลายทาง</p>
+<pre><code>&lt;script src="https://fern.plotnexuslab.com/embed/farmy-ask.js"
+        data-server="https://fern.plotnexuslab.com"&gt;&lt;/script&gt;</code></pre>
+<p>จะได้ปุ่มกลมลอยอยู่มุมขวาล่าง กดแล้วเปิดกล่องถาม พิมพ์หรือกดไมค์พูดก็ได้</p>
+
+<h2>ตัวเลือกเพิ่มเติม</h2>
+<table>
+  <tr><th>data-server</th><td>ที่อยู่เซิร์ฟเวอร์ฟาร์มมี่ (ไม่ใส่ = ใช้โดเมนเดียวกับไฟล์สคริปต์)</td></tr>
+  <tr><th>data-position</th><td><code>left</code> = ไปอยู่มุมซ้าย (ไม่ใส่ = มุมขวา)</td></tr>
+  <tr><th>data-title</th><td>ชื่อบนหัวกล่อง (ไม่ใส่ = “ถามฟาร์มมี่”)</td></tr>
+  <tr><th>data-open</th><td><code>1</code> = เปิดกล่องค้างไว้ตั้งแต่โหลดหน้า</td></tr>
+  <tr><th>data-mount</th><td>ใส่ selector เช่น <code>#farmy</code> เพื่อฝังลงในกล่องนั้นแทนที่จะลอยมุมจอ</td></tr>
+</table>
+
+<h2>แบบฝังในกล่องของหน้าเอง</h2>
+<pre><code>&lt;div id="farmy" style="height:560px"&gt;&lt;/div&gt;
+&lt;script src="https://fern.plotnexuslab.com/embed/farmy-ask.js"
+        data-server="https://fern.plotnexuslab.com"
+        data-mount="#farmy"&gt;&lt;/script&gt;</code></pre>
+
+<h2>ลองใช้จริง</h2>
+<p>กล่องด้านล่างคือตัวจริง ลองถาม “หมูมีตุ่มแดงขึ้น เป็นโรคอะไรได้บ้าง” หรือ “อาการโรคอหิวาต์แอฟริกา” ดู</p>
+<div class="box" id="farmy-demo"></div>
+
+<h2>ขอบเขตการใช้งาน</h2>
+<div class="note">
+  กล่องนี้ <b>ตอบคำถามอย่างเดียว</b> สั่งบันทึกข้อมูลหรือส่งเข้า LINE ไม่ได้ กันไว้ที่ฝั่งเซิร์ฟเวอร์
+  ไม่ใช่แค่ไม่ทำปุ่มให้ และเพราะไม่ได้ล็อกอิน จึงถามได้เฉพาะเรื่องทั่วไป —
+  อาการโรค · วิธีฉีดวัคซีน · สายพันธุ์ · ค่ามาตรฐานโรงเรือน · สภาพอากาศ · เอกสารมาตรฐานในคลัง
+  ส่วนข้อมูลภายในฟาร์ม (หมูป่วย บันทึกวัคซีน งานประจำวัน) ต้องเข้าใช้ในหน้าฟาร์มมี่
+</div>
+
+<script src="/embed/farmy-ask.js" data-mount="#farmy-demo"></script>
+</body>
+</html>

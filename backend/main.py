@@ -717,6 +717,9 @@ class Question(BaseModel):
     text: str
     # ประวัติแชทล่าสุด (frontend ส่งมาแค่ไม่กี่เทิร์นเพื่อประหยัด token)
     history: Optional[list[ChatTurn]] = None
+    # ถาม-ตอบอย่างเดียว ห้ามสั่งบันทึกข้อมูลหรือส่ง LINE
+    # ใช้กับกล่องถามที่เอาไปฝังในแดชบอร์ดอื่น (public/embed/farmy-ask.js)
+    qa_only: bool = False
 
 
 class Answer(BaseModel):
@@ -6284,6 +6287,15 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
     ):
         return Answer(answer="ข้อมูลส่วนนี้เป็นข้อมูลภายในฟาร์มค่ะ ต้องเข้าสู่ระบบก่อนถึงจะดูหรือบันทึกได้ "
                              "ถามเรื่องสภาพอากาศ พยากรณ์ หรือวิธีฉีดวัคซีนได้เลยค่ะ")
+
+    # กล่องถามที่ฝังในแดชบอร์ดอื่นตั้ง qa_only มา = ตอบคำถามอย่างเดียว
+    # คนที่เอาโค้ดไปฝังอาจไม่ได้ตั้งใจเปิดสิทธิ์บันทึกข้อมูลหรือส่ง LINE ให้คนที่เปิดหน้านั้น
+    # กันไว้ที่หลังบ้าน ไม่ใช่แค่ไม่ทำปุ่มให้ที่หน้าเว็บ
+    if q.qa_only and (_is_line_report_command(text) or _is_line_send_command(text)
+                      or _is_batch_add_command(text) or _is_followup_record_command(text)
+                      or _is_vaccine_record_command(text)):
+        return Answer(answer="กล่องนี้ใช้ถาม-ตอบอย่างเดียวค่ะ "
+                             "ถ้าต้องการบันทึกข้อมูลหรือส่งเข้า LINE ให้ทำในหน้าฟาร์มมี่นะคะ")
 
     # คำสั่งส่งรายงาน PDF (ไฟล์) เข้า LINE ด้วยเสียง -> เช็คก่อนคำสั่งส่งสรุปทั่วไป เพราะเจาะจงกว่า
     if _is_line_report_command(text):
