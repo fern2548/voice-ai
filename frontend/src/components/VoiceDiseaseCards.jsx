@@ -142,9 +142,10 @@ export default function VoiceDiseaseCards({ result }) {
             <ul>
               {result.others.map((o) => {
                 const d = findDisease(o.id)
+                // โรคที่มีรูปแล้วแต่ตกขอบการ์ด ใช้คำสรุปของโรคนั้นแทนข้อความ "ยังไม่มีภาพ"
                 return (
                   <li key={o.id}>
-                    <b>{d?.name || o.id}</b> — {NO_IMAGE_NOTE[o.id]}
+                    <b>{d?.name || o.id}</b> — {NO_IMAGE_NOTE[o.id] || d?.summary || ''}
                   </li>
                 )
               })}
