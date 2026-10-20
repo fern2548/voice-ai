@@ -109,7 +109,8 @@ export function VoiceAIProvider({ children }) {
     setMessages((prev) => [...prev, { role: 'user', text: q }])
     try {
       const d = await askAI(q, history)
-      setMessages((prev) => [...prev, { role: 'model', text: d.answer, cards: sym || undefined, visual: vis || undefined }])
+      setMessages((prev) => [...prev, { role: 'model', text: d.answer, cards: sym || undefined,
+        visual: vis || undefined, saved: d.saved || undefined }])
       // บอกด้วยเสียงว่ามีรูปให้ดู ผู้ใช้ที่ไม่ได้มองจอจะได้รู้ว่าต้องเลื่อนลง
       // ตัดสัญลักษณ์ Markdown ออกก่อน ไม่งั้นเสียงจะอ่านว่า "ดอกจันดอกจัน"
       const spoken = stripMarkdown(d.answer)

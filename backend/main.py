@@ -724,6 +724,9 @@ class Question(BaseModel):
 
 class Answer(BaseModel):
     answer: str
+    # แถวที่เพิ่งบันทึกจากคำสั่งเสียง ให้หน้าเว็บเอาไปโชว์เป็นตารางและกดแก้ไขต่อได้
+    # คนพูดมักบอกไม่ครบทุกช่อง (ลืมบอกโรงเรือน ลืมบอกจำนวน) ต้องเห็นว่าขาดอะไรแล้วเติมได้ทันที
+    saved: Optional[dict] = None
 
 
 # ---------- แหล่งข้อมูลเซนเซอร์ ----------
@@ -1228,6 +1231,36 @@ def list_vaccine_schedule():
     """รายการกำหนดรอบฉีดซ้ำทั้งหมดที่ตั้งไว้"""
     res = supabase.table("vaccine_schedule").select("*").order("vaccine_name").execute()
     return {"rows": res.data or []}
+
+
+class VaccineLogPatch(BaseModel):
+    """ช่องที่ให้แก้ได้หลังบันทึกด้วยเสียง — ไม่ให้แก้ note เพราะเก็บประโยคดิบไว้ตรวจย้อนหลัง"""
+    log_date: Optional[date] = None
+    vaccine_name: Optional[str] = None
+    barn_no: Optional[str] = None
+    pen_no: Optional[str] = None
+    pig_count: Optional[int] = None
+    injector: Optional[str] = None
+    dose: Optional[str] = None
+    lot_no: Optional[str] = None
+    log_time: Optional[str] = None
+    next_due_date: Optional[date] = None
+
+
+@app.put("/vaccine-log/{log_id}", dependencies=[Depends(verify_admin_token)])
+def update_vaccine_log(log_id: int, p: VaccineLogPatch):
+    """แก้ไขบันทึกการฉีด — ใช้ตอนพูดบันทึกแล้วลืมบอกบางช่อง
+
+    ส่งมาเฉพาะช่องที่จะแก้ ช่องที่ไม่ได้ส่งมาคงค่าเดิมไว้
+    (ถ้าเอา None ไปทับหมด ข้อมูลที่พูดถูกแล้วจะหายไปด้วย)
+    """
+    row = p.model_dump(mode="json", exclude_unset=True)
+    if not row:
+        raise HTTPException(status_code=400, detail="ไม่ได้ส่งช่องที่จะแก้มา")
+    res = supabase.table("vaccine_log").update(row).eq("id", log_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="ไม่พบบันทึกนี้")
+    return res.data[0]
 
 
 @app.post("/vaccine-log", dependencies=[Depends(verify_admin_token)])
@@ -5154,7 +5187,76 @@ def _record_followup_from_voice(text: str) -> str:
     return reply
 
 
-def _record_vaccine_from_voice(text: str) -> str:
+# ช่องที่คนมักพูดมาด้วยตอนบันทึกวัคซีน — ดึงให้ครบเท่าที่พูด ที่เหลือให้ไปเติมเอาทีหลัง
+_INJECTOR_RE = re.compile(r"(?:ผู้ฉีด|คนฉีด|ฉีดโดย|โดย)\s*([ก-๙A-Za-z][ก-๙A-Za-z.\s]{0,30})")
+# คำที่บอกว่าหมดชื่อคนแล้ว กำลังขึ้นช่องถัดไป
+# ใช้วิธีไล่ทีละคำแทนการเขียน regex ยาว ๆ เพราะคนพูดสลับลำดับช่องได้ตามใจ
+_INJECTOR_STOP = ("ขนาด", "เวลา", "ล็อต", "ล๊อต", "lot", "จำนวน", "โรงเรือน", "เล้า", "คอก",
+                  "วันที่", "เมื่อ", "ซีซี", "มิลลิลิตร", "มล", "ml", "cc", "ตัว", "อีก", "นัด")
+
+
+def _extract_injector(text: str) -> Optional[str]:
+    """ชื่อคนฉีด — เอาไม่เกิน 2 คำ และหยุดทันทีที่เจอคำของช่องอื่นหรือตัวเลข"""
+    m = _INJECTOR_RE.search(text)
+    if not m:
+        return None
+    words = []
+    for w in m.group(1).split():
+        if any(w.startswith(k) for k in _INJECTOR_STOP) or any(c.isdigit() for c in w):
+            break
+        words.append(w)
+        if len(words) >= 2:
+            break
+    name = " ".join(words).strip(" .")
+    return name if 1 < len(name) <= 24 else None
+_DOSE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(ซีซี|มิลลิลิตร|มล\.?|ml|cc)", re.I)
+_LOT_RE = re.compile(r"(?:ล็อต|ล๊อต|lot)\s*(?:no\.?|เลขที่)?\s*([A-Za-z0-9\-/]{2,20})", re.I)
+_TIME_RE = re.compile(r"(?:เวลา)\s*(\d{1,2})[:.](\d{2})")
+
+
+def _extract_shot_fields(text: str) -> dict:
+    """ดึงช่องที่พูดมาในประโยคเดียวกัน ไม่พูดช่องไหนก็ปล่อยว่างไว้"""
+    out: dict = {}
+    m = _BARN_RE.search(text)
+    if m:
+        out["barn_no"] = m.group(1)
+    m = _PEN_RE.search(text)
+    if m:
+        out["pen_no"] = m.group(1)
+    m = _COUNT_RE.search(text)
+    if m:
+        out["pig_count"] = int(m.group(1))
+    name = _extract_injector(text)
+    if name:
+        out["injector"] = name
+    m = _DOSE_RE.search(text)
+    if m:
+        out["dose"] = f"{m.group(1)} {m.group(2)}"
+    m = _LOT_RE.search(text)
+    if m:
+        out["lot_no"] = m.group(1)
+    m = _TIME_RE.search(text)
+    if m:
+        out["log_time"] = f"{int(m.group(1)):02d}:{m.group(2)}"
+    return out
+
+
+# ชื่อช่องที่เอาไปโชว์บนหน้าเว็บ เรียงตามลำดับที่อยากให้เห็น
+VACCINE_LOG_FIELDS = [
+    {"key": "log_date", "label": "วันที่ฉีด", "type": "date", "required": True},
+    {"key": "vaccine_name", "label": "วัคซีน", "type": "text", "required": True},
+    {"key": "barn_no", "label": "โรงเรือน", "type": "text"},
+    {"key": "pen_no", "label": "คอก", "type": "text"},
+    {"key": "pig_count", "label": "จำนวน (ตัว)", "type": "number"},
+    {"key": "injector", "label": "ผู้ฉีด", "type": "text"},
+    {"key": "dose", "label": "ขนาดที่ฉีด", "type": "text"},
+    {"key": "lot_no", "label": "ล็อตวัคซีน", "type": "text"},
+    {"key": "log_time", "label": "เวลา", "type": "text"},
+    {"key": "next_due_date", "label": "นัดครั้งถัดไป", "type": "date"},
+]
+
+
+def _record_vaccine_from_voice(text: str):
     """บันทึกการฉีดวัคซีนจากคำสั่งเสียง แล้วคืนข้อความยืนยันให้พูดกลับ
 
     หากำหนดรอบฉีดซ้ำ 2 ทาง เรียงลำดับ:
@@ -5185,14 +5287,25 @@ def _record_vaccine_from_voice(text: str) -> str:
         "vaccine_name": vaccine_name,
         "next_due_date": next_due.isoformat() if next_due else None,
         "note": text,  # เก็บประโยคดิบที่พูดไว้ด้วย เผื่อต้องตรวจสอบย้อนหลัง
+        **_extract_shot_fields(text),
     }
-    supabase.table("vaccine_log").insert(data).execute()
+    row = supabase.table("vaccine_log").insert(data).execute().data[0]
+
     what = vaccine_name or "วัคซีน"
     when = log_date.strftime("%d/%m/%Y")
     msg = f"บันทึกแล้วค่ะ ฉีด{what} วันที่ {when}"
     if next_due:
         msg += f" นัดฉีดครั้งถัดไปวันที่ {next_due.strftime('%d/%m/%Y')} ค่ะ"
-    return msg
+
+    # ช่องที่ยังว่าง = คนพูดไม่ได้บอกมา บอกให้รู้จะได้ไปเติมเอง
+    missing = [f["label"] for f in VACCINE_LOG_FIELDS
+               if f["key"] not in ("next_due_date",) and not row.get(f["key"])]
+    if missing:
+        msg += f" ยังไม่ได้บอก {' · '.join(missing)} เติมในตารางด้านล่างได้เลยค่ะ"
+
+    saved = {"kind": "vaccine_log", "id": row["id"], "row": row,
+             "fields": VACCINE_LOG_FIELDS, "missing": missing}
+    return msg, saved
 
 
 # ---------- คำสั่งด้วยเสียง: ส่งสรุปฟาร์มไป LINE ----------
@@ -6506,7 +6619,8 @@ def ask(q: Question, x_admin_token: str = Header(default="")):
 
     if _is_vaccine_record_command(text):
         try:
-            return Answer(answer=_record_vaccine_from_voice(text))
+            msg, saved = _record_vaccine_from_voice(text)
+            return Answer(answer=msg, saved=saved)
         except Exception as e:
             print(f"[warn] บันทึกวัคซีนไม่สำเร็จ: {e}")
             return Answer(answer="ขออภัยค่ะ บันทึกไม่สำเร็จ ลองพูดใหม่อีกครั้งนะค่ะ")

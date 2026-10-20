@@ -105,6 +105,8 @@ export const deleteVaccineProgram = (id) => del(`/vaccine-programs/${id}`)
 export const getBatchPlan = (days = 7) => get(`/batch-plan?days=${days}`)
 export const markPlanDone = (batch_id, program_id, booster_no = 0) => post('/batch-plan/done', { batch_id, program_id, booster_no })
 export const saveVaccineLog = (entry) => post('/vaccine-log', entry)
+// แก้บันทึกที่พูดไว้ ส่งเฉพาะช่องที่เปลี่ยน ช่องอื่นคงค่าเดิม
+export const updateVaccineLog = (id, patch) => put(`/vaccine-log/${id}`, patch)
 
 export const sendVaccineReportToLine = () => post('/line/send-vaccine-report', {})
 export const getVaccineSchedule = () => get('/vaccine-schedule')

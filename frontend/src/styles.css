@@ -2268,6 +2268,33 @@ th, td { font-size: 14px; }
 .vh-send { background: var(--accent); color: #fff; }
 .vh-send:hover { opacity: 0.9; }
 
+/* ---- ตารางสิ่งที่เพิ่งบันทึกจากคำสั่งเสียง ---- */
+.vsr { margin-top: 16px; text-align: left; background: var(--panel);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 14px; padding: 15px 17px; }
+.vsr-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.vsr-top b { font-size: 15.5px; display: inline-flex; align-items: center; gap: 7px; }
+.vsr-top b i { color: var(--accent); font-size: 19px; }
+.vsr-edit { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px;
+  padding: 7px 13px; border-radius: 9px; cursor: pointer; color: var(--text-dim);
+  background: var(--panel-2); border: 1px solid var(--border); }
+.vsr-edit:hover { color: var(--text); border-color: var(--accent); }
+.vsr-missing, .vsr-ok, .vsr-err { display: flex; align-items: flex-start; gap: 6px;
+  margin: 10px 0 0; font-size: 12.5px; line-height: 1.6; }
+.vsr-missing { color: var(--warn); }
+.vsr-ok { color: var(--accent); }
+.vsr-err { color: var(--danger, #e5484d); }
+.vsr-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.vsr-table th, .vsr-table td { padding: 8px 6px; border-bottom: 1px solid var(--border-soft);
+  font-size: 13.5px; text-align: left; vertical-align: middle; }
+.vsr-table th { width: 38%; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+.vsr-table tr:last-child th, .vsr-table tr:last-child td { border-bottom: 0; }
+/* ช่องที่ยังว่าง ต้องเห็นชัดว่าขาด ไม่ใช่กลืนไปกับช่องที่กรอกแล้ว */
+.vsr-table tr.empty th { color: var(--warn); }
+.vsr-blank { color: var(--text-faint); font-size: 12.5px; }
+.vsr-input { width: 100%; font-size: 13.5px; padding: 7px 10px; }
+.vsr-btns { display: flex; gap: 8px; margin-top: 13px; flex-wrap: wrap; }
+
 /* ---- พื้นที่สถานะ/คำถาม/คำตอบ ---- */
 .vh-thread {
   margin-top: 32px;

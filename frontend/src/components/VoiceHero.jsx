@@ -3,6 +3,7 @@ import { useVoiceAI } from '../context/VoiceAI.jsx'
 import VoiceDiseaseCards from './VoiceDiseaseCards.jsx'
 import AnswerText from './AnswerText.jsx'
 import VoiceVisuals from './VoiceVisuals.jsx'
+import VoiceSavedRecord from './VoiceSavedRecord.jsx'
 
 /**
  * หน้าแรก — ยกโครงมาจากเว็บ Farmy Voice (พอร์ต 5174) ทั้งดุ้น
@@ -47,7 +48,8 @@ export default function VoiceHero() {
       : null
   const showThread = lastUser != null
   // มีการ์ดโรคเมื่อไหร่ หน้าต้องยืดและเลื่อนได้ ไม่ใช่จอเดียวจบเหมือนตอนปกติ
-  const hasCards = Boolean(lastBot?.cards || lastBot?.visual)
+  // มี saved ด้วยก็ต้องยืดหน้าเหมือนกัน ตารางยาวกว่าคำตอบปกติ
+  const hasCards = Boolean(lastBot?.cards || lastBot?.visual || lastBot?.saved)
 
   return (
     <section className={`vh-hero ${hasCards ? 'has-cards' : ''}`}>
@@ -115,6 +117,9 @@ export default function VoiceHero() {
 
           {showThread && lastUser && <p className="vh-q">“{lastUser.text}”</p>}
           {showThread && lastBot && <AnswerText text={lastBot.text} />}
+
+          {/* พูดบันทึกข้อมูล -> โชว์ตารางว่าเก็บอะไรไว้บ้าง และเติมช่องที่ลืมพูดได้ทันที */}
+          {showThread && lastBot?.saved && <VoiceSavedRecord saved={lastBot.saved} />}
 
           {/* ถามเรื่องอาการ จะได้การ์ดโรคพร้อมภาพต่อท้ายคำตอบ อยู่ในหน้านี้เลย ไม่เด้งไปหน้าอื่น */}
           {showThread && lastBot?.cards && <VoiceDiseaseCards result={lastBot.cards} />}
