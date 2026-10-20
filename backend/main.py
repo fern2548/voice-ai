@@ -3544,6 +3544,18 @@ def _build_vaccine_report_messages() -> list[dict]:
             "text": "ยังตั้งค่า PUBLIC_REPORT_KEY ไม่ครบ จึงยังสร้างลิงก์รายงานไม่ได้ค่ะ",
         }]
 
+    # LINE บังคับว่าลิงก์รูปต้องเป็น https เต็มรูปแบบเท่านั้น
+    # ถ้า PUBLIC_BASE_URL ว่างหรือเป็น http จะได้ลิงก์ที่ LINE ไม่รับ
+    # แล้ว LINE จะ "ปฏิเสธทั้งชุดข้อความ" ไม่ใช่แค่ตัดรูปทิ้ง
+    # ผลคือกดริชเมนูแล้วไม่มีอะไรขึ้นเลยสักข้อความ หาสาเหตุไม่เจอเพราะไม่มีอะไรให้ดู
+    if not (PUBLIC_BASE_URL or "").startswith("https://"):
+        return [{
+            "type": "text",
+            "text": ("ยังส่งรายงานไม่ได้ค่ะ เพราะยังไม่ได้ตั้ง PUBLIC_BASE_URL "
+                     "เป็นที่อยู่แบบ https ของเซิร์ฟเวอร์ (ตอนนี้ได้ค่า: "
+                     + (PUBLIC_BASE_URL or "ว่าง") + ")"),
+        }]
+
     base = f"{PUBLIC_BASE_URL}/r/{PUBLIC_REPORT_KEY}"
     img_url = f"{base}/vaccine.png"
     pdf_url = f"{base}/vaccine.pdf"
@@ -3595,7 +3607,16 @@ async def line_webhook(request: Request):
         t = text.strip()
         try:
             if "รายงาน" in t or "วัคซีน" in t or t == "vaccine_report":
-                _line_reply(reply_token, _build_vaccine_report_messages())
+                msgs = _build_vaccine_report_messages()
+                # ชุดที่มีรูปส่งไม่ผ่าน (เช่นลิงก์รูปโหลดไม่ได้) LINE จะทิ้งทั้งชุด
+                # ถอยไปส่งเฉพาะข้อความ ผู้ใช้จะได้ลิงก์ PDF ติดมือไป
+                # ดีกว่ากดปุ่มแล้วเงียบจนคิดว่าระบบพัง
+                if not _line_reply(reply_token, msgs):
+                    texts = [m for m in msgs if m.get("type") == "text"]
+                    _line_reply(reply_token, texts or [{
+                        "type": "text",
+                        "text": "ขออภัยค่ะ ตอนนี้ส่งรายงานไม่สำเร็จ ลองใหม่อีกครั้งนะคะ",
+                    }])
             elif "สรุป" in t or "ฟาร์ม" in t or t == "farm_summary":
                 _line_reply(reply_token, [{"type": "text", "text": _build_farm_summary_for_line()}])
             elif "ป่วย" in t or t == "pig_sick":
