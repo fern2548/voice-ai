@@ -3517,60 +3517,38 @@ def public_vaccine_png(key: str, limit: int = 25):
 
 @app.get("/r/{key}/summary")
 def public_farm_summary(key: str):
-    """สรุปฟาร์มวันนี้ เป็นหน้าเว็บอ่านง่ายบนมือถือ"""
+    """สรุปฟาร์มวันนี้ เป็นหน้าเว็บอ่านง่ายบนมือถือ — เปิดจากปุ่มริชเมนู LINE
+
+    เนื้อหาชุดเดียวกับข้อความที่ส่งเข้ากลุ่มทุกเย็นและไฟล์ PDF
+    (ของเดิมเป็นสรุปสถานะคนละชุด: อากาศ หมูป่วยวันนี้ วัคซีนใกล้ครบกำหนด
+     ซึ่งไม่ตรงกับที่ฟาร์มเห็นในไลน์ เลยสับสนว่าตกลงอันไหนจริง)
+    หน้าเว็บแสดงอีโมจิได้ จึงคงไว้เหมือนในไลน์เป๊ะ ต่างจากไฟล์ PDF ที่ฟอนต์ไทยไม่มีอีโมจิ
+    """
     _check_report_key(key)
+    sm = _daily_summary()
 
-    today = datetime.now(BANGKOK).date().isoformat()
-
-    def _safe(fn, default):
-        """ดึงข้อมูลแต่ละส่วนแยกกัน ส่วนไหนล่มก็ยังแสดงส่วนที่เหลือได้"""
-        try:
-            return fn()
-        except Exception:
-            return default
-
-    weather_now = _safe(lambda: weather(), {})
-    sick_rows = _safe(
-        lambda: supabase.table("pig_health_log")
-        .select("*")
-        .eq("log_date", today)
-        .execute()
-        .data
-        or [],
-        [],
-    )
-    due_rows = _safe(lambda: _vaccine_due_rows(7), [])
-    vaccine_rows = _safe(
-        lambda: supabase.table("vaccine_log")
-        .select("*")
-        .order("log_date", desc=True)
-        .limit(5)
-        .execute()
-        .data
-        or [],
-        [],
-    )
-
-    sick_total = sum(int(r.get("sick_count") or 0) for r in sick_rows)
+    try:
+        d = date.fromisoformat(sm["date"])
+        day_text = _thai_date(d)
+    except ValueError:
+        day_text = sm["date"]
 
     def esc(v) -> str:
-        return (
-            str(v)
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace('"', "&quot;")
-        )
+        return (str(v if v is not None else "")
+                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
-    def rows_html(rows: list[dict], cols: list[tuple[str, str]]) -> str:
-        if not rows:
-            return '<p class="empty">ยังไม่มีข้อมูล</p>'
-        head = "".join(f"<th>{esc(label)}</th>" for _, label in cols)
+    if sm["sections"]:
         body = "".join(
-            "<tr>" + "".join(f"<td>{esc(r.get(k) or '-')}</td>" for k, _ in cols) + "</tr>"
-            for r in rows
+            f'<section><h2>{esc(sec["icon"])} {esc(sec["title"])}</h2><ul>'
+            + "".join(f"<li>{esc(l)}</li>" for l in sec["lines"])
+            + "</ul></section>"
+            for sec in sm["sections"]
         )
-        return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    else:
+        body = '<p class="empty">วันนี้ยังไม่มีการบันทึกอะไรเข้าระบบ</p>'
+
+    total = sm.get("total_records") or 0
+    count_text = f"บันทึกเข้าระบบวันนี้ {total} รายการ" if total else "ยังไม่มีการบันทึก"
 
     html = f"""<!doctype html>
 <html lang="th"><head>
@@ -3582,52 +3560,39 @@ def public_farm_summary(key: str):
   * {{ box-sizing: border-box; }}
   body {{ margin:0; padding:22px 18px 60px; background:#f7f8f7; color:#16232b;
          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Thai",sans-serif;
-         line-height:1.6; }}
-  h1 {{ font-size:23px; margin:0 0 4px; }}
-  .date {{ color:#68757d; font-size:14px; margin-bottom:22px; }}
-  .cards {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:26px; }}
-  .card {{ background:#fff; border-radius:14px; padding:15px 16px; box-shadow:0 1px 3px rgba(0,0,0,.07); }}
-  .card .label {{ font-size:13px; color:#68757d; }}
-  .card .value {{ font-size:29px; font-weight:600; margin-top:3px; }}
-  h2 {{ font-size:16px; margin:26px 0 10px; }}
-  table {{ width:100%; border-collapse:collapse; background:#fff; border-radius:12px;
-           overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.07); font-size:14px; }}
-  th, td {{ padding:10px 12px; text-align:left; border-bottom:1px solid #eef1f0; }}
-  th {{ background:#f0f4f2; font-weight:600; font-size:13px; color:#4a5a63; }}
-  tr:last-child td {{ border-bottom:none; }}
-  .empty {{ color:#8c979d; font-size:14px; margin:0; }}
-  .links {{ margin-top:30px; display:flex; flex-direction:column; gap:10px; }}
-  .links a {{ display:block; background:#16945c; color:#fff; text-decoration:none;
-              padding:14px; border-radius:12px; text-align:center; font-weight:600; }}
+         line-height:1.7; }}
+  h1 {{ font-size:24px; margin:0 0 4px; }}
+  .date {{ color:#68757d; font-size:14px; }}
+  .count {{ color:#16945c; font-size:14px; font-weight:600; margin-top:2px; }}
+  .pdf {{ display:block; margin:20px 0 6px; background:#16945c; color:#fff; text-decoration:none;
+          padding:15px; border-radius:13px; text-align:center; font-weight:700; font-size:15px; }}
+  section {{ background:#fff; border-radius:14px; padding:14px 16px; margin-top:14px;
+             box-shadow:0 1px 3px rgba(0,0,0,.07); }}
+  h2 {{ font-size:16px; margin:0 0 8px; }}
+  ul {{ margin:0; padding-left:20px; }}
+  li {{ font-size:14.5px; margin-bottom:5px; }}
+  li:last-child {{ margin-bottom:0; }}
+  .empty {{ color:#8c979d; font-size:15px; text-align:center; margin:40px 0; }}
+  .links {{ margin-top:26px; display:flex; flex-direction:column; gap:10px; }}
+  .links a {{ display:block; background:#eef3f0; color:#16945c; text-decoration:none;
+              padding:13px; border-radius:12px; text-align:center; font-weight:600; font-size:14.5px; }}
   @media (prefers-color-scheme: dark) {{
     body {{ background:#0f1512; color:#e8ecea; }}
-    .card, table {{ background:#182120; box-shadow:none; }}
-    th {{ background:#1f2a27; color:#9fb0a8; }}
-    th, td {{ border-color:#26312e; }}
+    section {{ background:#182120; box-shadow:none; }}
+    .links a {{ background:#1f2a27; color:#5fd6a0; }}
   }}
 </style>
 </head><body>
   <h1>สรุปฟาร์มวันนี้</h1>
-  <div class="date">ฟาร์มมี่ · {esc(datetime.now(BANGKOK).strftime('%d/%m/%Y %H:%M'))}</div>
+  <div class="date">ฟาร์มมี่ · {esc(day_text)}</div>
+  <div class="count">{esc(count_text)}</div>
 
-  <div class="cards">
-    <div class="card"><div class="label">สุกรป่วยวันนี้</div><div class="value">{sick_total}</div></div>
-    <div class="card"><div class="label">ถึงคิวฉีดใน 7 วัน</div><div class="value">{len(due_rows)}</div></div>
-    <div class="card"><div class="label">อุณหภูมิ</div><div class="value">{esc(weather_now.get('temperature', '-'))}°C</div></div>
-    <div class="card"><div class="label">ความชื้น</div><div class="value">{esc(weather_now.get('humidity', '-'))}%</div></div>
-  </div>
+  <a class="pdf" href="/r/{esc(key)}/summary.pdf">เปิดไฟล์ PDF ฉบับจัดหน้า</a>
 
-  <h2>บันทึกสุกรป่วยวันนี้</h2>
-  {rows_html(sick_rows, [("log_date", "วันที่"), ("sick_count", "ป่วย"), ("total_count", "ทั้งหมด"), ("note", "หมายเหตุ")])}
-
-  <h2>วัคซีนที่ถึงกำหนดใน 7 วัน</h2>
-  {rows_html(due_rows, [("next_due_date", "วันนัด"), ("vaccine_name", "วัคซีน"), ("barn_no", "โรงเรือน")])}
-
-  <h2>ฉีดวัคซีนล่าสุด</h2>
-  {rows_html(vaccine_rows, [("log_date", "วันที่"), ("vaccine_name", "วัคซีน"), ("barn_no", "โรงเรือน"), ("pig_count", "จำนวน")])}
+  {body}
 
   <div class="links">
-    <a href="/r/{esc(key)}/vaccine.pdf">เปิดรายงานวัคซีน (PDF)</a>
+    <a href="/r/{esc(key)}/vaccine.pdf">รายงานประวัติการฉีดวัคซีน (PDF)</a>
   </div>
 </body></html>"""
 
