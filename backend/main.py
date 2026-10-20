@@ -3492,10 +3492,43 @@ def export_vaccine_log_pdf():
 # ปุ่มริชเมนูฝังลิงก์ตายตัว จึงใช้ token หมดอายุไม่ได้ ต้องยืนยันด้วยคีย์ลับใน path แทน
 
 
+def _report_key_ok(key: str) -> bool:
+    return bool(PUBLIC_REPORT_KEY) and secrets.compare_digest(key, PUBLIC_REPORT_KEY)
+
+
 def _check_report_key(key: str) -> None:
     """ตรวจคีย์ลับ ถ้าไม่ตรงให้ตอบ 404 (ไม่ใช่ 403) จะได้ไม่บอกใบ้ว่ามี endpoint นี้อยู่จริง"""
-    if not PUBLIC_REPORT_KEY or not secrets.compare_digest(key, PUBLIC_REPORT_KEY):
+    if not _report_key_ok(key):
         raise HTTPException(status_code=404, detail="Not Found")
+
+
+def _bad_key_page() -> Response:
+    """หน้าแจ้งว่าลิงก์ใช้ไม่ได้ สำหรับลิงก์ที่เปิดในเบราว์เซอร์
+
+    ของเดิมตอบ 404 เป็น JSON เบราว์เซอร์ในแอป LINE เลยขึ้นแค่
+    "ไม่สามารถเปิดหน้านี้ได้ โปรดตรวจสอบการเชื่อมต่อ" ซึ่งชี้ไปผิดทางหมด
+    คนอ่านนึกว่าเน็ตมีปัญหา ทั้งที่จริงคือคีย์ในลิงก์ไม่ตรงกับเซิร์ฟเวอร์เครื่องนี้
+    ยังคงสถานะ 404 ไว้เหมือนเดิม แค่ตอบเป็นหน้าเว็บที่อ่านรู้เรื่อง
+    """
+    html = """<!doctype html><html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ลิงก์นี้ใช้ไม่ได้</title>
+<style>
+ :root{color-scheme:light dark}
+ body{margin:0;padding:48px 24px;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans Thai",sans-serif;
+      background:#f7f8f7;color:#16232b;line-height:1.8;text-align:center}
+ h1{font-size:21px;margin:0 0 10px}
+ p{font-size:15px;color:#68757d;max-width:30em;margin:0 auto 10px}
+ code{background:#eef1f0;padding:2px 6px;border-radius:5px;font-size:13px}
+ @media(prefers-color-scheme:dark){body{background:#0f1512;color:#e8ecea}
+  p{color:#9fb0a8} code{background:#1f2a27}}
+</style></head><body>
+<h1>ลิงก์นี้ใช้ไม่ได้</h1>
+<p>คีย์ในลิงก์ไม่ตรงกับเซิร์ฟเวอร์เครื่องนี้ ไม่ใช่ปัญหาการเชื่อมต่อ</p>
+<p>ถ้าเพิ่งย้ายลิงก์มาจากเซิร์ฟเวอร์เครื่องอื่น ให้ใช้คีย์ของเครื่องนี้
+(ค่า <code>PUBLIC_REPORT_KEY</code> ในไฟล์ตั้งค่า) แทนคีย์เดิม</p>
+</body></html>"""
+    return Response(content=html, media_type="text/html; charset=utf-8", status_code=404)
 
 
 @app.get("/r/{key}/vaccine.pdf")
@@ -3524,7 +3557,9 @@ def public_farm_summary(key: str):
      ซึ่งไม่ตรงกับที่ฟาร์มเห็นในไลน์ เลยสับสนว่าตกลงอันไหนจริง)
     หน้าเว็บแสดงอีโมจิได้ จึงคงไว้เหมือนในไลน์เป๊ะ ต่างจากไฟล์ PDF ที่ฟอนต์ไทยไม่มีอีโมจิ
     """
-    _check_report_key(key)
+    # เปิดในเบราว์เซอร์ คีย์ผิดให้ตอบเป็นหน้าเว็บที่อ่านรู้เรื่อง ไม่ใช่ JSON เปล่า ๆ
+    if not _report_key_ok(key):
+        return _bad_key_page()
     sm = _daily_summary()
 
     try:
