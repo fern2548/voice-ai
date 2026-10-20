@@ -2668,9 +2668,13 @@ def _format_daily_summary(sm: dict) -> str:
         lines.append("")
         lines.append(f"{sec['icon']} {sec['title']}")
         lines.extend(sec["lines"])
-    if PUBLIC_SITE_URL:
+    pdf = _summary_pdf_url()
+    if PUBLIC_SITE_URL or pdf:
         lines.append("")
-        lines.append(f"ดูรายละเอียด: {PUBLIC_SITE_URL}/tasks")
+        if pdf:
+            lines.append(f"ไฟล์ PDF ฉบับจัดหน้า: {pdf}")
+        if PUBLIC_SITE_URL:
+            lines.append(f"ดูรายละเอียด: {PUBLIC_SITE_URL}/tasks")
     return "\n".join(lines)
 
 
@@ -2698,6 +2702,136 @@ def cron_daily_summary_notify(x_cron_key: str = Header(default="")):
     _send_line_broadcast(_format_daily_summary(sm))
     return {"ok": True, "sent": True, "sections": len(sm["sections"]),
             "records": sm["total_records"]}
+
+
+# ---------- สรุปฟาร์มวันนี้ เป็นไฟล์ PDF ----------
+# เนื้อหาชุดเดียวกับข้อความที่ส่งเข้า LINE ทุกเย็น ต่างแค่จัดหน้าให้อ่านบนกระดาษ/มือถือสบายตา
+# ใช้ _daily_summary() ตัวเดิม ไม่ได้เขียนตรรกะซ้ำ แก้เนื้อหาที่เดียวได้ทั้งข้อความและไฟล์
+
+_TH_MONTHS = ("มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+              "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม")
+
+# ฟอนต์ Sarabun ไม่มีตัวอีโมจิ ถ้าปล่อยไว้จะกลายเป็นกล่องสี่เหลี่ยมเต็มไฟล์
+# ในข้อความ LINE อีโมจิช่วยให้กวาดตาเร็ว แต่บนกระดาษใช้หัวข้อกับเส้นแบ่งแทนได้สวยกว่า
+_EMOJI_RE = re.compile(
+    "[\U0001f300-\U0001faff\U00002600-\U000027bf\U00002b00-\U00002bff"
+    "\U0001f000-\U0001f0ff\ufe0f\u200d\u2190-\u23ff\u2022]+"
+)
+
+
+def _plain(text: str) -> str:
+    return _EMOJI_RE.sub("", text or "").strip()
+
+
+def _thai_date(d: date) -> str:
+    return f"{d.day} {_TH_MONTHS[d.month - 1]} {d.year + 543}"
+
+
+# อีโมจิหน้าบรรทัดในข้อความ LINE บอกสถานะอยู่ (เสร็จ / พบปัญหา / ด่วน)
+# พอตัดทิ้งเพื่อทำ PDF ทุกบรรทัดจะหน้าตาเหมือนกันหมด อ่านไม่ออกว่าอันไหนเสร็จอันไหนค้าง
+# จึงแปลงเป็นคำไทยสั้น ๆ แทน ไม่ใช่ตัดทิ้งเฉย ๆ
+_PDF_BULLETS = (("✅", "เสร็จ · "), ("⚠️", "ปัญหา · "), ("🔴", "ด่วน · "), ("🟠", "เร่ง · "))
+
+
+def _pdf_bullet(line: str) -> str:
+    for mark, word in _PDF_BULLETS:
+        if (line or "").lstrip().startswith(mark):
+            return word
+    return "•  "
+
+
+def _daily_summary_pdf_bytes(day: Optional[date] = None) -> bytes:
+    sm = _daily_summary(day)
+    try:
+        d = date.fromisoformat(sm["date"])
+    except ValueError:
+        d = datetime.now(BANGKOK).date()
+
+    pdf = _new_thai_pdf()
+    W = pdf.w - pdf.l_margin - pdf.r_margin
+
+    # ---- หัวกระดาษ ----
+    pdf.set_fill_color(31, 157, 99)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Thai", "B", 20)
+    pdf.cell(W, 16, "  สรุปฟาร์มวันนี้", border=0, fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Thai", size=12)
+    pdf.cell(W, 9, f"  {_thai_date(d)}", border=0, fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(40, 40, 40)
+    pdf.ln(5)
+
+    # ---- บรรทัดสรุปรวม ----
+    pdf.set_font("Thai", size=10)
+    pdf.set_text_color(110, 110, 110)
+    total = sm.get("total_records") or 0
+    head = f"ฟาร์มมี่ · บันทึกเข้าระบบวันนี้ {total} รายการ" if total else "ฟาร์มมี่"
+    pdf.cell(W, 7, head, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(W, 7, f"ออกรายงานเมื่อ {datetime.now(BANGKOK).strftime('%d/%m/%Y %H:%M')} น.",
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(40, 40, 40)
+    pdf.ln(3)
+
+    if not sm["sections"]:
+        pdf.set_font("Thai", size=13)
+        pdf.ln(10)
+        pdf.multi_cell(W, 9, "วันนี้ยังไม่มีการบันทึกอะไรเข้าระบบ", align="C")
+
+    for sec in sm["sections"]:
+        # กันหัวข้อไปตกอยู่ท้ายหน้าโดยไม่มีเนื้อหาตาม
+        if pdf.get_y() > pdf.h - 45:
+            pdf.add_page()
+        pdf.ln(3)
+        pdf.set_fill_color(234, 244, 239)
+        pdf.set_font("Thai", "B", 13)
+        pdf.cell(W, 10, "  " + _plain(sec["title"]), fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1.5)
+        pdf.set_font("Thai", size=11)
+        for line in sec["lines"]:
+            txt = _plain(line)
+            if not txt:
+                continue
+            if pdf.get_y() > pdf.h - 25:
+                pdf.add_page()
+            pdf.set_x(pdf.l_margin + 4)
+            pdf.multi_cell(W - 4, 7, _pdf_bullet(line) + txt, new_x="LMARGIN", new_y="NEXT")
+
+    # ---- ท้ายกระดาษ ----
+    pdf.ln(6)
+    pdf.set_draw_color(220, 228, 224)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
+    pdf.ln(3)
+    pdf.set_font("Thai", size=9)
+    pdf.set_text_color(130, 130, 130)
+    tail = "ระบบฟาร์มมี่สร้างไฟล์นี้อัตโนมัติจากข้อมูลที่บันทึกไว้ในวันนั้น"
+    if PUBLIC_SITE_URL:
+        tail += f" · ดูรายละเอียดได้ที่ {PUBLIC_SITE_URL}/tasks"
+    pdf.multi_cell(W, 6, tail)
+    return bytes(pdf.output())
+
+
+@app.get("/r/{key}/summary.pdf")
+def public_daily_summary_pdf(key: str, day: Optional[str] = None):
+    """สรุปฟาร์มวันนี้เป็น PDF — เปิดจากมือถือได้เลย ไม่ต้องล็อกอิน"""
+    _check_report_key(key)
+    d = None
+    if day:
+        try:
+            d = date.fromisoformat(day)
+        except ValueError:
+            d = None
+    return Response(
+        content=_daily_summary_pdf_bytes(d),
+        media_type="application/pdf",
+        # inline = กดจากในแอป LINE แล้วเปิดอ่านได้เลย ไม่ต้องโหลดลงเครื่องก่อน
+        headers={"Content-Disposition": "inline; filename=farm-summary.pdf"},
+    )
+
+
+def _summary_pdf_url() -> str:
+    """ลิงก์ถาวรของไฟล์ PDF สรุปฟาร์ม — ไม่พร้อมก็คืนค่าว่าง ให้ผู้เรียกข้ามไป"""
+    if not PUBLIC_REPORT_KEY or not (PUBLIC_BASE_URL or "").startswith("https://"):
+        return ""
+    return f"{PUBLIC_BASE_URL}/r/{PUBLIC_REPORT_KEY}/summary.pdf"
 
 
 # ---------- ชุมชนปรึกษาสัตวแพทย์ ----------
@@ -3618,7 +3752,11 @@ async def line_webhook(request: Request):
                         "text": "ขออภัยค่ะ ตอนนี้ส่งรายงานไม่สำเร็จ ลองใหม่อีกครั้งนะคะ",
                     }])
             elif "สรุป" in t or "ฟาร์ม" in t or t == "farm_summary":
-                _line_reply(reply_token, [{"type": "text", "text": _build_farm_summary_for_line()}])
+                # ใช้สรุปชุดเดียวกับที่ส่งเข้ากลุ่มทุกเย็น (งานที่ทำ วัคซีน ผสมพันธุ์ ฯลฯ)
+                # ของเดิมตอบสรุปสถานะชุดเก่า (อากาศ หมูป่วยล่าสุด) ซึ่งคนละเรื่องกัน
+                _line_reply(reply_token, [{
+                    "type": "text", "text": _format_daily_summary(_daily_summary()),
+                }])
             elif "ป่วย" in t or t == "pig_sick":
                 _line_reply(reply_token, [{"type": "text", "text": _rule_based_answer("หมูป่วยกี่ตัว")}])
             else:
