@@ -3,7 +3,7 @@ import { useLiveData } from '../context/LiveData.jsx'
 
 // เตือนเมื่อ "ต่อ backend ไม่ได้เลย" (คนละกรณีกับ SensorAlert ที่เตือนว่าข้อมูลเซนเซอร์เก่า)
 export default function ConnectionAlert() {
-  const { healthError } = useLiveData()
+  const { healthError, healthFails } = useLiveData()
 
   // ฉบับแจกให้เปิดอ่าน ไม่ได้ต่อเซิร์ฟเวอร์อยู่แล้ว บอกไปตรง ๆ ดีกว่าขึ้นว่าต่อไม่ได้
   if (OFFLINE) {
@@ -20,7 +20,11 @@ export default function ConnectionAlert() {
     )
   }
 
-  if (!healthError) return null
+  // ต้องพลาดติดกัน 2 ครั้ง (ราว 30 วินาที) ถึงจะขึ้นป้าย
+  // พลาดครั้งเดียวเกิดได้ตลอด — เน็ตมือถือสะดุด หรือเซิร์ฟเวอร์ที่หลับอยู่กำลังตื่น
+  // (วัดจริง: เซิร์ฟเวอร์บน Render ตอนหลับ ใช้เวลาตื่น 44 วินาที)
+  // ขึ้นป้ายสีส้มว่าต่อเซิร์ฟเวอร์ไม่ได้ทั้งที่อีก 30 วินาทีก็กลับมาเอง มีแต่ทำให้ตกใจเปล่า ๆ
+  if (!healthError || healthFails < 2) return null
 
   return (
     <div className="sensor-alert conn" role="alert">

@@ -13,6 +13,7 @@ export function LiveDataProvider({ children }) {
   const value = {
     health: health.data,
     healthError: health.error,
+    healthFails: health.fails,
     weather: weather.data,
     weatherUpdatedAt: weather.updatedAt,
   }
