@@ -5053,6 +5053,14 @@ _INTERVAL_MENTION_RE = re.compile(
 )
 
 
+# คำที่บอกว่าชื่อวัคซีนจบแล้ว กำลังขึ้นช่องถัดไป
+_VACCINE_NAME_CUT_RE = re.compile(
+    r"\s(?=(?:โรงเรือน|เล้า|คอก|จำนวน|ผู้ฉีด|คนฉีด|ฉีดโดย|โดย|ขนาด|ล็อต|ล๊อต|lot|เวลา)\b)"
+    r"|\s(?=\d+\s*(?:ตัว|ซีซี|มิลลิลิตร|มล|ml|cc))",
+    re.I,
+)
+
+
 def _extract_vaccine_name(text: str) -> Optional[str]:
     cleaned = _INTERVAL_MENTION_RE.sub(" ", text)  # ตัดวลีเรื่องรอบฉีดซ้ำออกก่อน ไม่ให้ปนชื่อวัคซีน
     for phrase in _VACCINE_STRIP_PHRASES:
@@ -5062,6 +5070,10 @@ def _extract_vaccine_name(text: str) -> Optional[str]:
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,")
     cleaned = re.sub(r"^(?:ที่|ให้|กับ|ของ|แก่)+\s*", "", cleaned)
     cleaned = re.sub(r"\s*(?:ที่|ให้|กับ|ของ|แก่)+$", "", cleaned)
+    # ตัดให้จบก่อนถึงช่องถัดไป ไม่งั้นชื่อวัคซีนกินทั้งประโยค
+    # (เจอจริง: "อหิวาต์สุกร โรงเรือน 2 คอก 3 จำนวน 40 ตัว โดย สมชาย ขนาด 2 ซีซี" กลายเป็นชื่อวัคซีนทั้งก้อน)
+    # ยิ่งผู้ใช้พูดครบช่องมากเท่าไหร่ ปัญหานี้ยิ่งชัด
+    cleaned = _VACCINE_NAME_CUT_RE.split(cleaned, maxsplit=1)[0]
     return cleaned.strip(" ,") or None
 
 
