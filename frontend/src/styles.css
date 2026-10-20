@@ -3169,6 +3169,37 @@ th, td { font-size: 14px; }
 /* การ์ดงาน */
 .tk-list { display: flex; flex-direction: column; gap: 10px; }
 
+/* ---- บัตรเชิญแอดไลน์ (ขึ้นเฉพาะคนในฟาร์มที่ล็อกอินแล้ว) ---- */
+.lnq { margin-top: 22px; border-radius: 16px; padding: 18px 20px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); }
+.lnq-main { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.lnq-text { flex: 1; min-width: 260px; }
+.lnq h2 { margin: 0 0 6px; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.lnq h2 i { color: var(--accent); font-size: 22px; }
+.lnq p { margin: 0 0 12px; font-size: 13.5px; line-height: 1.7; color: var(--text-dim); max-width: 52ch; }
+/* ไอดีต้องอ่านง่ายและก๊อปง่าย คนส่วนใหญ่พิมพ์ตามจากจอ */
+.lnq-id { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 12px; }
+.lnq-id code { font-size: 19px; font-weight: 700; letter-spacing: .5px; padding: 7px 14px;
+  border-radius: 10px; background: var(--panel); border: 1px solid var(--border); }
+.lnq-id button { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px;
+  padding: 8px 13px; border-radius: 10px; cursor: pointer; color: var(--text-dim);
+  background: var(--panel); border: 1px solid var(--border); }
+.lnq-id button:hover { color: var(--text); border-color: var(--accent); }
+.lnq-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  padding: 12px 20px; border-radius: 11px; font-size: 14.5px; font-weight: 700;
+  background: #06c755; color: #fff; }
+.lnq-btn:hover { background: #05b34c; }
+.lnq-hint { display: block; margin-top: 9px; font-size: 12px; color: var(--text-faint); }
+.lnq-qr { margin: 0; flex: none; text-align: center; }
+.lnq-qr img { width: 148px; height: 148px; border-radius: 12px; background: #fff;
+  border: 1px solid var(--border); display: block; padding: 7px; }
+.lnq-qr figcaption { margin-top: 6px; font-size: 11.5px; color: var(--text-faint); }
+@media (max-width: 560px) {
+  .lnq-main { gap: 16px; }
+  .lnq-qr { margin: 0 auto; }
+}
+
 /* ---- สรุปฟาร์มวันนี้ (สิ่งเดียวกับที่ส่งเข้า LINE ตอนเย็น) ---- */
 .ds { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
   padding: 15px 17px; display: flex; flex-direction: column; gap: 12px; }

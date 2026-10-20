@@ -1,10 +1,15 @@
 import MenuGrid from '../components/MenuGrid.jsx'
+import LineAddCard from '../components/LineAddCard.jsx'
+import { useAdminAuth } from '../context/AdminAuth.jsx'
 
 /**
  * หน้า "รวมทุกเมนู" — เปิดหน้าเดียวเห็นทุกอย่างที่ระบบทำได้
  * แยกออกมาจากหน้าแรก เพราะหน้าแรกตั้งใจให้เหลือแค่ปุ่มไมค์จอเดียวจบ
  */
 export default function MenuPage() {
+  // บัตรแอดไลน์ขึ้นเฉพาะคนที่ล็อกอินแล้ว บัญชีนี้ส่งข้อมูลของฟาร์มเราโดยเฉพาะ
+  const { isAdmin } = useAdminAuth()
+
   return (
     <div className="mn">
       <header className="mn-head">
@@ -15,6 +20,7 @@ export default function MenuPage() {
         </div>
       </header>
       <MenuGrid />
+      {isAdmin && <LineAddCard />}
     </div>
   )
 }
